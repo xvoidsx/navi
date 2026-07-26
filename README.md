@@ -7,7 +7,9 @@ It uses [wiredWM](https://github.com/rav3ndust/wiredWM), our fork of the `sway` 
 
 The compositor is heavily modified, and has an integrated `waybar`, `conky`, `rofi`, `dunst`, a host of custom scripts and curated software, and more.
 
-It aims to embrace the uniqueness of Linux and provide a futuristic and yet retro-feeling computing environment that feels alive.
+It aims to celebrate the spirit of the Wired and provide a futuristic and yet retro-feeling computing environment that feels alive.
+
+It's your window into the smallweb.
 
 It follows the [Serial Experiments Lain](#) aesthetic, and also uses our [nightshadeNeon](https://rav3ndust.xyz/wiki/nightshadeNeon.html) theme all throughout the distro.
 
