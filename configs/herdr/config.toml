@@ -1,5 +1,6 @@
+onboarding = false
 [theme]
-# naviOS/protocol7 - nightshadeNeon (herdr)
+# naviOS/protocol7 - nightshadeNeon (herdr) 
 # uses our nightshadeNeon colors
 # we've modified the base configuration and theme
 # ( place: $HOME/.config/herdr/config.toml )
@@ -17,8 +18,8 @@ prefix = "ctrl+space"
 close_pane = "prefix+shift+q"
 zoom = "prefix+f"
 new_tab = "prefix+enter"
-split_horizontal = "prefix+h"
-split_vertical = "prefix+v"
+split_horizontal = "prefix+v"
+split_vertical = "prefix+h"
 focus_pane_left = "prefix+left"
 focus_pane_down = "prefix+down"
 focus_pane_up = "prefix+up"
