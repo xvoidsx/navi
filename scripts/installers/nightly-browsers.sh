@@ -32,7 +32,7 @@ main () {
  echo "Installing Firefox Nightly..."; sleep 1
  firefox_nightly_install
  echo "Installing Brave Browser Nightly..."; sleep 1
- brave_browser_install
+ brave_nightly_install
  echo "Nightly browsers installed."; sleep 1
 }
 # - - - - - |
