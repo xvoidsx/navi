@@ -13,5 +13,6 @@ install_oc () {
 main () {
   echo "$x"; sleep 1
   install_oc
+}  
 # - - - - - |
 main
