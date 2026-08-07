@@ -2,6 +2,8 @@
 # nightly browsers installer
 # ( installs "Nightly" browsers. )
 # ( we keep Firefox Nightly and Brave Nightly around )
+# ( for those who want to be on the bleedin' edge of the web )
+################################################################
 set -e
 x="= = = = = nightly browsers installer = = = = ="
 firefox_nightly_install () {
