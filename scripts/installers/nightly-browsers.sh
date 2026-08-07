@@ -1,4 +1,4 @@
-#/usr/bin/env bash
+#!/usr/bin/env bash
 # nightly browsers installer
 # ( installs "Nightly" browsers. )
 # ( we keep Firefox Nightly and Brave Nightly around )
