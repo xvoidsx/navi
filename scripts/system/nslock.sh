@@ -26,53 +26,59 @@ QUOTE_WRAPPED="$(printf '%s' "$QUOTE" | fold -s -w 46)"
 tmp="$(mktemp -d /tmp/nslock2.XXXXXX)"
 trap 'rm -rf "$tmp"' EXIT
 face="$tmp/face.png"
-# capture, then build the whole face in a single magick pass.
-# the glow is blurred at half resolution and upscaled (blur = low-frequency,
-# so it survives the upscale identically); text is redrawn crisp at full res.
-# full-res coords: clock +0+80, date +0+204, label +0-132,
-# quote +0+170, attribution +0+132.
+# capture desktop img 
 grim "$tmp/screen.png"
+# imagemagick stuff/fade bg
 magick "$tmp/screen.png" \
-  -resize 50% -evaluate multiply 0.88 -blur 0x2 \
-  -font "Noto-Sans-Bold" -pointsize 48 -fill "$GREEN" \
-  -gravity North -annotate +0+40 "$(date +%H:%M)" \
-  -region 340x80+%[fx:w/2-170]+0 -blur 0x5 +region \
-  -resize 200% \
+  -evaluate multiply 0.75 \
+  \( +clone -crop x12+0+0 -scale 103%x100% -geometry +10+0 \) -composite \
+  \( +clone -crop x24+0+0 -scale 97%x100% -geometry -15+0 \) -composite \
+  \( +clone -crop x8+0+0 -scale 105%x100% -geometry +25+0 \) -composite \
+  -scale 50% -scale 200% \
+  \( +clone -font "Noto-Sans-Bold" -pointsize 96 -fill "$GREEN" \
+     -gravity North -annotate +0+80 "$(date +%H:%M)" \
+     -font "Noto-Sans-Regular" -pointsize 20 -fill "$CYAN" \
+     -gravity North -annotate +0+204 "$(date +%A\ %d\ %B\ %Y)" \
+     -font "Noto-Sans-Bold" -pointsize 18 -fill "$GREEN" \
+     -gravity Center -annotate +0-132 "type your password to return:" \
+     -blur 0x12 \) -composite \
   -font "Noto-Sans-Bold" -pointsize 96 -fill "$PINK" \
   -gravity North -annotate +0+80 "$(date +%H:%M)" \
   -font "Noto-Sans-Regular" -pointsize 20 -fill "$CYAN" \
   -gravity North -annotate +0+204 "$(date +%A\ %d\ %B\ %Y)" \
   -font "Noto-Sans-Bold" -pointsize 18 -fill "$GREEN" \
   -gravity Center -annotate +0-132 "type your password to return:" \
-  -font "Noto-Sans-Regular" -pointsize 22 -fill "$WHITE" \
+  -font "Noto-Sans-Regular" -pointsize 22 -fill "rgba(255,255,255,0.65)" \
   -gravity South -annotate +0+170 "$QUOTE_WRAPPED" \
-  -font "Noto-Sans-Italic" -pointsize 12 -fill "$PINK" \
+  -font "Noto-Sans-Italic" -pointsize 12 -fill "rgba(255,16,240,0.60)" \
   -gravity South -annotate +0+132 "- serial experiments lain" \
+  -background black -vignette 0x30 \
   "$face"
 # lock
 exec swaylock \
   --image "$face" \
   --scaling stretch \
   --indicator-idle-visible \
-  --indicator-radius 70 \
-  --indicator-thickness 8 \
+  --indicator-radius 75 \
+  --indicator-thickness 10 \
   --font "Noto Sans" \
-  --font-size 20 \
+  --font-size 22 \
   --ring-color "$PINK" \
-  --ring-ver-color "$GREEN" \
+  --ring-ver-color "$CYAN" \
   --ring-wrong-color "$RED" \
-  --ring-clear-color "$CYAN" \
+  --ring-clear-color "$GREEN" \
   --ring-caps-lock-color "$PINK" \
-  --inside-color "#00000000" \
-  --inside-ver-color "#39ff1418" \
-  --inside-wrong-color "#ff313118" \
-  --inside-clear-color "#00ffff18" \
+  --inside-color "#00000040" \
+  --inside-ver-color "#00ffff22" \
+  --inside-wrong-color "#ff313122" \
+  --inside-clear-color "#39ff1422" \
   --line-color "#00000000" \
   --separator-color "#00000000" \
   --text-color "$WHITE" \
-  --text-ver-color "$GREEN" \
+  --text-ver-color "$CYAN" \
   --text-wrong-color "$RED" \
-  --key-hl-color "$GREEN" \
+  --text-clear-color "$GREEN" \
+  --key-hl-color "$CYAN" \
   --bs-hl-color "$RED" \
   --caps-lock-key-hl-color "$PINK" \
   --daemonize
