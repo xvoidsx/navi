@@ -1,7 +1,7 @@
-# naviOS
+# navi
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/aef2471a-9c9f-423c-bf61-61aa3ba1fe03" />
 
-**naviOS** is a new GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx).
+**navi** is a new GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx).
 
 It uses [wiredWM](https://github.com/rav3ndust/wiredWM), our fork of the `sway` wayland compositor, as its flagship desktop.
 
@@ -15,7 +15,7 @@ It follows the [Serial Experiments Lain](#) aesthetic, and also uses our [nights
 
 ### cozy computing
 
-**naviOS** brings you the minimalism and speed you can only get in a tiling environment, and it looks and feels great to live in. Here are some screenshots of it in day to day use.
+**navi** brings you the minimalism and speed you can only get in a tiling environment, and it looks and feels great to live in. Here are some screenshots of it in day to day use.
 
 A cozy computing environment is one that you look forward to using when you sit down at the computer. Not only does it feel good and functional to use, but it also looks beautiful as well! If you're going to be using your computer for hours every day doing work and play, don't you want to use a system that invites you to *have fun* while you do so?
 
