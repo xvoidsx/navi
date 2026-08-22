@@ -33,4 +33,4 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 ### notes
 
-This repo is a work in progress, and things are being moved over and tweaked before we begin making public releases of naviOS. A website for the distro is in the works right now, and `.iso` images are planned in the future once we've got some things wrapped up - we will announce it as soon as these things are finished up and ready to go!
+This repo is a work in progress, and things are being moved over and tweaked before we begin making public releases of **navi**. A website for the distro is in the works right now, and `.iso` images are planned in the future once we've got some things wrapped up - we will announce it as soon as these things are finished up and ready to go!
