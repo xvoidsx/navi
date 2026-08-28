@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # opencode installer
-# ( installs opencode )
+# ( installs opencode agent )
 ##################################
 set -e
 x="= = = = = opencode installer = = = = ="
