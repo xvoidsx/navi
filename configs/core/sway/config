@@ -1,0 +1,248 @@
+################################################################
+#                                                              ~
+#                                      ##                      ~
+#                                      ##                      ~
+#                                      ##                      ~
+#                                                              ~
+#     ##.####    :####    ##:  :##   ####                      ~
+#     #######    ######    ##  ##    ####                      ~
+#     ###  :##   #:  :##  :##  ##:     ##                      ~
+#     ##    ##    :#####   ##..##      ##                      ~
+#     ##    ##  .#######   ##::##      ##                      ~
+#     ##    ##  ## .  ##   :####:      ##                      ~
+#     ##    ##  ##:  ###    ####       ##                      ~	
+#     ##    ##  ########    ####    ########                   ~
+#     ##    ##    ###.##    :##:    ######## 		               ~
+#                                            		               ~	
+#    ( - l e t s - a l l - l o v e - l a i n - )               ~	
+#                                            		               ~	
+#                                            		               ~
+################################################################
+# wired config ( wayland version )
+# ( - this file should live at .config/sway/config )
+# this file won't be overwritten, so feel free to edit it as you see fit!
+# for reference, please see these links:
+# - https://rav3ndust.xyz/wiki/wiredWM.html
+# - https://github.com/rav3ndust/wiredWM
+# - https://codeberg.org/rav3ndust/wiredWM
+# Note that in this config, "$mod" is the 'super' key, while "Mod1' is the 'alt' key
+set $mod Mod4
+
+# - - - this is sway specific: - - -
+# XXX it is also being tested, so comment it out when not using it.
+# ensure some paths are properly linked
+#exec --no-startup-id bash -c 'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:$HOME/.local/bin:$PATH"'
+
+# import environment
+exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP=sway XDG_SESSION_DESKTOP=sway
+
+# set secret store. we use gnome-keyring. a gui to see its content can be called via `seahorse`
+exec --no-startup-id "gnome-keyring-daemon --components=secrets"
+
+# handle some imports
+exec systemctl --user import-environment DISPLAY WAYLAND_DISPLAY SWAYSOCK PATH
+exec_always --no-startup-id systemctl --user set-environment PATH="/usr/games:$HOME/.local/bin:$PATH"
+
+# set wallpaper
+#exec swaybg -i $HOME/wiredWM/wp/synthwavelain.jpeg
+#exec swaybg -i $HOME/wiredWM/wp/SElain12.png
+exec swaybg -i $HOME/wiredWM/wp/SElain3.jpg
+
+# setting mouse theme
+# we have two options to choose from: Yaru and Adwaita. 
+# both look nice - simply uncomment the one you want to use (adwaita is default)
+#seat * xcursor_theme Yaru
+seat * xcursor_theme Adwaita 
+
+# make windows float or tile by default.
+#for_window [class="[.]*"] floating enable
+
+# - - for window title bars - -
+for_window [class="^.*"] border pixel 2
+
+# - - for gaps - -
+gaps inner 3
+gaps outer 3
+
+# for border colors - nightshadeNeon theme
+client.focused          #ff10f0 #000000 #39ff14 #39ff14 #ff10f0
+client.focused_inactive #333333 #000000 #00ffff #ffffff #333333
+client.unfocused        #222222 #000000 #ff3131 #ffffff #222222
+
+##############################################################################
+# Font for window titles.
+font pango:Noto Sans 10
+
+# enable mouse warping when changing windows with the keyboard.
+#mouse_warping container
+
+# turn on touchpad and tap-to-click for laptop use
+input "type:touchpad" {
+    tap enabled
+}
+
+# - - - use this for lock/hibernate on wayland
+# screenlock and suspend (wayland)
+# uses `nslock`, our wrapper around `swaylock`
+exec swayidle \
+    timeout 600 'nslock' \
+    timeout 900 'systemctl suspend' \
+    before-sleep 'nslock'
+
+exec --no-startup-id sh -c "sleep 1 && blueman-applet &"
+exec --no-startup-id dunst
+exec_always --no-startup-id sh -c "sleep 1 && meteo-qt &"
+exec --no-startup-id lxpolkit
+
+# Use pactl to adjust volume
+set $refresh_i3status killall -SIGUSR1 i3status
+bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +10% && $refresh_i3status && notify-send "wired helper" "volume +10"
+bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -10% && $refresh_i3status && notify-send "wired helper" "volume -10"
+bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && $refresh_i3status && notify-send "wired helper" "volume muted"
+bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && $refresh_i3status
+
+floating_modifier $mod
+
+# start a terminal.
+bindsym $mod+Return exec alacritty
+
+# kill focused window
+bindsym $mod+Shift+q kill
+
+# bindings for turning gaps on and off
+bindsym $mod+g exec --no-startup-id "swaymsg 'gaps inner 3; gaps outer 3' && notify-send 'wired helper' 'Gaps enabled.'"
+bindsym $mod+Shift+g exec --no-startup-id "swaymsg 'gaps inner 0; gaps outer 0' && notify-send 'wired helper' 'Gaps disabled.'"
+
+# launcher
+bindsym $mod+d exec dmenu_run -fn "NotoSans-10" -nb black -nf pink -sb green -sf red -p "nightshade - run command: "
+bindsym $mod+Shift+a exec --no-startup-id i3-dmenu-desktop --dmenu='dmenu -fn "NotoSans-10" -i -nb black -nf pink -sb green -sf red -p "nightshade - Applications List: "'
+bindsym $mod+Tab exec --no-startup-id "rofi -show combi drun,run"
+
+# other useful binds
+bindsym $mod+Shift+n exec --no-startup-id "dunstctl history-pop"
+bindsym $mod+c exec --no-startup-id "gsimplecal"
+bindsym Mod1+c exec --no-startup-id "alacritty -e calcurse"
+bindsym $mod+Shift+f exec --no-startup-id "nemo"
+bindsym Caps_Lock exec --no-startup-id "notify-send 'wired helper' 'Caps Lock pressed.'"
+bindsym $mod+p exec --no-startup-id "grimshot savecopy area $HOME/Pictures/Screenshots/$(date -Ins).png --notify"
+bindsym Mod1+h exec --no-startup-id "alacritty -e htop"
+bindsym Mod1+s exec --no-startup-id "alacritty -e vim /tmp/$(date -I).txt"
+bindsym Mod1+b exec --no-startup-id "firefox-nightly"
+bindsym Mod1+e exec --no-startup-id "remoji"
+
+# change focus
+bindsym $mod+j focus left
+bindsym $mod+k focus down
+bindsym $mod+l focus up
+bindsym $mod+semicolon focus right
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+
+# move focused window
+bindsym $mod+Shift+j move left
+bindsym $mod+Shift+k move down
+bindsym $mod+Shift+l move up
+bindsym $mod+Shift+semicolon move right
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+
+# split
+bindsym $mod+h split h
+bindsym $mod+v split v
+
+bindsym $mod+f fullscreen toggle
+
+bindsym $mod+s layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+e layout toggle split
+
+bindsym $mod+Shift+space floating toggle
+bindsym $mod+space focus mode_toggle
+
+bindsym $mod+a focus parent
+bindsym $mod+Shift+s sticky toggle
+
+# workspaces
+set $ws1 "1"
+set $ws2 "2"
+set $ws3 "3"
+set $ws4 "4"
+set $ws5 "5"
+set $ws6 "6"
+set $ws7 "7"
+set $ws8 "8"
+set $ws9 "9"
+set $ws10 "10"
+
+bindsym $mod+1 workspace number $ws1
+bindsym $mod+2 workspace number $ws2
+bindsym $mod+3 workspace number $ws3
+bindsym $mod+4 workspace number $ws4
+bindsym $mod+5 workspace number $ws5
+bindsym $mod+6 workspace number $ws6
+bindsym $mod+7 workspace number $ws7
+bindsym $mod+8 workspace number $ws8
+bindsym $mod+9 workspace number $ws9
+bindsym $mod+0 workspace number $ws10
+
+bindsym $mod+Shift+1 move container to workspace number $ws1
+bindsym $mod+Shift+2 move container to workspace number $ws2
+bindsym $mod+Shift+3 move container to workspace number $ws3
+bindsym $mod+Shift+4 move container to workspace number $ws4
+bindsym $mod+Shift+5 move container to workspace number $ws5
+bindsym $mod+Shift+6 move container to workspace number $ws6
+bindsym $mod+Shift+7 move container to workspace number $ws7
+bindsym $mod+Shift+8 move container to workspace number $ws8
+bindsym $mod+Shift+9 move container to workspace number $ws9
+bindsym $mod+Shift+0 move container to workspace number $ws10
+
+bindsym $mod+Shift+z exec "nslock"
+
+bindsym $mod+Shift+h exec "learn"
+bindsym $mod+Shift+r exec "swaymsg reload"
+bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit command detected. Are you sure you would like to logout of wiredWM? This session will be closed.' -B 'Yes, log out of wiredWM' 'i3-msg exit'"
+
+# resize mode
+mode "resize" {
+    bindsym j resize shrink width 10 px or 10 ppt
+    bindsym k resize grow height 10 px or 10 ppt
+    bindsym l resize shrink height 10 px or 10 ppt
+    bindsym semicolon resize grow width 10 px or 10 ppt
+    bindsym Left resize shrink width 10 px or 10 ppt
+    bindsym Down resize grow height 10 px or 10 ppt
+    bindsym Up resize shrink height 10 px or 10 ppt
+    bindsym Right resize grow width 10 px or 10 ppt
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+    bindsym $mod+r mode "default"
+}
+bindsym $mod+r mode "resize"
+
+# Bar
+bar {
+    position top
+    swaybar_command waybar
+    font pango:Noto Sans 10
+    colors {
+        focused_workspace #ff10f0 #000000e5 #39FF14
+        inactive_workspace #000000 #000000e5 #ff3131
+        separator #ff10f0
+        statusline #ff10f0
+        background #000000e5
+    }
+}
+
+# custom conky
+exec --no-startup-id "sleep 2 && conky &"
+
+# ensure proper kb layout
+exec "setxkbmap -layout us,de"
+
+# XXX - - - Sway-specific Things - - -
+default_border pixel 3
+# make system suspend when lid is closed (for laptops)
+bindswitch lid:on exec 'systemctl suspend'
