@@ -1,0 +1,107 @@
+// wired nightshade launcher
+// this is the default launcher used to launch apps and run commands in wired.
+// this file should live at ( $HOME/.config/rofi/config.rasi )
+configuration {
+    modi: "combi";
+    combi-modi: "window,drun,run";
+    font: "Noto Sans 12";	
+    show-icons: true;
+    icon-theme: "Papirus"; 	
+    display-window: "Windows";
+    display-drun: "Apps";
+    display-run: "Run";
+    sidebar-mode: false;
+    kb-mode-next: "Control+Tab";
+    kb-mode-previous: "Control+Shift+Tab";
+    kb-accept-entry: "Return";
+    kb-cancel: "Escape";
+}
+
+* {
+    background: #000000;
+    foreground: #ff10f0;
+    accent: #ff10f0;
+    text-color: #39ff14;
+    border-color: #ff10f0;
+    selected-background: #000000;
+    selected-foreground: #39ff14;  
+}
+
+window {
+    background-color: @background;
+    border: 2;
+    border-color: @border-color;
+    padding: 10;
+    width: 700px;
+}
+
+mainbox {
+    background-color: @background;
+    border: 0;
+    padding: 0;
+}
+
+inputbar {
+    background-color: @background;
+    text-color: @foreground;
+    border: 1;
+    border-color: @border-color;
+    padding: 8px;
+}
+
+entry {
+    background-color: @background;
+    text-color: @foreground;
+}
+
+listview {
+    background-color: @background;
+    border: 0;
+    spacing: 0;  
+    scrollbar: true;
+}
+
+element {
+    background-color: @background;
+    text-color: @foreground;
+    padding: 0;  
+    border: 0;   
+}
+
+element selected {
+    background-color: @selected-background;
+    text-color: @selected-foreground;
+    border: 1;
+    border-color: #39ff14;
+}
+
+element selected.normal {
+    background-color: @selected-background;
+    text-color: @selected-foreground;
+}
+
+element selected.active {
+    background-color: @selected-background;
+    text-color: @selected-foreground;  
+}
+
+element-text {
+    background-color: #000000;
+    text-color: inherit;
+    highlight: @accent;
+}
+
+element normal {
+    background-color: #000000;
+    text-color: @foreground;
+}
+
+element active {
+    background-color: #000000;
+    text-color: @foreground;
+}
+
+element-icon {  
+    background-color: #000000;
+    padding: 0;  
+}
