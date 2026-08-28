@@ -20,7 +20,7 @@
         "clock#3"
     ],
     "modules-right": [
-        "custom/weather",
+    "custom/weather",
 	"pulseaudio",
         "network",
         "battery",
@@ -71,7 +71,7 @@
         "interval": 3600,
         "on-click": "navi-weather",
         "tooltip": false
-    },
+    }, 
 
     "pulseaudio": {
         "format": "🔊 {volume:2}%",  // Added volume character
