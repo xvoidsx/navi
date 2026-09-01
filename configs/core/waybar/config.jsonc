@@ -20,15 +20,15 @@
         "clock#3"
     ],
     "modules-right": [
-    "custom/weather",
+        //"custom/media",
 	"pulseaudio",
         "network",
         "battery",
         "backlight",
         "idle_inhibitor",
-        "power-profiles-daemon",
-	"tray",
-        "custom/power"
+        "power-profiles-daemon",	
+	"tray", 	
+	"custom/power"
     ],
 
     "sway/workspaces": {
@@ -64,14 +64,8 @@
         //"format": "{:%Y/%m/%d}",
         "format": "{:%d %B}",
 	"tooltip": false, 
-        "on-click": "navi-calendar"
+        "on-click": "gsimplecal"
     },
-    "custom/weather": {
-        "exec": "python3 /usr/share/naviOS/scripts/weather-bar.py",
-        "interval": 3600,
-        "on-click": "navi-weather",
-        "tooltip": false
-    }, 
 
     "pulseaudio": {
         "format": "🔊 {volume:2}%",  // Added volume character
@@ -96,9 +90,20 @@
             "format-disconnected": "⚠ Disconnected",
             "tooltip-format": "Wireless status -  {ifname}: {ipaddr}/{cidr}",
 	    "tooltip-format-wifi": "{essid}",
-            "on-click": "navi-network",
+            "on-click": "st -e nmtui",
             "interval": 30 
         },
+    // this is a 'testing' audioplayer module. shows currently playing audio and is interactive.
+    "custom/media": {
+	    "format": "{}",
+	    "return-type": "json",
+	    "max-length": 20,
+	    "fixed-width": true,
+	    "escape": true,
+	    "exec": "/usr/local/bin/mediaplayer.sh",
+	    "on-click": "playerctl play-pause",
+	    "interval": 1 
+    },
     // - - - XXX end testing section XXX - - - 
     "memory": {
         "interval": 5,
