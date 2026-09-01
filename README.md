@@ -1,5 +1,5 @@
 # navi
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/aef2471a-9c9f-423c-bf61-61aa3ba1fe03" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/7eddaefa-0f3b-4cfe-8372-0e722fc8b173" />
 
 ###### the minimal **navi** desktop
 
@@ -29,13 +29,15 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 ###### floating windows
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/8c691eae-3e1b-4983-bab5-ff9c695dde0a" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/49e39b89-d1a1-42ef-bbfb-6a2b25adf26f" />
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/f6a02c49-e01c-40d5-916c-a29f2c6ce11c" />
+###### browsing the web
 
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/88ed837a-8e01-40dc-bfc1-496e46f293c1" />
 
+###### neighborli, one of **navi**'s built-in webapps
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/0f4a9c65-7d30-45de-952e-9547aaaff5dc" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/4c0589cb-6dee-45f7-85ab-1001626111c8" />
 
 ###### **navi**'s `rofi` launcher - in this case, sorting a list of installed games.
 
