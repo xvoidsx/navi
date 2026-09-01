@@ -1,6 +1,8 @@
 # navi
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/aef2471a-9c9f-423c-bf61-61aa3ba1fe03" />
 
+###### the minimal **navi** desktop
+
 **navi** is a new GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx).
 
 It uses [wiredWM](https://github.com/rav3ndust/wiredWM), our fork of the `sway` wayland compositor, as its flagship desktop.
