@@ -25,9 +25,9 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 ###### tiled windows
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/5d322ab5-d128-4059-84f9-9069408c3fe7" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/ae36f014-77d4-4558-9a04-be57dbfd27b3" />
 
-### floating windows
+###### floating windows
 
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/8c691eae-3e1b-4983-bab5-ff9c695dde0a" />
 
