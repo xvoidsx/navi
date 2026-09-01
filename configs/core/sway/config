@@ -135,11 +135,11 @@ bindsym Mod1+e exec --no-startup-id "remoji"
 bindsym Mod1+b exec --no-startup-id "firefox-nightly"
 bindsym Mod1+Shift+b exec --no-startup-id "brave-browser-nightly"
 
-# navi pop-up terminal/agent
+# navi-Q (pop-up terminal/agent)
 # alt+A for pop-up agent
 # alt+shift+A for pop-up terminal
-bindsym Mod1+a exec "navi-quake agent"
-bindsym Mod1+Shift+a exec "navi-quake terminal"
+bindsym Mod1+a exec "navi-Q agent"
+bindsym Mod1+Shift+a exec "navi-Q terminal"
 
 # change focus
 bindsym $mod+j focus left
