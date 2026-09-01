@@ -21,11 +21,13 @@ It follows the [Serial Experiments Lain](#) aesthetic, and also uses our [nights
 
 A cozy computing environment is one that you look forward to using when you sit down at the computer. Not only does it feel good and functional to use, but it also looks beautiful as well! If you're going to be using your computer for hours every day doing work and play, don't you want to use a system that invites you to *have fun* while you do so?
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/f558b813-91e8-47c6-ab0e-c67ffb4a1d6d" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/5d91abac-9b6f-4715-b0db-94e84115a989" />
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/6aedbb2b-6c61-4871-8b17-06eb7f8f9bd8" />
+###### tiled windows
 
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/5d322ab5-d128-4059-84f9-9069408c3fe7" />
+
+### floating windows
 
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/8c691eae-3e1b-4983-bab5-ff9c695dde0a" />
 
