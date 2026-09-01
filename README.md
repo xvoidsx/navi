@@ -29,7 +29,11 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/f6a02c49-e01c-40d5-916c-a29f2c6ce11c" />
 
+
+
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/0f4a9c65-7d30-45de-952e-9547aaaff5dc" />
+
+###### **navi**'s `rofi` launcher - in this case, sorting a list of installed games.
 
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/92bf3ada-4803-4037-a56c-3f948bb255dc" />
 
