@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# navi-quake
+# navi-Q
 # opens up your persistent agent or terminal which can be put away and brought back with a keybind
 # binds: alt+A ( agent ), alt+shift+A ( terminal )
 # uses the scratchpad functionality from sway
@@ -12,7 +12,7 @@ OC="opencode"
 CX="codex"
 AGY="agy"
 # - - - - - - - 
-APP_ID="navi-quake"
+APP_ID="navi-Q"
 
 case "${1:-}" in
     agent)
@@ -24,7 +24,7 @@ case "${1:-}" in
         ;;
 
     *)
-        echo "Usage: navi-quake {agent|terminal}"
+        echo "Usage: navi-Q {agent|terminal}"
         exit 1
         ;;
 esac
