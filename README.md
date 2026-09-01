@@ -31,6 +31,8 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/0f4a9c65-7d30-45de-952e-9547aaaff5dc" />
 
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/92bf3ada-4803-4037-a56c-3f948bb255dc" />
+
 ### notes
 
 This repo is a work in progress, and things are being moved over and tweaked before we begin making public releases of **navi**. A website for the distro is in the works right now, and `.iso` images are planned in the future once we've got some things wrapped up - we will announce it as soon as these things are finished up and ready to go!
