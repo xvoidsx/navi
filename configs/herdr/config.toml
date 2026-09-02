@@ -1,10 +1,10 @@
-onboarding = false
-[theme]
 # naviOS/protocol7 - nightshadeNeon (herdr) 
 # uses our nightshadeNeon colors
 # we've modified the base configuration and theme
 # ( place: $HOME/.config/herdr/config.toml )
+onboarding = false
 
+[theme]
 name = "terminal"
 
 [theme.custom]
@@ -51,5 +51,6 @@ command = "herdr pane swap --direction down"
 pane_gaps = true 
 show_agent_labels_on_pane_borders = true
 
+agent_panel_sort = "spaces"
 [ui.toast]
 delivery = "system"
