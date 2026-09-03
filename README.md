@@ -41,7 +41,7 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 ###### **navi**'s `rofi` launcher - in this case, sorting a list of installed games.
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/41dd42fd-2ac9-41b1-b0f6-814770cf4ac1" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/d7fd181c-a612-4cdb-a55b-a151c5c7cdd2" />
 
 ###### navi-Q in Agent mode showing the latest from Hacker News.
 
