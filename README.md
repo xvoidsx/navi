@@ -39,11 +39,15 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/4c0589cb-6dee-45f7-85ab-1001626111c8" />
 
-###### **navi**'s `rofi` launcher - in this case, sorting a list of installed games.
+###### **navi**'s `rofi` launcher - in this case, sorting a list of installed games
 
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/d7fd181c-a612-4cdb-a55b-a151c5c7cdd2" />
 
-###### navi-Q in Agent mode showing the latest from Hacker News.
+###### navi-Q in Agent mode showing the latest from Hacker News
+
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/585c6a23-bf1d-490c-a244-9fe071a2875b" />
+
+###### listen to music in cliamp with our custom Void visualizer and nightshadeNeon theme
 
 ### notes
 
