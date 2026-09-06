@@ -18,6 +18,10 @@ We include 3 default **navi mods**:
 
 **navi mods** are written in Go using [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) for making a beautiful TUI.
 
+### wiring
+
+**navi mods** live in `mods/widgets/` and are wired up to the window manager using launcher scripts (for example: `/usr/bin/navi-networks`.
+
 The windows are rendered in Alacritty, and the theme is drenched in our [nightshadeNeon](https://rav3ndust.xyz/wiki/nightshadeNeon.html) theme, just like the rest of **navi**.
 
 ### future mods
