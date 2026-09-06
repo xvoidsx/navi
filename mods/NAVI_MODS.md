@@ -4,7 +4,7 @@
 
 ###### the `navi-networks` mod running a speed test
 
-**navi mods** are modules that live in the system's waybar, whether it is `waybar` (for navi's Wayland session), or `polybar` (for navi's X session).
+**navi mods** are modules that live in the system's panel, whether it is `waybar` (for navi's Wayland session), or `polybar` (for navi's X session).
 
 ### the mods
 
