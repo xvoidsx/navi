@@ -30,6 +30,11 @@ jobs:
       contents: write
       actions: read
     steps:
+      - name: Check out the repo (gh needs git context)
+        uses: actions/checkout@v4
+        with:
+          ref: mika
+
       - name: Download the ISO artifact
         uses: actions/download-artifact@v4
         with:
