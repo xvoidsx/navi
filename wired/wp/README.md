@@ -7,5 +7,5 @@ Source: `wiredWM` repo (`next` branch), `wp/` directory.
 
 First boot: `sway/config` runs `/usr/bin/navi-wallpaper`, which tries the
 animated default (`gifpaperslain/navi-lain.gif` via mpvpaper) first, verifies
-it is actually running, and only falls back to the static `lain3wp.jpg` via
+it is actually running, and only falls back to the static `SElain3.jpg` via
 swaybg if mpvpaper fails. The two never run at once.

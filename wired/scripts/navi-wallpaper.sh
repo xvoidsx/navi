@@ -10,7 +10,7 @@ set -u
 
 SHARE="/usr/share/navi/wired"
 ANIMATED="$SHARE/wp/gifpaperslain/navi-lain.gif"
-STATIC="$SHARE/wp/lain3wp.jpg"
+STATIC="$SHARE/wp/SElain3.jpg"
 
 log() { printf 'navi-wallpaper: %s\n' "$*" >&2; }
 

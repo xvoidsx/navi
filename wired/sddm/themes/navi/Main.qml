@@ -20,7 +20,7 @@ Rectangle {
         id: wallpaper
         anchors.fill: parent
         fillMode: Image.PreserveAspectCrop
-        source: "file:///usr/share/navi/wired/wp/lain3wp.jpg"
+        source: "file:///usr/share/navi/wired/wp/SElain3.jpg"
     }
 
     // ---- animated background: drop a muted loop at
