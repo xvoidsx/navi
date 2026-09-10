@@ -5,6 +5,7 @@
 # Installs the navi "wired" desktop layer on Debian 13 (trixie):
 #   packages -> /usr/share/navi/wired (the iron structure) -> ~/.config/*
 #   commands -> /usr/bin + /usr/share/applications (rofi-visible)
+#   agent runtime: ollama, opencode, omp -> /usr/bin
 #   doas, flatpak/flathub, wallpapers, first-boot behavior
 #
 # Idempotent: safe to re-run. Existing configs are backed up, never clobbered.
@@ -47,9 +48,8 @@ PKGS=(
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak
 )
 
-# Build deps for mpvpaper (Raven's fork). Installed as one unquoted word list —
-# note: the fork's build_install.sh has a quoting bug here ("$pkgs" as one arg).
-MPVPAPER_DEPS=(meson libmpv-dev git build-essential ninja-build)
+# Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
+# machine gets them — navi is a multi-user system.
 
 # ---------------------------------------------------------------- ui
 
@@ -161,22 +161,61 @@ build_mpvpaper() {
     return 0
   fi
 
-  # shellcheck disable=SC2068
-  $DOAS apt install -y ${MPVPAPER_DEPS[@]}
-
   local src="$HOME/src/mpvpaper"
   if [ ! -d "$src" ]; then
-    git clone --single-branch https://github.com/rav3ndust/mpvpaper "$src"
+    git clone --single-branch https://github.com/xvoidsx/mpvpaper "$src"
   else
     info "mpvpaper source already cloned at $src"
   fi
 
-  # NOTE: the fork's scripts/build_install.sh auto-sets a wallpaper after
-  # building (run_gifpaper_setter). The navi installer owns wallpaper
-  # selection, so we build directly here and never call that setter.
-  ( cd "$src" && meson setup build --prefix=/usr/local && ninja -C build )
-  ( cd "$src" && $DOAS ninja -C build install )
-  ok "mpvpaper built and installed to /usr/local"
+  # the fork's scripts/build_install.sh builds + installs only — wallpaper
+  # selection belongs to the navi installer, never to the fork.
+  bash "$src/scripts/build_install.sh"
+  ok "mpvpaper built and installed"
+}
+
+# ---------------------------------------------------------------- agents
+
+# Agent-native from the first boot: ollama runtime, opencode, and omp.
+# Binaries land in /usr/bin so every user on the machine gets them.
+setup_agents() {
+  step "agent runtime (ollama, opencode, omp)"
+
+  if command -v ollama >/dev/null 2>&1; then
+    ok "ollama already installed"
+  else
+    info "installing ollama..."
+    local tmp
+    tmp="$(mktemp)"
+    curl -fsSL https://ollama.com/install.sh -o "$tmp"
+    $DOAS sh "$tmp"
+    rm -f "$tmp"
+    if $DOAS systemctl enable --now ollama 2>/dev/null; then
+      ok "ollama installed and enabled"
+    else
+      warn "ollama installed but the service did not enable — run: doas systemctl enable --now ollama"
+    fi
+  fi
+
+  # the official installer drops the binary in ~/.opencode/bin; promote it
+  # to /usr/bin so it's on every user's PATH.
+  if [ -x /usr/bin/opencode ]; then
+    ok "opencode already in /usr/bin"
+  else
+    info "installing opencode..."
+    curl -fsSL https://opencode.ai/install | bash
+    $DOAS install -m 0755 "$HOME/.opencode/bin/opencode" /usr/bin/opencode
+    ok "opencode -> /usr/bin/opencode"
+  fi
+
+  # the omp installer honors PI_INSTALL_DIR — straight into /usr/bin.
+  if [ -x /usr/bin/omp ]; then
+    ok "omp already in /usr/bin"
+  else
+    info "installing omp (oh-my-pi)..."
+    curl -fsSL https://omp.sh/install | $DOAS env PI_INSTALL_DIR=/usr/bin sh
+    ok "omp -> /usr/bin/omp"
+  fi
 }
 
 # ---------------------------------------------------------------- deploy: /usr/share/navi
@@ -477,6 +516,7 @@ main() {
   install_identity
   install_commands
   setup_doas
+  setup_agents
   setup_environment
   setup_flatpak
   setup_dirs
