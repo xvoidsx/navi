@@ -1,8 +1,8 @@
 # navi-installer.list.chroot — extra packages inside the installer ISO.
 #
 # The ISO is a minimal live environment whose only job is running
-# /usr/local/bin/navi-install: partition, encrypt, debootstrap, and hand
-# off to provisioning. No desktop stack lives here.
+# /usr/local/bin/navi-install: network, partition, encrypt, debootstrap,
+# and hand off to provisioning. No desktop stack lives here.
 
 debootstrap
 cryptsetup
@@ -16,4 +16,12 @@ git
 ca-certificates
 console-setup
 efibootmgr
+network-manager
+wpasupplicant
+iw
+
+
+systemd-timesyncd
+
+# tput, for the installer's nightshadeNeon frame renderer
 ncurses-bin
