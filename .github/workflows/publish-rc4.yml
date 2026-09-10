@@ -1,0 +1,70 @@
+name: Publish Mika RC4 release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Successful ISO build run ID to publish"
+        required: true
+        default: "34473056897"
+      tag:
+        description: "Release tag (must already point at the ISO build commit)"
+        required: true
+        default: "v1.2-mika-RC4"
+      target_sha:
+        description: "Commit the tag points at"
+        required: true
+        default: "861d68d84310"
+  # Push trigger exists so GitHub registers/executes this workflow from the
+  # mika branch (workflow_dispatch alone is not reliably dispatchable until
+  # the file lands on the default branch). Pushing this file publishes RC4.
+  push:
+    branches: [mika]
+    paths:
+      - .github/workflows/publish-rc4.yml
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Check out the repo (gh needs git context)
+        uses: actions/checkout@v4
+        with:
+          ref: mika
+
+      - name: Download the ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: navi-1.2-mika-RC4.iso
+          # inputs.* only exist on workflow_dispatch; fall back on push events
+          run-id: ${{ inputs.run_id || '34473056897' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist
+
+      - name: Verify ISO and checksum it
+        run: |
+          set -euo pipefail
+          ls -lh dist
+          ISO="$(ls dist/*.iso | head -n 1)"
+          test -s "$ISO"
+          ( cd dist && sha256sum "$(basename "$ISO")" > SHA256SUMS.txt )
+          cat dist/SHA256SUMS.txt
+          echo "ISO_PATH=$ISO" >> "$GITHUB_ENV"
+
+      - name: Upload the ISO to the RC4 prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # inputs.* only exist on workflow_dispatch; fall back on push events
+          TAG: ${{ inputs.tag || 'v1.2-mika-RC4' }}
+        run: |
+          set -euo pipefail
+          # The release shell is created ahead of time (Actions' GITHUB_TOKEN
+          # cannot create releases on this repo); the runner just attaches
+          # the built assets to it.
+          gh release view "$TAG" >/dev/null \
+            || { echo "release $TAG does not exist yet — aborting"; exit 1; }
+          gh release upload "$TAG" "$ISO_PATH" dist/SHA256SUMS.txt --clobber
+          gh release view "$TAG" --json url,assets --jq '{url: .url, assets: [.assets[].name]}'
