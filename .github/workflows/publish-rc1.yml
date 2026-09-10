@@ -34,7 +34,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: navi_1.2_mika_RC1.iso
-          run-id: ${{ inputs.run_id }}
+          # inputs.* only exist on workflow_dispatch; fall back on push events
+          run-id: ${{ inputs.run_id || '34462615883' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: dist
 
@@ -51,16 +52,18 @@ jobs:
       - name: Create the prerelease and attach the ISO
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # inputs.* only exist on workflow_dispatch; fall back on push events
+          TAG: ${{ inputs.tag || 'v1.2-mika-RC1' }}
+          TARGET_SHA: ${{ inputs.target_sha || '04622f4c47413241980dbe2feca638ffa5304e56' }}
         run: |
           set -euo pipefail
-          TAG="${{ inputs.tag }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists, deleting it first"
             gh release delete "$TAG" --yes
           fi
           gh release create "$TAG" \
             "$ISO_PATH" dist/SHA256SUMS.txt \
-            --target "${{ inputs.target_sha }}" \
+            --target "$TARGET_SHA" \
             --title "navi 1.2 mika RC1 (test build)" \
             --prerelease \
             --notes "$(cat <<'NOTES_EOF'
