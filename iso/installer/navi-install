@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# navi-install — the navi system installer (Mika RC6)
+# navi-install — the navi system installer (Mika RC7)
 #     by rav3ndust.xyz (xvoidsx)
 #
 # Boots from the navi installer ISO (root autologin on tty1) and installs
@@ -40,20 +40,64 @@ MAPPER_NAME="cryptroot"    # dm-crypt name for the LUKS root
 # =====================================================================
 
 # ---------------------------------------------------------------- ui
+#
+# The installer is navi's front door — it should look like it belongs.
+# Big ASCII wordmark, an honest progress bar across the 12 phases, and a
+# rotating tip under every phase so the wait teaches something.
+
+PHASE_TOTAL=12
+PHASE_N=0
+PHASE_TIP=0
+
+TIPS=(
+  "the wired is navi's name for the desktop — you're building your door into it."
+  "you'll type your disk passphrase twice at every boot: once for grub, once for the system. that's normal."
+  "first boot provisions everything — packages, agents, wallpapers. it needs network and takes a while."
+  "every tool navi installs shows up in the rofi launcher."
+  "the installer syncs your clock from the network by itself — dead cmos batteries welcome."
+  "grub unlocks the disk with pbkdf2, not argon2, because grub can't do argon2. now you know."
+  "your wifi password rides into the installed system on the encrypted root — first boot is already online."
+  "the cli installer is intentional. it is indeed very navi."
+  "hostname defaults to 'navi'. name it like you'd name a ship."
+  "the wired will provide."
+)
 
 banner() {
   cat <<'EOF'
 
                        ∅
 
-         ✦  w e l c o m e   t o   n a v i !  ✦
+  █   █   ███   █   █  █████
+  ██  █  █   █  █   █    █
+  █ █ █  █████  █   █    █
+  █  ██  █   █   █ █     █
+  █   █  █   █    █    █████
 
-              1 . 2   " m i k a "   R C 3
+         1 . 2   " m i k a "   R C 7
 
             the wired will provide.
 
 
 EOF
+}
+
+progress_bar() { # <n> <total>
+  local n="$1" total="$2" width=28 filled empty i
+  filled=$(( n * width / total ))
+  empty=$(( width - filled ))
+  printf '    '
+  for ((i=0; i<filled; i++)); do printf '█'; done
+  for ((i=0; i<empty; i++)); do printf '░'; done
+  printf '  %d%%\n' "$(( n * 100 / total ))"
+}
+
+phase() { # <label> — a major installer phase, with progress bar + tip
+  PHASE_N=$((PHASE_N + 1))
+  echo
+  echo "──▶ [$PHASE_N/$PHASE_TOTAL] $1"
+  progress_bar "$PHASE_N" "$PHASE_TOTAL"
+  echo "    tip: ${TIPS[$PHASE_TIP]}"
+  PHASE_TIP=$(( (PHASE_TIP + 1) % ${#TIPS[@]} ))
 }
 
 step() { echo; echo "──▶ $1"; }
@@ -64,6 +108,7 @@ die()  { echo "    ✗ $1" >&2; exit 1; }
 # ---------------------------------------------------------------- preflight
 
 preflight() {
+  phase "preflight"
   [ "$EUID" -eq 0 ] || die "run as root (this installer owns the disks)."
 
   # UEFI and legacy BIOS both work — the disk layout below boots either way.
@@ -161,14 +206,21 @@ wifi_connect() {
       unset pass
       return 0
     fi
-    echo "    didn't connect — wrong password?"
+    echo "    didn't connect."
+    if [ "$try" -lt 3 ]; then
+      local ans
+      read -r -p "    try a different password? [Y/n] " ans
+      case "${ans:-Y}" in
+        [Yy]*) read -r -s -p "    password for '$ssid': " pass; echo ;;
+      esac
+    fi
   done
   unset pass
   return 1
 }
 
 setup_network() {
-  step "network"
+  phase "network"
 
   # NetworkManager drives both wired and wireless on the live ISO.
   if command -v nmcli >/dev/null 2>&1; then
@@ -204,6 +256,7 @@ setup_network() {
 # installed system, so first boot is online for provisioning. The profiles
 # live on the LUKS-encrypted root, guarded by the disk passphrase.
 persist_network() {
+  phase "carrying network profiles"
   local src=/etc/NetworkManager/system-connections
   [ -d "$src" ] || return 0
   local files=( "$src"/*.nmconnection )
@@ -217,7 +270,7 @@ persist_network() {
 # ---------------------------------------------------------------- disk selection
 
 pick_disk() {
-  step "disk selection"
+  phase "disk selection"
   echo "    available disks:"
   # NOTE: NAME,TYPE only — MODEL can contain spaces, which breaks field parsing
   mapfile -t DISKS < <(lsblk -dnp -o NAME,TYPE | awk '$2=="disk" {print $1}')
@@ -266,7 +319,7 @@ read_secret_twice() { # <prompt> <var> — reads twice, must match + non-empty
 }
 
 get_credentials() {
-  step "user + hostname + encryption"
+  phase "user + hostname + encryption"
   while true; do
     read -r -p "    username: " NAVI_USER
     if [[ "$NAVI_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] && [ "$NAVI_USER" != "root" ]; then
@@ -300,7 +353,7 @@ get_credentials() {
 # ---------------------------------------------------------------- partitioning
 
 partition_disk() {
-  step "partitioning $DISK (GPT: bios_grub + EFI + LUKS root)"
+  phase "partitioning $DISK"
 
   # make sure nothing on the disk is mounted or mapped
   umount -R "$TARGET" 2>/dev/null || true
@@ -330,7 +383,7 @@ partition_disk() {
 }
 
 format_encrypt() {
-  step "encrypting + formatting"
+  phase "encrypting + formatting"
 
   # PBKDF2, not argon2: GRUB unlocks /boot from the encrypted root and GRUB
   # cannot do argon2. iter-time 5000ms keeps the GRUB unlock delay sane.
@@ -351,7 +404,7 @@ format_encrypt() {
 }
 
 mount_target() {
-  step "mounting target"
+  phase "mounting target"
   mkdir -p "$TARGET"
   mount "/dev/mapper/$MAPPER_NAME" "$TARGET"
   mkdir -p "$TARGET/boot/efi"
@@ -362,33 +415,43 @@ mount_target() {
 # ---------------------------------------------------------------- base system
 
 run_debootstrap() {
-  step "debootstrap Debian 13 (trixie)"
+  phase "base system (debootstrap)"
   # Last word on the clock: the interactive steps above (disk choice,
   # passwords, partitioning, LUKS) take minutes, and old hardware can lose
   # the time in that window. Re-sync right before we trust signatures.
+  # Sub-header only here — the clock already had its phase.
+  SYNC_CLOCK_SUB=1
   sync_clock
+  unset SYNC_CLOCK_SUB
   local attempt
   for attempt in 1 2; do
     if debootstrap \
       --arch=amd64 \
       --components=main,contrib,non-free,non-free-firmware \
-      --include=linux-image-amd64,grub-efi-amd64,grub-pc,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,network-manager,wpasupplicant,console-setup,ca-certificates,firmware-linux \
+      --include=linux-image-amd64,grub-efi-amd64,grub-pc,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,console-setup,ca-certificates,firmware-linux \
       trixie "$TARGET" http://deb.debian.org/debian; then
       ok "base system installed"
       return 0
     fi
     if [ "$attempt" = "1" ]; then
       info "debootstrap failed — re-syncing clock, then one retry"
+      SYNC_CLOCK_SUB=1
       sync_clock 2>/dev/null || info "clock re-sync failed, retrying anyway"
+      unset SYNC_CLOCK_SUB
     fi
   done
-  die "debootstrap failed twice — check the network and the clock (date -u), then re-run."
+  # Name the actual culprit: the debootstrap log records which package
+  # refused to configure, so the next fix targets the right thing.
+  info "failing package(s) per $TARGET/debootstrap/debootstrap.log:"
+  grep -a "error processing package" "$TARGET/debootstrap/debootstrap.log" 2>/dev/null \
+    | tail -4 | sed 's/^/    /' || true
+  die "debootstrap failed twice — culprits above (full log: $TARGET/debootstrap/debootstrap.log), then re-run."
 }
 
 # ---------------------------------------------------------------- chroot configuration
 
 configure_target() {
-  step "configuring the installed system"
+  phase "configuring the installed system"
 
   mount --bind /dev  "$TARGET/dev"
   mount --bind /proc "$TARGET/proc"
@@ -414,6 +477,12 @@ export DEBIAN_FRONTEND=noninteractive
 
 echo "  [chroot] package lists"
 apt-get update -qq
+
+echo "  [chroot] network stack (NetworkManager + WiFi)"
+# Installed here, NOT in debootstrap --include: NM's postinst needs a
+# configured system and dies in debootstrap's minimal configure phase
+# ("Failure while configuring base packages" — seen on the Toshiba bench).
+apt-get install -y network-manager wpasupplicant iw
 
 echo "  [chroot] hostname"
 echo "@HOSTNAME@" > /etc/hostname
@@ -503,7 +572,7 @@ CHROOT_EOF
 # ---------------------------------------------------------------- teardown
 
 teardown() {
-  step "unmounting"
+  phase "unmounting"
   umount -R "$TARGET" 2>/dev/null || true
   cryptsetup close "$MAPPER_NAME" 2>/dev/null || true
   sync
@@ -534,7 +603,13 @@ net_time_epoch() {
 }
 
 sync_clock() {
-  step "syncing clock (package signatures need the right time)"
+  # Its own phase when called from main(); a quiet sub-header when
+  # re-syncing right before debootstrap (the clock already had its phase).
+  if [ -n "${SYNC_CLOCK_SUB:-}" ]; then
+    echo; echo "──▶ re-syncing clock (package signatures need the right time)"
+  else
+    phase "syncing clock (package signatures need the right time)"
+  fi
 
   # real NTP when the live image carries it
   if systemctl cat systemd-timesyncd.service >/dev/null 2>&1; then
@@ -601,7 +676,7 @@ main() {
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.2 "mika" RC6 is installed.                      ║
+  ║   ✓  navi 1.2 "mika" RC7 is installed.                      ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase at the prompt     ║
