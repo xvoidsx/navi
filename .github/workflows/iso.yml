@@ -1,0 +1,69 @@
+# navi ISO builder (Mika RC1) — manual trigger only.
+#
+# Builds the installer ISO inside a privileged debian:trixie container and
+# uploads it as a workflow artifact. These builds are heavy (debootstrap +
+# a full live image), so there is deliberately NO push/PR trigger — Raven
+# dispatches each build by hand from the Actions tab.
+#
+# The container route (instead of ubuntu-latest + sudo) keeps the whole
+# build on real Debian tooling: live-build, debootstrap, and friends from
+# trixie itself.
+
+name: navi ISO (Mika RC1)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-24.04
+    container:
+      image: debian:trixie
+      options: --privileged
+    steps:
+      # NOTE: actions/checkout needs node, which debian:trixie-slim lacks,
+      # so the repo is cloned with plain git instead.
+      - name: Clone navi (mika)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates
+          git clone --depth 1 --branch mika \
+            "https://x-access-token:${GH_TOKEN}@github.com/xvoidsx/navi.git" src
+          cd src && git rev-parse --short HEAD
+
+      # nodejs: JS actions (upload-artifact) run inside the container and
+      # need node; trixie ships node 20, which actions/*@v4 require.
+      - name: Install live-build
+        run: |
+          set -euo pipefail
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq live-build nodejs
+
+      - name: Stage the live-build tree
+        run: |
+          set -euo pipefail
+          cd src && ./iso/stage.sh
+
+      - name: Build the ISO
+        run: |
+          set -euo pipefail
+          cd src/iso/build && lb config && lb build
+
+      - name: Collect the ISO
+        run: |
+          set -euo pipefail
+          iso_path="$(ls src/iso/build/navi_1.2_mika_RC1-*.hybrid.iso | head -n 1)"
+          cp "$iso_path" /tmp/navi_1.2_mika_RC1.iso
+          ls -lh /tmp/navi_1.2_mika_RC1.iso
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: navi_1.2_mika_RC1.iso
+          path: /tmp/navi_1.2_mika_RC1.iso
+          if-no-files-found: error

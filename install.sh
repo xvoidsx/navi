@@ -169,8 +169,9 @@ build_mpvpaper() {
   fi
 
   # the fork's scripts/build_install.sh builds + installs only — wallpaper
-  # selection belongs to the navi installer, never to the fork.
-  bash "$src/scripts/build_install.sh"
+  # selection belongs to the navi installer, never to the fork. it must run
+  # from the fork's repo root (it uses relative meson/ninja paths).
+  ( cd "$src" && bash scripts/build_install.sh )
   ok "mpvpaper built and installed"
 }
 

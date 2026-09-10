@@ -1,0 +1,360 @@
+#!/usr/bin/env bash
+#
+# navi-install — the navi system installer (Mika RC1)
+#     by rav3ndust.xyz (xvoidsx)
+#
+# Boots from the navi installer ISO (root autologin on tty1) and installs
+# navi to a disk: GPT layout, EFI system partition, one LUKS2-encrypted
+# root (ext4), Debian 13 (trixie) via debootstrap, kernel + GRUB with
+# cryptodisk support so the LUKS passphrase prompt appears at boot.
+#
+# Hard separation, by design:
+#   THIS script does partitioning, filesystems, LUKS, debootstrap, users,
+#   bootloader/initramfs, and the handoff. Everything else — packages,
+#   /wired, commands, identity, agents, wallpapers, flatpak, services —
+#   is provisioning, and runs from /opt/navi-iso/install.sh --yes as a
+#   first-boot systemd service (see installer/navi-provision).
+#
+# Run as root on the installer ISO. UEFI boot is required (x86_64).
+
+set -euo pipefail
+
+# ============================== toggles ==============================
+# SDDM autologin for the installed user once provisioning finishes.
+# "yes": first boot goes LUKS prompt -> wired desktop, no login screen.
+# "no":  first boot goes LUKS prompt -> SDDM login, user types password.
+AUTOLOGIN="yes"
+
+HOSTNAME="navi"            # hostname for the installed system
+TARGET="/mnt/navi"         # where the new system is assembled
+ISO_ROOT="/opt/navi-iso"   # navi payload shipped on the ISO
+MAPPER_NAME="cryptroot"    # dm-crypt name for the LUKS root
+# =====================================================================
+
+# ---------------------------------------------------------------- ui
+
+banner() {
+  cat <<'EOF'
+
+                       ∅
+
+         ✦  w e l c o m e   t o   n a v i !  ✦
+
+              1 . 2   " m i k a "   R C 1
+
+            the wired will provide.
+
+
+EOF
+}
+
+step() { echo; echo "──▶ $1"; }
+ok()   { echo "    ✓ $1"; }
+info() { echo "    · $1"; }
+die()  { echo "    ✗ $1" >&2; exit 1; }
+
+# ---------------------------------------------------------------- preflight
+
+preflight() {
+  [ "$EUID" -eq 0 ] || die "run as root (this installer owns the disks)."
+
+  [ -d /sys/firmware/efi ] \
+    || die "this machine did not boot in UEFI mode — reboot the ISO via UEFI and try again."
+
+  local t
+  for t in debootstrap cryptsetup parted mkfs.fat mkfs.ext4 blkid; do
+    command -v "$t" >/dev/null 2>&1 || die "missing tool: $t (broken installer ISO)."
+  done
+
+  [ -f "$ISO_ROOT/install.sh" ] && [ -d "$ISO_ROOT/wired" ] \
+    || die "$ISO_ROOT is missing install.sh/wired (broken installer ISO)."
+
+  ok "preflight: root, UEFI, tools, navi payload"
+}
+
+# ---------------------------------------------------------------- disk selection
+
+pick_disk() {
+  step "disk selection"
+  echo "    available disks:"
+  # NOTE: NAME,TYPE only — MODEL can contain spaces, which breaks field parsing
+  mapfile -t DISKS < <(lsblk -dnp -o NAME,TYPE | awk '$2=="disk" {print $1}')
+  [ "${#DISKS[@]}" -gt 0 ] || die "no disks found."
+
+  local i
+  for i in "${!DISKS[@]}"; do
+    printf '    [%d] %s %s\n' "$((i+1))" "${DISKS[$i]}" \
+      "$(lsblk -rn -o SIZE,MODEL "${DISKS[$i]}")"
+  done
+
+  local choice
+  while true; do
+    read -r -p "    install navi to disk number: " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#DISKS[@]}" ]; then
+      DISK="${DISKS[$((choice-1))]}"
+      break
+    fi
+    echo "    pick a number between 1 and ${#DISKS[@]}."
+  done
+  ok "target disk: $DISK"
+
+  echo
+  echo "    !!!  ALL DATA ON $DISK WILL BE DESTROYED  !!!"
+  lsblk -o NAME,SIZE,FSTYPE,LABEL,MODEL "$DISK"
+  echo
+  local confirm
+  read -r -p "    type YES in capitals to continue: " confirm
+  [ "$confirm" = "YES" ] || die "aborted — nothing was touched."
+  ok "destructive confirmation accepted"
+}
+
+# ---------------------------------------------------------------- credentials
+
+read_secret_twice() { # <prompt> <var> — reads twice, must match + non-empty
+  local prompt="$1" var="$2" a b
+  while true; do
+    read -r -s -p "    $prompt: " a; echo
+    read -r -s -p "    again: " b; echo
+    if [ -z "$a" ]; then echo "    must not be empty — try again."; continue; fi
+    if [ "$a" != "$b" ]; then echo "    mismatch — try again."; continue; fi
+    if [[ "$a" == *:* ]]; then echo "    may not contain ':' — try again."; continue; fi
+    printf -v "$var" '%s' "$a"
+    return 0
+  done
+}
+
+get_credentials() {
+  step "user + encryption"
+  while true; do
+    read -r -p "    username: " NAVI_USER
+    if [[ "$NAVI_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] && [ "$NAVI_USER" != "root" ]; then
+      break
+    fi
+    echo "    lowercase letters, digits, _ or -, may not be root."
+  done
+
+  read_secret_twice "password for $NAVI_USER" USER_PASS
+
+  # LUKS passphrase: strength matters here, it guards the whole disk.
+  while true; do
+    read_secret_twice "disk encryption passphrase (min 8 chars)" LUKS_PASS
+    if [ "${#LUKS_PASS}" -ge 8 ]; then break; fi
+    echo "    too short — the passphrase guards the entire disk."
+  done
+  ok "user $NAVI_USER + encryption passphrase set"
+}
+
+# ---------------------------------------------------------------- partitioning
+
+partition_disk() {
+  step "partitioning $DISK (GPT: EFI + LUKS root)"
+
+  # make sure nothing on the disk is mounted or mapped
+  umount -R "$TARGET" 2>/dev/null || true
+  cryptsetup close "$MAPPER_NAME" 2>/dev/null || true
+  swapoff -a 2>/dev/null || true
+
+  parted -s "$DISK" mklabel gpt
+  parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
+  parted -s "$DISK" set 1 esp on
+  parted -s "$DISK" mkpart primary 513MiB 100%
+  partprobe "$DISK"
+  sleep 2
+
+  # nvme0n1 -> nvme0n1p1 ; sda -> sda1
+  local suffix=""
+  if [[ "$DISK" =~ [0-9]$ ]]; then suffix="p"; fi
+  ESP_PART="${DISK}${suffix}1"
+  ROOT_PART="${DISK}${suffix}2"
+  [ -b "$ESP_PART" ] && [ -b "$ROOT_PART" ] \
+    || die "partitions did not appear ($ESP_PART / $ROOT_PART)."
+
+  ok "EFI: $ESP_PART · root: $ROOT_PART"
+}
+
+format_encrypt() {
+  step "encrypting + formatting"
+
+  # PBKDF2, not argon2: GRUB unlocks /boot from the encrypted root and GRUB
+  # cannot do argon2. iter-time 5000ms keeps the GRUB unlock delay sane.
+  printf '%s' "$LUKS_PASS" | cryptsetup luksFormat \
+    --type luks2 --pbkdf pbkdf2 --iter-time 5000 -q "$ROOT_PART" --key-file -
+  printf '%s' "$LUKS_PASS" | cryptsetup open \
+    "$ROOT_PART" "$MAPPER_NAME" --key-file -
+  unset LUKS_PASS
+  ok "LUKS2 (pbkdf2) on $ROOT_PART, open as $MAPPER_NAME"
+
+  mkfs.ext4 -q -L navi-root "/dev/mapper/$MAPPER_NAME"
+  mkfs.fat -F32 -n NAVI-EFI "$ESP_PART" >/dev/null
+  ok "ext4 root + FAT32 EFI system partition"
+
+  LUKS_UUID="$(blkid -s UUID -o value "$ROOT_PART")"
+  ROOT_UUID="$(blkid -s UUID -o value "/dev/mapper/$MAPPER_NAME")"
+  ESP_UUID="$(blkid -s UUID -o value "$ESP_PART")"
+}
+
+mount_target() {
+  step "mounting target"
+  mkdir -p "$TARGET"
+  mount "/dev/mapper/$MAPPER_NAME" "$TARGET"
+  mkdir -p "$TARGET/boot/efi"
+  mount "$ESP_PART" "$TARGET/boot/efi"
+  ok "target at $TARGET"
+}
+
+# ---------------------------------------------------------------- base system
+
+run_debootstrap() {
+  step "debootstrap Debian 13 (trixie)"
+  debootstrap \
+    --arch=amd64 \
+    --components=main,contrib,non-free,non-free-firmware \
+    --include=linux-image-amd64,grub-efi-amd64,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,network-manager,console-setup,ca-certificates,firmware-linux \
+    trixie "$TARGET" http://deb.debian.org/debian
+  ok "base system installed"
+}
+
+# ---------------------------------------------------------------- chroot configuration
+
+configure_target() {
+  step "configuring the installed system"
+
+  mount --bind /dev  "$TARGET/dev"
+  mount --bind /proc "$TARGET/proc"
+  mount --bind /sys  "$TARGET/sys"
+  mount --bind /run  "$TARGET/run"
+  cp /etc/resolv.conf "$TARGET/etc/resolv.conf"
+
+  # navi payload -> the target, where first-boot provisioning finds it
+  mkdir -p "$TARGET/opt/navi-iso"
+  cp -a "$ISO_ROOT"/. "$TARGET/opt/navi-iso/"
+  ok "navi payload -> /opt/navi-iso"
+
+  # user password, via a locked-down file (never on a command line)
+  printf '%s:%s' "$NAVI_USER" "$USER_PASS" > "$TARGET/root/.navi-user-pass"
+  chmod 600 "$TARGET/root/.navi-user-pass"
+  unset USER_PASS
+
+  # the chroot script: static body (quoted heredoc) + sed-injected values.
+  # all injected values are charset-validated above, so sed is safe.
+  cat > "$TARGET/root/navi-chroot-setup.sh" <<'CHROOT_EOF'
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+echo "  [chroot] package lists"
+apt-get update -qq
+
+echo "  [chroot] hostname"
+echo "@HOSTNAME@" > /etc/hostname
+cat > /etc/hosts <<'EOF'
+127.0.0.1 localhost
+127.0.1.1 @HOSTNAME@
+::1 localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+EOF
+
+echo "  [chroot] crypttab + fstab"
+echo "@MAPPER_NAME@ UUID=@LUKS_UUID@ none luks,discard" > /etc/crypttab
+cat > /etc/fstab <<'EOF'
+UUID=@ROOT_UUID@ / ext4 errors=remount-ro 0 1
+UUID=@ESP_UUID@ /boot/efi vfat umask=0077 0 1
+EOF
+
+echo "  [chroot] GRUB with cryptodisk (unlocks /boot inside LUKS)"
+sed -i 's/^#\?GRUB_ENABLE_CRYPTODISK=.*/GRUB_ENABLE_CRYPTODISK=y/' /etc/default/grub
+
+echo "  [chroot] user"
+useradd -m -s /bin/bash "@NAVI_USER@"
+chpasswd < /root/.navi-user-pass
+shred -u /root/.navi-user-pass
+passwd -l root
+
+echo "  [chroot] doas (temporary nopass rule for first-boot provisioning;"
+echo "           navi-provision locks this down to 'persist' when done)"
+printf 'permit nopass %s as root\n' "@NAVI_USER@" > /etc/doas.conf
+chmod 644 /etc/doas.conf
+
+echo "  [chroot] first-boot provisioning service"
+install -m 0755 /opt/navi-iso/installer/navi-provision /usr/local/bin/navi-provision
+install -m 0644 /opt/navi-iso/installer/navi-provision.service \
+  /etc/systemd/system/navi-provision.service
+printf 'NAVI_USER=%s\nNAVI_AUTOLOGIN=%s\n' "@NAVI_USER@" "@AUTOLOGIN@" > /etc/navi-install.conf
+chmod 644 /etc/navi-install.conf
+systemctl enable navi-provision.service
+systemctl set-default graphical.target
+systemctl enable NetworkManager-wait-online.service
+
+echo "  [chroot] bootloader + initramfs"
+grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+  --bootloader-id=navi --recheck
+update-grub
+update-initramfs -u -k all
+
+echo "  [chroot] done"
+CHROOT_EOF
+
+  sed -i \
+    -e "s/@HOSTNAME@/$HOSTNAME/g" \
+    -e "s/@MAPPER_NAME@/$MAPPER_NAME/g" \
+    -e "s/@LUKS_UUID@/$LUKS_UUID/g" \
+    -e "s/@ROOT_UUID@/$ROOT_UUID/g" \
+    -e "s/@ESP_UUID@/$ESP_UUID/g" \
+    -e "s/@NAVI_USER@/$NAVI_USER/g" \
+    -e "s/@AUTOLOGIN@/$AUTOLOGIN/g" \
+    "$TARGET/root/navi-chroot-setup.sh"
+  chmod 700 "$TARGET/root/navi-chroot-setup.sh"
+
+  chroot "$TARGET" /bin/bash /root/navi-chroot-setup.sh
+  rm -f "$TARGET/root/navi-chroot-setup.sh"
+  ok "target configured: $HOSTNAME, user $NAVI_USER, GRUB, initramfs"
+}
+
+# ---------------------------------------------------------------- teardown
+
+teardown() {
+  step "unmounting"
+  umount -R "$TARGET" 2>/dev/null || true
+  cryptsetup close "$MAPPER_NAME" 2>/dev/null || true
+  sync
+  ok "disks synced, LUKS closed"
+}
+
+# ---------------------------------------------------------------- main
+
+main() {
+  banner
+  preflight
+  pick_disk
+  get_credentials
+  partition_disk
+  format_encrypt
+  mount_target
+  run_debootstrap
+  configure_target
+  teardown
+
+  # don't offer the installer again on this boot's root shell
+  touch /tmp/navi-install.done
+
+  cat <<EOF
+
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                                                              ║
+  ║   ✓  navi 1.2 "mika" RC1 is installed.                      ║
+  ║                                                              ║
+  ║   remove the ISO and reboot.                                 ║
+  ║   1. enter your disk encryption passphrase at the prompt     ║
+  ║   2. first boot provisions the wired (takes a while —        ║
+  ║      packages, agents, wallpapers; needs network)             ║
+  ║   3. you land directly in the wired. welcome home.           ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+EOF
+  local ans
+  read -r -p "    reboot now? [Y/n] " ans
+  case "${ans:-Y}" in [Yy]*) reboot ;; *) echo "    reboot when ready: reboot";; esac
+}
+
+main "$@"

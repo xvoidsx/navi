@@ -1,0 +1,23 @@
+#!/bin/sh
+# iso/auto/config — live-build configuration for the navi installer ISO.
+#
+# Run from a staged build tree (see iso/stage.sh):
+#   cd iso/build && lb config && lb build
+#
+# Produces a Debian 13 (trixie) live ISO that boots straight into the
+# navi CLI system installer — no desktop, no "try navi" mode.
+
+set -e
+
+lb config \
+  --distribution trixie \
+  --archive-areas "main contrib non-free non-free-firmware" \
+  --bootloaders "syslinux grub-efi" \
+  --binary-images iso-hybrid \
+  --debian-installer false \
+  --memtest none \
+  --iso-application "navi" \
+  --iso-publisher "xvoidsx" \
+  --iso-volume "navi 1.2 mika RC1" \
+  --image-name "navi_1.2_mika_RC1" \
+  "$@"
