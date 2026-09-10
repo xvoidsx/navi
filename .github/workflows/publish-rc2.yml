@@ -54,49 +54,17 @@ jobs:
           cat dist/SHA256SUMS.txt
           echo "ISO_PATH=$ISO" >> "$GITHUB_ENV"
 
-      - name: Create the prerelease and attach the ISO
+      - name: Upload the ISO to the RC2 prerelease
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # inputs.* only exist on workflow_dispatch; fall back on push events
           TAG: ${{ inputs.tag || 'v1.2-mika-RC2' }}
-          TARGET_SHA: ${{ inputs.target_sha || '1d18ed6b0739689d19fc817cd54be6b42929f3b9' }}
         run: |
           set -euo pipefail
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists, deleting it first"
-            gh release delete "$TAG" --yes
-          fi
-          gh release create "$TAG" \
-            "$ISO_PATH" dist/SHA256SUMS.txt \
-            --target "$TARGET_SHA" \
-            --title "navi 1.2 mika RC2 (test build)" \
-            --prerelease \
-            --notes "$(cat <<'NOTES_EOF'
-          # navi 1.2 "mika" — RC2 test build
-
-          This is a **pre-release test build** for fresh-machine validation. It is not the final release.
-
-          ## New in RC2: wireless support in the installer
-          - If Ethernet is plugged in, the installer uses it automatically (as before).
-          - Otherwise the installer offers **WiFi**: it scans for networks, you pick
-            one from the numbered list (or choose 0 and type the SSID for hidden
-            networks), then enter the password. Three attempts, then it asks you
-            to plug in Ethernet instead.
-          - Your WiFi profile is carried into the installed system (stored on the
-            LUKS-encrypted root), so first boot is already online for provisioning.
-
-          ## What to expect
-          - UEFI x86_64 only (no BIOS/CSM, no Secure Boot)
-          - Boots straight into the navi CLI installer — no live desktop
-          - Full-disk LUKS2 encryption; you will type your passphrase **twice** at boot (GRUB, then initramfs) — expected
-          - First boot needs network access to finish provisioning the desktop
-          - SDDM autologs you into the wired after provisioning
-
-          ## Verify
-          Compare against `SHA256SUMS.txt` attached below.
-
-          ## Feedback
-          Anything weird goes back to the mika branch — this build is the gate for the final `v1.2-mika` release.
-          NOTES_EOF
-          )"
+          # The release shell is created ahead of time (Actions' GITHUB_TOKEN
+          # cannot create releases on this repo); the runner just attaches
+          # the built assets to it.
+          gh release view "$TAG" >/dev/null \
+            || { echo "release $TAG does not exist yet — aborting"; exit 1; }
+          gh release upload "$TAG" "$ISO_PATH" dist/SHA256SUMS.txt --clobber
           gh release view "$TAG" --json url,assets --jq '{url: .url, assets: [.assets[].name]}'
