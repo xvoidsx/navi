@@ -64,7 +64,24 @@ jobs:
       - name: Build the ISO
         run: |
           set -euo pipefail
-          cd src/iso/build && lb config && lb build
+          cd src/iso/build
+          # NOTE: the lb config flags are inline here on purpose. live-build
+          # auto-executes an executable auto/config script — and ours has to
+          # call `lb config` itself, which recursed forever and red-lit the
+          # first build. With no auto/config in the tree, `lb config` below
+          # just configures.
+          lb config \
+            --distribution trixie \
+            --archive-areas "main contrib non-free non-free-firmware" \
+            --bootloaders "syslinux grub-efi" \
+            --binary-images iso-hybrid \
+            --debian-installer false \
+            --memtest none \
+            --iso-application "navi" \
+            --iso-publisher "xvoidsx" \
+            --iso-volume "navi 1.2 mika RC1" \
+            --image-name "navi_1.2_mika_RC1"
+          lb build
 
       - name: Collect the ISO
         run: |

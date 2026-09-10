@@ -8,7 +8,6 @@ mode. The ISO is the clean-machine test vehicle for Mika RC1.
 
 ```text
 iso/
-├── auto/config                        # lb config wrapper (trixie, hybrid ISO)
 ├── config/
 │   ├── package-lists/navi-installer.list.chroot   # tools inside the ISO
 │   └── hooks/normal/0100-navi-iso.hook.chroot     # installer + tty1 autologin
@@ -20,12 +19,17 @@ iso/
 └── build/                             # staged tree — gitignored, built by CI
 ```
 
+(There is deliberately no `auto/config`: live-build auto-executes it, and
+ours must call `lb config` itself — that recursed forever in the first
+build. The flags live inline in `.github/workflows/iso.yml` instead.)
+
 ## How it works
 
-1. `iso/stage.sh` copies `iso/auto`, `iso/config`, and the navi payload
+1. `iso/stage.sh` copies `iso/config` and the navi payload
    (`install.sh`, `wired/`, `iso/installer`) into `iso/build/`, with the
    payload landing at `config/includes.chroot/opt/navi-iso/`.
-2. `lb config && lb build` (as root) produces `navi_1.2_mika_RC1-<arch>.hybrid.iso`.
+2. `lb config <flags> && lb build` (as root; flags are in
+   `.github/workflows/iso.yml`) produces `navi_1.2_mika_RC1-<arch>.hybrid.iso`.
 3. The ISO boots: root autologin on tty1 → `/usr/local/bin/navi-install`.
 4. `navi-install` (system layer only): disk select → type `YES` → user +
    passwords → LUKS passphrase → GPT (EFI + one LUKS2 root, PBKDF2 so GRUB
@@ -59,7 +63,7 @@ Locally, on a Debian machine as root:
 
 ```sh
 ./iso/stage.sh
-cd iso/build && lb config && lb build
+cd iso/build && lb config <flags> && lb build   # flags: see .github/workflows/iso.yml
 ```
 
 Requirements: UEFI boot for the target machine (the installer aborts on
