@@ -1,0 +1,82 @@
+# lain-says: let Lain comment on PRs as lainVII[bot].
+#
+# How it works:
+#   1. A markdown file is pushed to .github/lain-says/ on a branch with an
+#      open PR (e.g. .github/lain-says/review.md on mika).
+#   2. This workflow mints a GitHub App installation token for the lainVII app
+#      (repo secrets LAIN_APP_ID / LAIN_PRIVATE_KEY), finds the open PR for the
+#      branch, and posts each file's full contents as a PR comment authored by
+#      lainVII[bot].
+#   3. Posted files are removed in a cleanup commit so each file is said once.
+#      The cleanup push re-triggers this workflow, finds nothing queued, and
+#      exits (it also skips when the actor is the bot itself).
+#
+# The app's private key never leaves GitHub Secrets; no step here sees it.
+# Requires the lainVII app installed on the repo with
+# Contents: read/write and Pull requests: read/write.
+
+name: lain-says
+
+on:
+  push:
+    paths:
+      - '.github/lain-says/*.md'
+
+permissions:
+  contents: read
+
+jobs:
+  speak:
+    if: github.actor != 'lainvii[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Cleanup commit is pushed back with the app token instead.
+          persist-credentials: false
+
+      - name: Mint lainVII app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.LAIN_APP_ID }}
+          private-key: ${{ secrets.LAIN_PRIVATE_KEY }}
+
+      - name: Post queued comments
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(.github/lain-says/*.md)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "nothing queued for lain to say."
+            exit 0
+          fi
+
+          pr_number="$(GH_TOKEN="$APP_TOKEN" gh api \
+            "repos/${REPO}/pulls?head=${REPO%%/*}:${BRANCH}&state=open" \
+            --jq '.[0].number // empty')"
+          if [ -z "$pr_number" ]; then
+            echo "no open PR for branch ${BRANCH}; leaving files queued."
+            exit 0
+          fi
+          echo "found PR #${pr_number} for branch ${BRANCH}"
+
+          git config user.name "lainVII[bot]"
+          git config user.email "327406224+lainvii[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${APP_TOKEN}@github.com/${REPO}.git"
+
+          for f in "${files[@]}"; do
+            echo "posting ${f} ..."
+            GH_TOKEN="$APP_TOKEN" gh api \
+              "repos/${REPO}/issues/${pr_number}/comments" \
+              -F body=@"$f" >/dev/null
+            git rm -q "$f"
+          done
+
+          git commit -qm "lainVII[bot]: posted queued PR comments"
+          git push -q origin "HEAD:${BRANCH}"
+          echo "done."
