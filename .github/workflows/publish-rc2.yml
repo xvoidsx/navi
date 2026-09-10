@@ -6,7 +6,7 @@ on:
       run_id:
         description: "Successful ISO build run ID to publish"
         required: true
-        default: "BUILD_RUN_ID"
+        default: "34465948538"
       tag:
         description: "Release tag (must already point at the ISO build commit)"
         required: true
@@ -14,7 +14,7 @@ on:
       target_sha:
         description: "Commit the tag points at"
         required: true
-        default: "BUILD_COMMIT_SHA"
+        default: "1d18ed6b0739689d19fc817cd54be6b42929f3b9"
   # Push trigger exists so GitHub registers/executes this workflow from the
   # mika branch (workflow_dispatch alone is not reliably dispatchable until
   # the file lands on the default branch). Pushing this file publishes RC2.
@@ -40,7 +40,7 @@ jobs:
         with:
           name: navi-1.2-mika-RC2.iso
           # inputs.* only exist on workflow_dispatch; fall back on push events
-          run-id: ${{ inputs.run_id || 'BUILD_RUN_ID' }}
+          run-id: ${{ inputs.run_id || '34465948538' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: dist
 
@@ -59,7 +59,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # inputs.* only exist on workflow_dispatch; fall back on push events
           TAG: ${{ inputs.tag || 'v1.2-mika-RC2' }}
-          TARGET_SHA: ${{ inputs.target_sha || 'BUILD_COMMIT_SHA' }}
+          TARGET_SHA: ${{ inputs.target_sha || '1d18ed6b0739689d19fc817cd54be6b42929f3b9' }}
         run: |
           set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then
