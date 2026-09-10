@@ -1,4 +1,4 @@
-# navi ISO builder (Mika RC4).
+# navi ISO builder (Mika RC5).
 #
 # Builds the installer ISO inside a privileged debian:trixie container and
 # uploads it as a workflow artifact. These builds are heavy (debootstrap +
@@ -14,13 +14,13 @@
 # build on real Debian tooling: live-build, debootstrap, and friends from
 # trixie itself.
 
-name: navi ISO (Mika RC4)
+name: navi ISO (Mika RC5)
 
 # Bump these two for each release candidate; everything downstream derives
 # the image name, volume label, and artifact name from them.
 env:
-  RC_LABEL: RC4
-  ISO_BASENAME: navi-1.2-mika-RC4
+  RC_LABEL: RC5
+  ISO_BASENAME: navi-1.2-mika-RC5
 
 on:
   workflow_dispatch:
