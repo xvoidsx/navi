@@ -15,6 +15,13 @@ on:
         description: "Commit the tag points at"
         required: true
         default: "04622f4c47413241980dbe2feca638ffa5304e56"
+  # Push trigger exists so GitHub registers/executes this workflow from the
+  # mika branch (workflow_dispatch alone is not reliably dispatchable until
+  # the file lands on the default branch). Pushing this file publishes RC1.
+  push:
+    branches: [mika]
+    paths:
+      - .github/workflows/publish-rc1.yml
 
 jobs:
   publish:
