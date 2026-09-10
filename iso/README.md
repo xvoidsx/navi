@@ -1,8 +1,8 @@
-# navi ISO pipeline — Mika RC1
+# navi ISO pipeline — Mika RC10
 
 Builds the installer ISO: a Debian 13 (trixie) live image that boots
 **straight into the navi CLI system installer** — no desktop, no "try navi"
-mode. The ISO is the clean-machine test vehicle for Mika RC1.
+mode. The ISO is the clean-machine test vehicle for Mika RC10.
 
 ## Layout
 
@@ -12,9 +12,7 @@ iso/
 │   ├── package-lists/navi-installer.list.chroot   # tools inside the ISO
 │   └── hooks/normal/0100-navi-iso.hook.chroot     # installer + tty1 autologin
 ├── installer/
-│   ├── navi-install                   # the CLI system installer (runs on ISO)
-│   ├── navi-provision                 # first-boot provisioning wrapper
-│   └── navi-provision.service         # …as a oneshot systemd unit
+│   └── navi-install                   # the CLI system installer (runs on ISO)
 ├── stage.sh                           # assemble a live-build tree (not committed)
 └── build/                             # staged tree — gitignored, built by CI
 ```
@@ -29,32 +27,39 @@ build. The flags live inline in `.github/workflows/iso.yml` instead.)
    (`install.sh`, `wired/`, `iso/installer`) into `iso/build/`, with the
    payload landing at `config/includes.chroot/opt/navi-iso/`.
 2. `lb config <flags> && lb build` (as root; flags are in
-   `.github/workflows/iso.yml`) produces `navi_1.2_mika_RC1-<arch>.hybrid.iso`.
+   `.github/workflows/iso.yml`) produces `navi-1.2-mika-RC10-<arch>.hybrid.iso`.
 3. The ISO boots: root autologin on tty1 → `/usr/local/bin/navi-install`.
-4. `navi-install` (system layer only): disk select → type `YES` → user +
-   passwords → LUKS passphrase → GPT (EFI + one LUKS2 root, PBKDF2 so GRUB
-   can unlock `/boot`) → debootstrap trixie → users, crypttab, GRUB,
-   initramfs → copies the navi payload to `/opt/navi-iso` in the target →
-   installs + enables `navi-provision.service` → reboot.
-5. First boot: LUKS passphrase prompt → `navi-provision.service` runs
-   `install.sh --yes` as the installed user (provisioning layer: packages,
-   `/wired`, commands, identity, agents, wallpapers, flatpak, SDDM) →
-   writes the SDDM autologin drop-in (if `AUTOLOGIN=yes`) → locks doas down
-   to `permit persist` → disables itself → starts SDDM → wired desktop.
+4. `navi-install` (system layer): disk select → type `YES` → username +
+   full name + passwords + hostname → LUKS passphrase → hybrid GPT
+   (bios_grub + ESP + one LUKS2 root, so legacy BIOS and UEFI both boot) →
+   debootstrap trixie → users, crypttab, GRUB (with cryptodisk), initramfs →
+   copies the navi payload to `/opt/navi-iso` in the target → **provisions
+   the wired right there in the chroot** (`install.sh --yes` as the
+   installed user, doas temporarily nopass, locked down to `permit persist`
+   after) → reboot.
+5. First boot: LUKS passphrase prompt (twice — GRUB, then initramfs, since
+   `/boot` lives inside the encrypted root) → SDDM password login → the
+   wired desktop. No network needed at first boot: everything is already
+   provisioned.
 
-## Why provisioning runs at first boot, not in chroot
+## Why provisioning runs in the installer chroot, not at first boot
 
-`install.sh` must run as a **normal user** (it refuses root), uses
-`doas`/`sudo` for escalation, enables real systemd services (`sddm`,
-`ollama`), and touches per-user state (`~/.config`, flatpak user
-overrides). None of that works faithfully inside a debootstrap chroot.
-First-boot provisioning runs on the real system with networking up, so
-every step behaves exactly as it will for users. The installer pre-seeds
-a temporary `permit nopass` doas rule so provisioning is non-interactive;
-`navi-provision` replaces it with `permit persist` when done.
+(RC10 changed this — it used to be a first-boot oneshot service.)
+First-boot provisioning bets the whole install on the new system's network
+coming up by itself, on unknown hardware. Old wifi chips don't always
+cooperate (seen on the x200 bench: the persisted profile never connected,
+so provisioning couldn't fetch a single package). The installer's network
+is proven — it just downloaded the base system — so provisioning runs
+while it's up, inside the chroot.
 
-If provisioning ever fails, boot continues to a getty: log in as the
-installed user and run `/opt/navi-iso/install.sh --yes` by hand.
+`install.sh` refuses root, so the installer runs it as the installed user
+via `runuser` with a clean environment, with a temporary `permit nopass`
+doas rule that is replaced by `permit persist` when provisioning finishes.
+`systemctl enable` calls in the chroot do their symlink work client-side
+(into the target's `/etc`); the D-Bus daemon-reload lands on the
+disposable live session — harmless, and nothing starts target services.
+If provisioning fails, the installer dies loudly with the log path instead
+of stranding a half-built system at first boot.
 
 ## Building
 
@@ -66,12 +71,11 @@ Locally, on a Debian machine as root:
 cd iso/build && lb config <flags> && lb build   # flags: see .github/workflows/iso.yml
 ```
 
-Requirements: UEFI boot for the target machine (the installer aborts on
-BIOS boot), x86_64, network access at first boot.
+Requirements: x86_64, network access during installation. The installed
+system needs no network at first boot.
 
 ## Follow-ups (not in RC1 scaffolding)
 
 - `system/` and `scripts/installers/` are not populated yet — `install.sh`
   already tolerates their absence (skips silently).
 - Secure Boot signing is not set up (unsigned `grub-efi-amd64`).
-- BIOS/CSM target installs are not supported (UEFI-only for RC1).
