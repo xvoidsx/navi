@@ -1,0 +1,102 @@
+name: Publish Mika RC2 release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Successful ISO build run ID to publish"
+        required: true
+        default: "BUILD_RUN_ID"
+      tag:
+        description: "Release tag (must already point at the ISO build commit)"
+        required: true
+        default: "v1.2-mika-RC2"
+      target_sha:
+        description: "Commit the tag points at"
+        required: true
+        default: "BUILD_COMMIT_SHA"
+  # Push trigger exists so GitHub registers/executes this workflow from the
+  # mika branch (workflow_dispatch alone is not reliably dispatchable until
+  # the file lands on the default branch). Pushing this file publishes RC2.
+  push:
+    branches: [mika]
+    paths:
+      - .github/workflows/publish-rc2.yml
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Check out the repo (gh needs git context)
+        uses: actions/checkout@v4
+        with:
+          ref: mika
+
+      - name: Download the ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: navi-1.2-mika-RC2.iso
+          # inputs.* only exist on workflow_dispatch; fall back on push events
+          run-id: ${{ inputs.run_id || 'BUILD_RUN_ID' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist
+
+      - name: Verify ISO and checksum it
+        run: |
+          set -euo pipefail
+          ls -lh dist
+          ISO="$(ls dist/*.iso | head -n 1)"
+          test -s "$ISO"
+          ( cd dist && sha256sum "$(basename "$ISO")" > SHA256SUMS.txt )
+          cat dist/SHA256SUMS.txt
+          echo "ISO_PATH=$ISO" >> "$GITHUB_ENV"
+
+      - name: Create the prerelease and attach the ISO
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # inputs.* only exist on workflow_dispatch; fall back on push events
+          TAG: ${{ inputs.tag || 'v1.2-mika-RC2' }}
+          TARGET_SHA: ${{ inputs.target_sha || 'BUILD_COMMIT_SHA' }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, deleting it first"
+            gh release delete "$TAG" --yes
+          fi
+          gh release create "$TAG" \
+            "$ISO_PATH" dist/SHA256SUMS.txt \
+            --target "$TARGET_SHA" \
+            --title "navi 1.2 mika RC2 (test build)" \
+            --prerelease \
+            --notes "$(cat <<'NOTES_EOF'
+          # navi 1.2 "mika" — RC2 test build
+
+          This is a **pre-release test build** for fresh-machine validation. It is not the final release.
+
+          ## New in RC2: wireless support in the installer
+          - If Ethernet is plugged in, the installer uses it automatically (as before).
+          - Otherwise the installer offers **WiFi**: it scans for networks, you pick
+            one from the numbered list (or choose 0 and type the SSID for hidden
+            networks), then enter the password. Three attempts, then it asks you
+            to plug in Ethernet instead.
+          - Your WiFi profile is carried into the installed system (stored on the
+            LUKS-encrypted root), so first boot is already online for provisioning.
+
+          ## What to expect
+          - UEFI x86_64 only (no BIOS/CSM, no Secure Boot)
+          - Boots straight into the navi CLI installer — no live desktop
+          - Full-disk LUKS2 encryption; you will type your passphrase **twice** at boot (GRUB, then initramfs) — expected
+          - First boot needs network access to finish provisioning the desktop
+          - SDDM autologs you into the wired after provisioning
+
+          ## Verify
+          Compare against `SHA256SUMS.txt` attached below.
+
+          ## Feedback
+          Anything weird goes back to the mika branch — this build is the gate for the final `v1.2-mika` release.
+          NOTES_EOF
+          )"
+          gh release view "$TAG" --json url,assets --jq '{url: .url, assets: [.assets[].name]}'
