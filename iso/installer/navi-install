@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# navi-install — the navi system installer (Mika RC7)
+# navi-install — the navi system installer (Mika RC8)
 #     by rav3ndust.xyz (xvoidsx)
 #
 # Boots from the navi installer ISO (root autologin on tty1) and installs
@@ -41,69 +41,162 @@ MAPPER_NAME="cryptroot"    # dm-crypt name for the LUKS root
 
 # ---------------------------------------------------------------- ui
 #
-# The installer is navi's front door — it should look like it belongs.
-# Big ASCII wordmark, an honest progress bar across the 12 phases, and a
-# rotating tip under every phase so the wait teaches something.
+# The installer is navi's front door — it stays on screen the whole time.
+# A persistent nightshadeNeon frame: the ASCII navi wordmark and the
+# progress bar are pinned at the top and never scroll away, the live
+# install log streams through a window in the middle, and a rotating tip
+# sits pinned at the bottom. Noisy command output goes to the log file;
+# the frame tails it. Interactive prompts pause the frame and use a
+# plain screen instead.
 
 PHASE_TOTAL=12
 PHASE_N=0
-PHASE_TIP=0
+
+UI_DIR="/tmp/navi-ui"
+UI_LOG="$UI_DIR/install.log"
+UI_PHASE="$UI_DIR/phase"      # "n|label"
+
+# nightshadeNeon, as close as the linux console gets: bright ansi on black
+N_GREEN=$'\e[1;92m'     # navi green #39FF14
+N_MAGENTA=$'\e[1;95m'   # navi magenta #FF10F0
+N_CYAN=$'\e[1;96m'      # cyan #00FFFF
+N_RED=$'\e[1;91m'       # red #FF3131
+N_DIM=$'\e[2m'
+N_OFF=$'\e[0m'
 
 TIPS=(
-  "the wired is navi's name for the desktop — you're building your door into it."
-  "you'll type your disk passphrase twice at every boot: once for grub, once for the system. that's normal."
-  "first boot provisions everything — packages, agents, wallpapers. it needs network and takes a while."
+  "the wired is navi's name for the desktop. this installer is its front door."
+  "two passphrase prompts per boot — grub, then the system. that's normal."
+  "first boot provisions the wired: packages, agents, wallpapers. needs network."
   "every tool navi installs shows up in the rofi launcher."
-  "the installer syncs your clock from the network by itself — dead cmos batteries welcome."
-  "grub unlocks the disk with pbkdf2, not argon2, because grub can't do argon2. now you know."
-  "your wifi password rides into the installed system on the encrypted root — first boot is already online."
+  "the clock syncs itself from the network. dead cmos batteries welcome."
+  "grub unlocks with pbkdf2, not argon2 — grub can't do argon2. now you know."
+  "wifi profiles ride into the installed system. first boot is already online."
   "the cli installer is intentional. it is indeed very navi."
   "hostname defaults to 'navi'. name it like you'd name a ship."
   "the wired will provide."
 )
 
-banner() {
-  cat <<'EOF'
-
-                       ∅
-
-  █   █   ███   █   █  █████
-  ██  █  █   █  █   █    █
-  █ █ █  █████  █   █    █
-  █  ██  █   █   █ █     █
-  █   █  █   █    █    █████
-
-         1 . 2   " m i k a "   R C 7
-
-            the wired will provide.
-
-
-EOF
+# log: everything the installer says, plus everything noisy commands say.
+# while the frame runs it stays in the log window; while paused (prompts)
+# it also prints to the terminal so the conversation stays visible.
+ui_log() {
+  printf '%s\n' "$*" >>"$UI_LOG"
+  if [ -z "${UI_PID:-}" ]; then printf '%s\n' "$*"; fi
 }
 
-progress_bar() { # <n> <total>
-  local n="$1" total="$2" width=28 filled empty i
-  filled=$(( n * width / total ))
-  empty=$(( width - filled ))
-  printf '    '
-  for ((i=0; i<filled; i++)); do printf '█'; done
-  for ((i=0; i<empty; i++)); do printf '░'; done
-  printf '  %d%%\n' "$(( n * 100 / total ))"
-}
-
-phase() { # <label> — a major installer phase, with progress bar + tip
+phase() { # <label> — a major installer phase; moves the pinned progress bar
   PHASE_N=$((PHASE_N + 1))
-  echo
-  echo "──▶ [$PHASE_N/$PHASE_TOTAL] $1"
-  progress_bar "$PHASE_N" "$PHASE_TOTAL"
-  echo "    tip: ${TIPS[$PHASE_TIP]}"
-  PHASE_TIP=$(( (PHASE_TIP + 1) % ${#TIPS[@]} ))
+  printf '%s|%s\n' "$PHASE_N" "$1" >"$UI_PHASE"
+  ui_log ""
+  ui_log "──▶ [$PHASE_N/$PHASE_TOTAL] $1"
 }
 
-step() { echo; echo "──▶ $1"; }
-ok()   { echo "    ✓ $1"; }
-info() { echo "    · $1"; }
-die()  { echo "    ✗ $1" >&2; exit 1; }
+step() { ui_log ""; ui_log "──▶ $1"; }
+ok()   { ui_log "    ✓ $1"; }
+info() { ui_log "    · $1"; }
+die() {
+  ui_stop
+  clear
+  printf '%s    ✗ %s%s\n' "$N_RED" "$1" "$N_OFF" >&2
+  echo "    last lines of the install log:" >&2
+  tail -n 25 "$UI_LOG" 2>/dev/null | sed 's/^/    /' >&2 || true
+  echo "    full log: $UI_LOG" >&2
+  exit 1
+}
+
+_ui_bar() { # <n> <total> <width> — the pinned progress bar
+  local n="$1" total="$2" width="$3" filled i out
+  filled=$(( n * width / total ))
+  out="${N_GREEN}"
+  for ((i=0; i<filled; i++)); do out="${out}█"; done
+  out="${out}${N_DIM}"
+  for ((i=filled; i<width; i++)); do out="${out}░"; done
+  printf '%s%s' "$out" "$N_OFF"
+}
+
+_ui_draw() {
+  local lines cols log_n n label tip_i tip el shown line pline
+  lines=$(tput lines 2>/dev/null || echo 24)
+  cols=$(tput cols 2>/dev/null || echo 80)
+  [ "$lines" -ge 18 ] || lines=18
+  [ "$cols" -ge 50 ] || cols=50
+  log_n=$(( lines - 13 ))   # fixed chrome: 13 lines, rest is log window
+  [ "$log_n" -lt 2 ] && log_n=2
+
+  IFS='|' read -r n label <"$UI_PHASE" 2>/dev/null || { n="$PHASE_N"; label="starting"; }
+  [ -n "$n" ] || n=0
+
+  tip_i=$(( $(date +%s) / 8 % ${#TIPS[@]} ))
+  tip="${TIPS[$tip_i]}"
+
+  tput civis 2>/dev/null || true
+  tput cup 0 0 2>/dev/null || true
+  el=$(tput el 2>/dev/null || true)
+
+  # pinned header: wordmark + progress bar. never scrolls away.
+  printf '%s%s\n' "${N_MAGENTA}                       ∅${N_OFF}" "$el"
+  printf '%s\n' "$el"
+  printf '%s%s\n' "${N_GREEN}  █   █   ███   █   █  █████${N_OFF}" "$el"
+  printf '%s%s\n' "${N_GREEN}  ██  █  █   █  █   █    █${N_OFF}" "$el"
+  printf '%s%s\n' "${N_GREEN}  █ █ █  █████  █   █    █${N_OFF}" "$el"
+  printf '%s%s\n' "${N_GREEN}  █  ██  █   █   █ █     █${N_OFF}" "$el"
+  printf '%s%s\n' "${N_GREEN}  █   █  █   █    █    █████${N_OFF}" "$el"
+  printf '%s%s\n' "${N_CYAN}         1.2 \"mika\" RC8${N_OFF}" "$el"
+  printf '  %s %s%3d%%%s%s\n' \
+    "$(_ui_bar "$n" "$PHASE_TOTAL" 30)" "$N_DIM" "$(( n * 100 / PHASE_TOTAL ))" "$N_OFF" "$el"
+  pline="  phase $n/$PHASE_TOTAL · $label"
+  printf '%s%s%s%s\n' "$N_DIM" "${pline:0:$cols}" "$N_OFF" "$el"
+
+  # live log window: the last few lines of the install, nothing else
+  printf '%s%s\n' "${N_DIM}── install log ──${N_OFF}" "$el"
+  shown=0
+  while IFS= read -r line && [ "$shown" -lt "$log_n" ]; do
+    printf '%s%s\n' "${line:0:$cols}" "$el"
+    shown=$((shown + 1))
+  done < <(tail -n "$log_n" "$UI_LOG" 2>/dev/null)
+  while [ "$shown" -lt "$log_n" ]; do printf '%s\n' "$el"; shown=$((shown + 1)); done
+
+  # pinned tip, always on screen
+  printf '%s%s\n' "${N_DIM}── tip ──${N_OFF}" "$el"
+  printf '  %s∅ %s%s%s%s\n' "$N_MAGENTA" "$N_CYAN" "${tip:0:$((cols - 8))}" "$N_OFF" "$el"
+
+  tput ed 2>/dev/null || true
+  return 0
+}
+
+_ui_loop_kill() {
+  if [ -n "${UI_PID:-}" ]; then
+    kill "$UI_PID" 2>/dev/null || true
+    wait "$UI_PID" 2>/dev/null || true
+    UI_PID=""
+  fi
+}
+
+ui_start() { # frame on, from here until ui_stop
+  mkdir -p "$UI_DIR"
+  : >"$UI_LOG"
+  printf '0|starting\n' >"$UI_PHASE"
+  trap '_ui_loop_kill; tput cnorm 2>/dev/null || true' EXIT
+  ui_resume
+}
+
+ui_resume() { # (re)start the frame renderer
+  _ui_loop_kill
+  ( while :; do _ui_draw || true; sleep 1; done ) & UI_PID=$!
+}
+
+ui_pause() { # frame off for an interactive prompt; plain screen
+  _ui_loop_kill
+  tput cnorm 2>/dev/null || true
+  clear
+}
+
+ui_stop() { # frame off for good (success screen / fatal error)
+  trap - EXIT
+  _ui_loop_kill
+  tput cnorm 2>/dev/null || true
+}
 
 # ---------------------------------------------------------------- preflight
 
@@ -429,7 +522,7 @@ run_debootstrap() {
       --arch=amd64 \
       --components=main,contrib,non-free,non-free-firmware \
       --include=linux-image-amd64,grub-efi-amd64,grub-pc,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,console-setup,ca-certificates,firmware-linux \
-      trixie "$TARGET" http://deb.debian.org/debian; then
+      trixie "$TARGET" http://deb.debian.org/debian >>"$UI_LOG" 2>&1; then
       ok "base system installed"
       return 0
     fi
@@ -503,6 +596,15 @@ EOF
 
 echo "  [chroot] GRUB with cryptodisk (unlocks /boot inside LUKS)"
 sed -i 's/^#\?GRUB_ENABLE_CRYPTODISK=.*/GRUB_ENABLE_CRYPTODISK=y/' /etc/default/grub
+# Debian's stock grub defaults carry no GRUB_ENABLE_CRYPTODISK line at all,
+# so the sed above can no-op — and then grub-install refuses to touch the
+# encrypted disk ("attempt to install to encrypted disk without cryptodisk
+# enabled"). Append as fallback, then PROVE it landed: this failed silently
+# once on the Toshiba bench and must never do so again.
+grep -q '^GRUB_ENABLE_CRYPTODISK=y' /etc/default/grub \
+  || echo 'GRUB_ENABLE_CRYPTODISK=y' >> /etc/default/grub
+grep -q '^GRUB_ENABLE_CRYPTODISK=y' /etc/default/grub \
+  || { echo "  [chroot] FATAL: GRUB_ENABLE_CRYPTODISK=y missing from /etc/default/grub"; exit 1; }
 
 echo "  [chroot] navi boot branding (menu says navi, not Debian)"
 sed -i 's/^#\?GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR=navi/' /etc/default/grub
@@ -564,7 +666,7 @@ CHROOT_EOF
     "$TARGET/root/navi-chroot-setup.sh"
   chmod 700 "$TARGET/root/navi-chroot-setup.sh"
 
-  chroot "$TARGET" /bin/bash /root/navi-chroot-setup.sh
+  chroot "$TARGET" /bin/bash /root/navi-chroot-setup.sh >>"$UI_LOG" 2>&1
   rm -f "$TARGET/root/navi-chroot-setup.sh"
   ok "target configured: $HOSTNAME, user $NAVI_USER, GRUB, initramfs"
 }
@@ -655,12 +757,18 @@ main() {
       --who="navi installer" --why="installation in progress" \
       --mode=block "$0" "$@"
   fi
-  banner
+  ui_start
   preflight
+  # setup_network can prompt for WiFi; pick_disk/get_credentials always do.
+  # the frame pauses for the conversation, then resumes.
+  ui_pause
   setup_network
+  ui_resume
   sync_clock
+  ui_pause
   pick_disk
   get_credentials
+  ui_resume
   partition_disk
   format_encrypt
   mount_target
@@ -672,11 +780,14 @@ main() {
   # don't offer the installer again on this boot's root shell
   touch /tmp/navi-install.done
 
+  ui_stop
+  clear
+
   cat <<EOF
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.2 "mika" RC7 is installed.                      ║
+  ║   ✓  navi 1.2 "mika" RC8 is installed.                      ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase at the prompt     ║
