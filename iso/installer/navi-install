@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 #
-# navi-install — the navi system installer (Mika RC2)
+# navi-install — the navi system installer (Mika RC3)
 #     by rav3ndust.xyz (xvoidsx)
 #
 # Boots from the navi installer ISO (root autologin on tty1) and installs
-# navi to a disk: GPT layout, EFI system partition, one LUKS2-encrypted
-# root (ext4), Debian 13 (trixie) via debootstrap, kernel + GRUB with
-# cryptodisk support so the LUKS passphrase prompt appears at boot.
+# navi to a disk: GPT layout, bios_grub + EFI system partition, one
+# LUKS2-encrypted root (ext4), Debian 13 (trixie) via debootstrap, kernel +
+# GRUB with cryptodisk support so the LUKS passphrase prompt appears at boot.
+#
+# Boots on UEFI and legacy BIOS: the disk gets both an EFI system partition
+# and a bios_grub partition, and GRUB is installed for both targets.
 #
 # Network: the installer downloads Debian mid-install and first boot
 # provisions the wired — both need the machine online. Ethernet (DHCP)
@@ -20,7 +23,7 @@
 #   is provisioning, and runs from /opt/navi-iso/install.sh --yes as a
 #   first-boot systemd service (see installer/navi-provision).
 #
-# Run as root on the installer ISO. UEFI boot is required (x86_64).
+# Run as root on the installer ISO. UEFI and legacy BIOS both work (x86_64).
 
 set -euo pipefail
 
@@ -45,7 +48,7 @@ banner() {
 
          ✦  w e l c o m e   t o   n a v i !  ✦
 
-              1 . 2   " m i k a "   R C 2
+              1 . 2   " m i k a "   R C 3
 
             the wired will provide.
 
@@ -63,8 +66,12 @@ die()  { echo "    ✗ $1" >&2; exit 1; }
 preflight() {
   [ "$EUID" -eq 0 ] || die "run as root (this installer owns the disks)."
 
-  [ -d /sys/firmware/efi ] \
-    || die "this machine did not boot in UEFI mode — reboot the ISO via UEFI and try again."
+  # UEFI and legacy BIOS both work — the disk layout below boots either way.
+  if [ -d /sys/firmware/efi ]; then
+    BOOT_MODE="UEFI"
+  else
+    BOOT_MODE="legacy BIOS"
+  fi
 
   local t
   for t in debootstrap cryptsetup parted mkfs.fat mkfs.ext4 blkid nmcli curl; do
@@ -74,7 +81,7 @@ preflight() {
   [ -f "$ISO_ROOT/install.sh" ] && [ -d "$ISO_ROOT/wired" ] \
     || die "$ISO_ROOT is missing install.sh/wired (broken installer ISO)."
 
-  ok "preflight: root, UEFI, tools, navi payload"
+  ok "preflight: root, $BOOT_MODE boot, tools, navi payload"
 }
 
 # ---------------------------------------------------------------- network
@@ -282,29 +289,33 @@ get_credentials() {
 # ---------------------------------------------------------------- partitioning
 
 partition_disk() {
-  step "partitioning $DISK (GPT: EFI + LUKS root)"
+  step "partitioning $DISK (GPT: bios_grub + EFI + LUKS root)"
 
   # make sure nothing on the disk is mounted or mapped
   umount -R "$TARGET" 2>/dev/null || true
   cryptsetup close "$MAPPER_NAME" 2>/dev/null || true
   swapoff -a 2>/dev/null || true
 
+  # One layout boots everywhere: a tiny bios_grub partition lets legacy BIOS
+  # GRUB embed its core image, the ESP serves UEFI, and the rest is LUKS.
   parted -s "$DISK" mklabel gpt
-  parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
-  parted -s "$DISK" set 1 esp on
-  parted -s "$DISK" mkpart primary 513MiB 100%
+  parted -s "$DISK" mkpart primary 1MiB 3MiB
+  parted -s "$DISK" set 1 bios_grub on
+  parted -s "$DISK" mkpart ESP fat32 3MiB 515MiB
+  parted -s "$DISK" set 2 esp on
+  parted -s "$DISK" mkpart primary 515MiB 100%
   partprobe "$DISK"
   sleep 2
 
   # nvme0n1 -> nvme0n1p1 ; sda -> sda1
   local suffix=""
   if [[ "$DISK" =~ [0-9]$ ]]; then suffix="p"; fi
-  ESP_PART="${DISK}${suffix}1"
-  ROOT_PART="${DISK}${suffix}2"
+  ESP_PART="${DISK}${suffix}2"
+  ROOT_PART="${DISK}${suffix}3"
   [ -b "$ESP_PART" ] && [ -b "$ROOT_PART" ] \
     || die "partitions did not appear ($ESP_PART / $ROOT_PART)."
 
-  ok "EFI: $ESP_PART · root: $ROOT_PART"
+  ok "bios_grub: ${DISK}${suffix}1 · EFI: $ESP_PART · root: $ROOT_PART"
 }
 
 format_encrypt() {
@@ -344,7 +355,7 @@ run_debootstrap() {
   debootstrap \
     --arch=amd64 \
     --components=main,contrib,non-free,non-free-firmware \
-    --include=linux-image-amd64,grub-efi-amd64,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,network-manager,wpasupplicant,console-setup,ca-certificates,firmware-linux \
+    --include=linux-image-amd64,grub-efi-amd64,grub-pc,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,network-manager,wpasupplicant,console-setup,ca-certificates,firmware-linux \
     trixie "$TARGET" http://deb.debian.org/debian
   ok "base system installed"
 }
@@ -399,6 +410,18 @@ EOF
 echo "  [chroot] GRUB with cryptodisk (unlocks /boot inside LUKS)"
 sed -i 's/^#\?GRUB_ENABLE_CRYPTODISK=.*/GRUB_ENABLE_CRYPTODISK=y/' /etc/default/grub
 
+echo "  [chroot] navi boot branding (menu says navi, not Debian)"
+sed -i 's/^#\?GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR=navi/' /etc/default/grub
+grep -q '^GRUB_DISTRIBUTOR=' /etc/default/grub \
+  || echo 'GRUB_DISTRIBUTOR=navi' >> /etc/default/grub
+sed -i 's/^#\?GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' /etc/default/grub
+if [ -f /opt/navi-iso/wired/wp/SElain3.jpg ]; then
+  cp /opt/navi-iso/wired/wp/SElain3.jpg /boot/grub/navi-bg.jpg
+  grep -q '^GRUB_BACKGROUND=' /etc/default/grub \
+    && sed -i 's|^GRUB_BACKGROUND=.*|GRUB_BACKGROUND=/boot/grub/navi-bg.jpg|' /etc/default/grub \
+    || echo 'GRUB_BACKGROUND=/boot/grub/navi-bg.jpg' >> /etc/default/grub
+fi
+
 echo "  [chroot] user"
 useradd -m -s /bin/bash "@NAVI_USER@"
 chpasswd < /root/.navi-user-pass
@@ -420,9 +443,15 @@ systemctl enable navi-provision.service
 systemctl set-default graphical.target
 systemctl enable NetworkManager-wait-online.service
 
-echo "  [chroot] bootloader + initramfs"
-grub-install --target=x86_64-efi --efi-directory=/boot/efi \
-  --bootloader-id=navi --recheck
+echo "  [chroot] bootloader (legacy BIOS + UEFI) + initramfs"
+# MBR for legacy BIOS: always written, harmless on UEFI-only machines.
+grub-install --target=i386-pc --bootloader-id=navi --recheck "@DISK@"
+# EFI boot entry: only when the installer itself booted via UEFI,
+# because efibootmgr needs UEFI runtime to register it.
+if [ -d /sys/firmware/efi ]; then
+  grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+    --bootloader-id=navi --recheck
+fi
 update-grub
 update-initramfs -u -k all
 
@@ -437,6 +466,7 @@ CHROOT_EOF
     -e "s/@ESP_UUID@/$ESP_UUID/g" \
     -e "s/@NAVI_USER@/$NAVI_USER/g" \
     -e "s/@AUTOLOGIN@/$AUTOLOGIN/g" \
+    -e "s|@DISK@|$DISK|g" \
     "$TARGET/root/navi-chroot-setup.sh"
   chmod 700 "$TARGET/root/navi-chroot-setup.sh"
 
@@ -478,7 +508,7 @@ main() {
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.2 "mika" RC2 is installed.                      ║
+  ║   ✓  navi 1.2 "mika" RC3 is installed.                      ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase at the prompt     ║
