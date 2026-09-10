@@ -1,0 +1,34 @@
+# CLIAMP configuration
+# ( navi defaults )
+# ( this file should live at $HOME/.config/cliamp/config.toml )
+# = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
+# Default volume in dB (range: -30 to 6)
+volume = 0
+
+# Repeat mode: "off", "all", or "one"
+repeat = "All"
+
+# Start with shuffle enabled
+shuffle = false
+
+# Start with mono output (L+R downmix)
+mono = false
+
+# Color theme name (e.g. "catppuccin", "dracula")
+# Leave empty for default ANSI terminal colors
+theme = ""
+
+# EQ preset name (e.g. "Rock", "Jazz", "Classical", "Bass Boost")
+# Leave empty or "Custom" to use the manual eq values below
+eq_preset = "Custom"
+
+# 10-band EQ gains in dB (range: -12 to 12)
+# Bands: 70Hz, 180Hz, 320Hz, 600Hz, 1kHz, 3kHz, 6kHz, 12kHz, 14kHz, 16kHz
+# Only used when eq_preset is "Custom" or empty
+eq = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+visualizer = "Retro"
+speed = 1.00
+
+[soundcloud]
+enabled = true
