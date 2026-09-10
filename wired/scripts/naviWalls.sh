@@ -11,7 +11,9 @@ notifier () {
 }
 original_removal () {
 	# we need to stop the original wallpaper from displaying 
-	killall swaybg
+	killall swaybg || true
+	# and stop any animated wallpaper so the two never fight
+	killall mpvpaper || true
 }
 main () {
 	# TODO fill out logic here

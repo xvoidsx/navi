@@ -43,11 +43,8 @@ exec --no-startup-id "gnome-keyring-daemon --components=secrets"
 exec systemctl --user import-environment DISPLAY WAYLAND_DISPLAY SWAYSOCK PATH
 exec_always --no-startup-id systemctl --user set-environment PATH="/usr/games:$HOME/.local/bin:$PATH"
 
-# set wallpaper
-# static fallback first, so there's always something behind the animation
-exec swaybg -i /usr/share/navi/wired/wp/lain3wp.jpg -m fill
-# animated default: navi-lain.gif on all outputs (mpvpaper)
-exec mpvpaper ALL -o "loop panscan=1" /usr/share/navi/wired/wp/gifpaperslain/navi-lain.gif
+# set wallpaper — animated-first, static fallback handled inside
+exec /usr/bin/navi-wallpaper
 
 # setting mouse theme
 # we have two options to choose from: Yaru and Adwaita. 

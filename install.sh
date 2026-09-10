@@ -325,6 +325,8 @@ install_commands() {
 
   install_bin "nslock.sh"           "nslock"
   install_bin "naviWalls.sh"        "naviWalls"
+  install_bin "gifpaperslain.sh"    "gifpaperslain"
+  install_bin "navi-wallpaper.sh"   "navi-wallpaper"
   install_bin "wired_power_menu.sh" "power_menu"
   install_bin "remoji.sh"           "remoji"
   install_bin "learn.sh"            "learn"
