@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# navi-install — the navi system installer (Mika RC3)
+# navi-install — the navi system installer (Mika RC4)
 #     by rav3ndust.xyz (xvoidsx)
 #
 # Boots from the navi installer ISO (root autologin on tty1) and installs
@@ -266,7 +266,7 @@ read_secret_twice() { # <prompt> <var> — reads twice, must match + non-empty
 }
 
 get_credentials() {
-  step "user + encryption"
+  step "user + hostname + encryption"
   while true; do
     read -r -p "    username: " NAVI_USER
     if [[ "$NAVI_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] && [ "$NAVI_USER" != "root" ]; then
@@ -277,13 +277,24 @@ get_credentials() {
 
   read_secret_twice "password for $NAVI_USER" USER_PASS
 
+  # hostname: the machine gets a name. default is just "navi".
+  while true; do
+    read -r -p "    hostname [navi]: " h
+    h="${h:-navi}"
+    if [[ "$h" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
+      HOSTNAME="$h"
+      break
+    fi
+    echo "    lowercase letters, digits, hyphens; must start and end alphanumeric."
+  done
+
   # LUKS passphrase: strength matters here, it guards the whole disk.
   while true; do
     read_secret_twice "disk encryption passphrase (min 8 chars)" LUKS_PASS
     if [ "${#LUKS_PASS}" -ge 8 ]; then break; fi
     echo "    too short — the passphrase guards the entire disk."
   done
-  ok "user $NAVI_USER + encryption passphrase set"
+  ok "user $NAVI_USER on $HOSTNAME + encryption passphrase set"
 }
 
 # ---------------------------------------------------------------- partitioning
@@ -560,7 +571,7 @@ main() {
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.2 "mika" RC3 is installed.                      ║
+  ║   ✓  navi 1.2 "mika" RC4 is installed.                      ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase at the prompt     ║
