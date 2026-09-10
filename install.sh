@@ -227,6 +227,10 @@ deploy_share() {
   $DOAS rm -rf "$WIRED_SHARE"
   $DOAS cp -a "$WIRED_DIR" "$WIRED_SHARE"
   $DOAS chmod -R a+rX "$WIRED_SHARE"
+  # executable bit: every repo script must run no matter how the repo was
+  # fetched (clone, zip, ...). /usr/bin copies are set separately by
+  # install_commands via install -m 0755.
+  $DOAS find "$SHARE_DIR" -name '*.sh' -exec chmod 0755 {} +
   ok "wired/ deployed to $WIRED_SHARE"
 
   if [ -d "$SYSTEM_DIR" ]; then
