@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 #
-# navi-install — the navi system installer (Mika RC1)
+# navi-install — the navi system installer (Mika RC2)
 #     by rav3ndust.xyz (xvoidsx)
 #
 # Boots from the navi installer ISO (root autologin on tty1) and installs
 # navi to a disk: GPT layout, EFI system partition, one LUKS2-encrypted
 # root (ext4), Debian 13 (trixie) via debootstrap, kernel + GRUB with
 # cryptodisk support so the LUKS passphrase prompt appears at boot.
+#
+# Network: the installer downloads Debian mid-install and first boot
+# provisions the wired — both need the machine online. Ethernet (DHCP)
+# just works; otherwise the installer offers WiFi (scan, pick, password)
+# and carries the profile into the installed system.
 #
 # Hard separation, by design:
 #   THIS script does partitioning, filesystems, LUKS, debootstrap, users,
@@ -40,7 +45,7 @@ banner() {
 
          ✦  w e l c o m e   t o   n a v i !  ✦
 
-              1 . 2   " m i k a "   R C 1
+              1 . 2   " m i k a "   R C 2
 
             the wired will provide.
 
@@ -62,7 +67,7 @@ preflight() {
     || die "this machine did not boot in UEFI mode — reboot the ISO via UEFI and try again."
 
   local t
-  for t in debootstrap cryptsetup parted mkfs.fat mkfs.ext4 blkid; do
+  for t in debootstrap cryptsetup parted mkfs.fat mkfs.ext4 blkid nmcli curl; do
     command -v "$t" >/dev/null 2>&1 || die "missing tool: $t (broken installer ISO)."
   done
 
@@ -70,6 +75,136 @@ preflight() {
     || die "$ISO_ROOT is missing install.sh/wired (broken installer ISO)."
 
   ok "preflight: root, UEFI, tools, navi payload"
+}
+
+# ---------------------------------------------------------------- network
+#
+# The installer downloads Debian mid-install and first boot provisions the
+# wired — both need the machine online. Ethernet (DHCP) just works; for
+# WiFi we connect here with NetworkManager and carry the profile into the
+# installed system so first boot is already online.
+
+net_is_up() {
+  # TCP-level check against the same mirror debootstrap uses.
+  curl -sI --max-time 8 http://deb.debian.org/debian/ >/dev/null 2>&1
+}
+
+net_describe() {
+  local dev
+  dev="$(ip -o route get 1.1.1.1 2>/dev/null | awk '{print $5; exit}')"
+  [ -n "$dev" ] && echo "via $dev" || echo "link up"
+}
+
+wifi_iface() {
+  nmcli -t -f DEVICE,TYPE dev 2>/dev/null | awk -F: '$2=="wifi" {print $1; exit}'
+}
+
+wifi_available() {
+  [ -n "$(wifi_iface)" ]
+}
+
+wifi_connect() {
+  local ifname ssid pass try
+  ifname="$(wifi_iface)"
+  [ -n "$ifname" ] || { echo "    no WiFi radio found."; return 1; }
+
+  echo "    scanning for networks…"
+  nmcli dev wifi rescan ifname "$ifname" >/dev/null 2>&1 || true
+  sleep 4
+
+  local i=0
+  declare -a NETS=()
+  while IFS= read -r ssid; do
+    [ -n "$ssid" ] && [ "$ssid" != "--" ] || continue
+    NETS+=("$ssid")
+    i=$((i+1))
+    printf '    [%d] %s\n' "$i" "$ssid"
+    [ "$i" -ge 20 ] && break
+  done < <(nmcli -t -f SSID dev wifi list ifname "$ifname" 2>/dev/null | awk '!seen[$0]++')
+
+  [ "${#NETS[@]}" -gt 0 ] || { echo "    no networks found in range."; return 1; }
+  echo "    [0] type the network name manually (hidden network)"
+
+  local choice
+  while true; do
+    read -r -p "    network number: " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 0 ] && [ "$choice" -le "${#NETS[@]}" ]; then
+      break
+    fi
+    echo "    pick 0–${#NETS[@]}."
+  done
+  if [ "$choice" -eq 0 ]; then
+    read -r -p "    network name (SSID): " ssid
+    [ -n "$ssid" ] || { echo "    empty network name."; return 1; }
+  else
+    ssid="${NETS[$((choice-1))]}"
+  fi
+
+  read -r -s -p "    password for '$ssid' (empty for open networks): " pass; echo
+
+  for try in 1 2 3; do
+    echo "    connecting (attempt $try/3)…"
+    if [ -n "$pass" ]; then
+      nmcli dev wifi connect "$ssid" password "$pass" ifname "$ifname" >/dev/null 2>&1
+    else
+      nmcli dev wifi connect "$ssid" ifname "$ifname" >/dev/null 2>&1
+    fi
+    if net_is_up; then
+      ok "joined '$ssid'"
+      unset pass
+      return 0
+    fi
+    echo "    didn't connect — wrong password?"
+  done
+  unset pass
+  return 1
+}
+
+setup_network() {
+  step "network"
+
+  # NetworkManager drives both wired and wireless on the live ISO.
+  if command -v nmcli >/dev/null 2>&1; then
+    systemctl start NetworkManager 2>/dev/null || true
+    sleep 2
+  fi
+
+  if net_is_up; then
+    ok "already online $(net_describe) — carrying on"
+    return 0
+  fi
+
+  echo "    no connection yet. the installer downloads Debian as it works,"
+  echo "    and first boot provisions the wired — both need you online."
+  echo
+
+  if wifi_available; then
+    local ans
+    read -r -p "    no wired link — set up WiFi instead? [Y/n] " ans
+    case "${ans:-Y}" in
+      [Yy]*) wifi_connect || die "couldn't get online — plug in ethernet and re-run." ;;
+      *) die "offline — plug in ethernet and re-run the installer." ;;
+    esac
+  else
+    die "offline and no WiFi radio detected — plug in ethernet and re-run."
+  fi
+
+  net_is_up || die "still offline — re-check the password/cable and re-run."
+  ok "online $(net_describe)"
+}
+
+# Carry live-ISO network profiles (WiFi passphrases included) into the
+# installed system, so first boot is online for provisioning. The profiles
+# live on the LUKS-encrypted root, guarded by the disk passphrase.
+persist_network() {
+  local src=/etc/NetworkManager/system-connections
+  [ -d "$src" ] || return 0
+  local files=( "$src"/*.nmconnection )
+  [ -e "${files[0]}" ] || return 0
+  mkdir -p "$TARGET/etc/NetworkManager/system-connections"
+  cp -a "$src"/*.nmconnection "$TARGET/etc/NetworkManager/system-connections/"
+  chmod 600 "$TARGET"/etc/NetworkManager/system-connections/*.nmconnection
+  ok "network profile(s) carried into the installed system (${#files[@]} file(s))"
 }
 
 # ---------------------------------------------------------------- disk selection
@@ -209,7 +344,7 @@ run_debootstrap() {
   debootstrap \
     --arch=amd64 \
     --components=main,contrib,non-free,non-free-firmware \
-    --include=linux-image-amd64,grub-efi-amd64,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,network-manager,console-setup,ca-certificates,firmware-linux \
+    --include=linux-image-amd64,grub-efi-amd64,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,network-manager,wpasupplicant,console-setup,ca-certificates,firmware-linux \
     trixie "$TARGET" http://deb.debian.org/debian
   ok "base system installed"
 }
@@ -325,6 +460,7 @@ teardown() {
 main() {
   banner
   preflight
+  setup_network
   pick_disk
   get_credentials
   partition_disk
@@ -332,6 +468,7 @@ main() {
   mount_target
   run_debootstrap
   configure_target
+  persist_network
   teardown
 
   # don't offer the installer again on this boot's root shell
@@ -341,7 +478,7 @@ main() {
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.2 "mika" RC1 is installed.                      ║
+  ║   ✓  navi 1.2 "mika" RC2 is installed.                      ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase at the prompt     ║
