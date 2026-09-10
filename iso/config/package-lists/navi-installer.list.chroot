@@ -20,3 +20,5 @@ network-manager
 wpasupplicant
 iw
 
+
+systemd-timesyncd
