@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# navi-install — the navi system installer (Mika RC4)
+# navi-install — the navi system installer (Mika RC5)
 #     by rav3ndust.xyz (xvoidsx)
 #
 # Boots from the navi installer ISO (root autologin on tty1) and installs
@@ -363,6 +363,10 @@ mount_target() {
 
 run_debootstrap() {
   step "debootstrap Debian 13 (trixie)"
+  # Last word on the clock: the interactive steps above (disk choice,
+  # passwords, partitioning, LUKS) take minutes, and old hardware can lose
+  # the time in that window. Re-sync right before we trust signatures.
+  sync_clock
   local attempt
   for attempt in 1 2; do
     if debootstrap \
@@ -373,7 +377,10 @@ run_debootstrap() {
       ok "base system installed"
       return 0
     fi
-    [ "$attempt" = "1" ] && info "debootstrap failed — one retry (flaky network?)"
+    if [ "$attempt" = "1" ]; then
+      info "debootstrap failed — re-syncing clock, then one retry"
+      sync_clock 2>/dev/null || info "clock re-sync failed, retrying anyway"
+    fi
   done
   die "debootstrap failed twice — check the network and the clock (date -u), then re-run."
 }
@@ -550,6 +557,16 @@ sync_clock() {
 # ---------------------------------------------------------------- main
 
 main() {
+  # Never let the machine sleep mid-install: a suspend/resume cycle drops the
+  # network and can re-read a dead hardware clock (classic old-laptop
+  # failure). Inhibit sleep, idle sleep, and lid-switch handling for the
+  # whole run.
+  if [ -z "${NAVI_INHIBITED:-}" ] && command -v systemd-inhibit >/dev/null 2>&1; then
+    export NAVI_INHIBITED=1
+    exec systemd-inhibit --what=sleep:idle:handle-lid-switch \
+      --who="navi installer" --why="installation in progress" \
+      --mode=block "$0" "$@"
+  fi
   banner
   preflight
   setup_network
@@ -571,7 +588,7 @@ main() {
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.2 "mika" RC4 is installed.                      ║
+  ║   ✓  navi 1.2 "mika" RC5 is installed.                      ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase at the prompt     ║
