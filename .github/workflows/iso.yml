@@ -1,9 +1,14 @@
-# navi ISO builder (Mika RC1) — manual trigger only.
+# navi ISO builder (Mika RC1).
 #
 # Builds the installer ISO inside a privileged debian:trixie container and
 # uploads it as a workflow artifact. These builds are heavy (debootstrap +
-# a full live image), so there is deliberately NO push/PR trigger — Raven
-# dispatches each build by hand from the Actions tab.
+# a full live image), so the push trigger is path-filtered to ISO-relevant
+# changes only.
+#
+# NOTE on triggers: GitHub only registers workflows it sees on the default
+# branch, and mika is unmerged by design — so `workflow_dispatch` cannot
+# start a run until this lands on main. The push trigger below is what runs
+# RC builds in the meantime; dispatch takes over after the merge.
 #
 # The container route (instead of ubuntu-latest + sudo) keeps the whole
 # build on real Debian tooling: live-build, debootstrap, and friends from
@@ -13,6 +18,13 @@ name: navi ISO (Mika RC1)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [mika]
+    paths:
+      - 'iso/**'
+      - 'install.sh'
+      - 'wired/**'
+      - '.github/workflows/iso.yml'
 
 permissions:
   contents: read
