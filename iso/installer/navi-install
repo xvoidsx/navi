@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# navi-install — the navi system installer (Mika RC5)
+# navi-install — the navi system installer (Mika RC6)
 #     by rav3ndust.xyz (xvoidsx)
 #
 # Boots from the navi installer ISO (root autologin on tty1) and installs
@@ -512,46 +512,59 @@ teardown() {
 
 # ---------------------------------------------------------------- clock
 # Package signatures are time-sensitive. Old laptops (the machines navi
-# loves most) often have dead CMOS batteries and boot thinking it is 2013 —
+# loves most) often have dead CMOS batteries and boot with a wrong date —
 # debootstrap then dies with "Invalid Release signature". Sync before we
 # trust the network for packages.
-clock_sane() {
-  local y
-  y="$(date -u +%Y 2>/dev/null)"
-  [ "$y" -ge 2024 ] && [ "$y" -le 2035 ]
+#
+# Lesson from the Toshiba bench (RC4): a year-range sanity check is not a
+# sync. The dead RTC read "April 2026", which passed the old check while
+# being months off. Now network time is ground truth: fetch it, compare,
+# set the clock if it disagrees, and VERIFY the set took.
+net_time_epoch() {
+  # epoch seconds from an HTTP Date header; tries several sources
+  local url hdr
+  for url in http://deb.debian.org/debian/ http://www.google.com/ http://www.cloudflare.com/; do
+    hdr="$(curl -sI --max-time 10 "$url" | grep -i '^date:' | cut -d' ' -f2- | tr -d '\r')"
+    if [ -n "$hdr" ]; then
+      date -u -d "$hdr" +%s 2>/dev/null && return 0
+    fi
+    sleep 1
+  done
+  return 1
 }
 
 sync_clock() {
   step "syncing clock (package signatures need the right time)"
 
-  # timesyncd is the normal path on the live image
-  if command -v timedatectl >/dev/null 2>&1; then
+  # real NTP when the live image carries it
+  if systemctl cat systemd-timesyncd.service >/dev/null 2>&1; then
     systemctl start systemd-timesyncd 2>/dev/null || true
     timedatectl set-ntp true 2>/dev/null || true
     local i
-    for i in $(seq 1 30); do
+    for i in $(seq 1 15); do
       timedatectl show 2>/dev/null | grep -q "NTPSynchronized=yes" && break
       sleep 2
     done
   fi
 
-  # fallback: steal the time from an HTTP Date header — setup_network just
-  # proved deb.debian.org is reachable
-  if ! clock_sane; then
-    local hdr
-    hdr="$(curl -sI --max-time 15 http://deb.debian.org/debian/ \
-             | grep -i '^date:' | cut -d' ' -f2- | tr -d '\r')"
-    if [ -n "$hdr" ]; then
-      date -u -s "$hdr" 2>/dev/null || true
-      info "clock set from network time"
+  # ground truth: network time via HTTP Date. If the system clock disagrees
+  # by more than 5 minutes, set it — then prove the set took.
+  local net now diff
+  if net="$(net_time_epoch)"; then
+    now="$(date -u +%s)"
+    diff=$(( net > now ? net - now : now - net ))
+    if [ "$diff" -gt 300 ]; then
+      date -u -s "@$net" 2>/dev/null || true
+      info "clock was off by ${diff}s — set from network time"
+      now="$(date -u +%s)"
+      diff=$(( net > now ? net - now : now - net ))
+    fi
+    if [ "$diff" -le 300 ]; then
+      ok "clock: $(date -u '+%Y-%m-%d %H:%M UTC') (agrees with network time)"
+      return 0
     fi
   fi
-
-  if clock_sane; then
-    ok "clock: $(date -u '+%Y-%m-%d %H:%M UTC')"
-  else
-    die "clock is still wrong ($(date -u)) and time sync failed — package signatures will not verify. Set it by hand: date -u -s 'YYYY-MM-DD HH:MM:SS'"
-  fi
+  die "clock is wrong and time sync failed (system: $(date -u), network: ${net:-unreachable}) — package signatures will not verify. Set it by hand: date -u -s 'YYYY-MM-DD HH:MM:SS'"
 }
 
 # ---------------------------------------------------------------- main
@@ -588,7 +601,7 @@ main() {
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.2 "mika" RC5 is installed.                      ║
+  ║   ✓  navi 1.2 "mika" RC6 is installed.                      ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase at the prompt     ║
