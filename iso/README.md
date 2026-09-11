@@ -1,8 +1,8 @@
-# navi ISO pipeline — Mika RC11
+# navi ISO pipeline — Mika RC12
 
 Builds the installer ISO: a Debian 13 (trixie) live image that boots
 **straight into the navi CLI system installer** — no desktop, no "try navi"
-mode. The ISO is the clean-machine test vehicle for Mika RC11.
+mode. The ISO is the clean-machine test vehicle for Mika RC12.
 
 ## Layout
 
@@ -27,7 +27,7 @@ build. The flags live inline in `.github/workflows/iso.yml` instead.)
    (`install.sh`, `wired/`, `iso/installer`) into `iso/build/`, with the
    payload landing at `config/includes.chroot/opt/navi-iso/`.
 2. `lb config <flags> && lb build` (as root; flags are in
-   `.github/workflows/iso.yml`) produces `navi-1.2-mika-RC11-<arch>.hybrid.iso`.
+   `.github/workflows/iso.yml`) produces `navi-1.2-mika-RC12-<arch>.hybrid.iso`.
 3. The ISO boots: root autologin on tty1 → `/usr/local/bin/navi-install`.
 4. `navi-install` (system layer): disk select → type `YES` → username +
    full name + passwords + hostname → LUKS passphrase → hybrid GPT

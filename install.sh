@@ -35,7 +35,7 @@ DOAS=""
 # virtual). i3status + i3blocks were dropped: navi uses polybar, not i3bar,
 # on the X11 session.
 PKGS=(
-  i3 i3lock-fancy nitrogen pamixer wget htop opendoas lsd
+  i3 i3lock-fancy nitrogen pamixer wget curl git htop opendoas lsd
   nsxiv pulseaudio-utils xcompmgr picom waybar alacritty fonts-inter xterm
   arandr nemo rofi xss-lock feh pandoc volumeicon-alsa polybar blueman dunst
   flameshot meteo-qt pasystray ffmpeg kitty stterm surf conky-all suckless-tools
@@ -153,6 +153,12 @@ install_packages() {
   fi
   $DOAS apt install -y -t trixie-backports ydotool
   ok "ydotool installed from backports"
+  # ydotool's daemon only works for users in the input group
+  # (see /usr/share/doc/ydotool/README.Debian). group membership takes
+  # effect on the next login — i.e. the first SDDM login after install.
+  $DOAS groupadd -f input
+  $DOAS usermod -aG input "$USER"
+  ok "$USER added to the input group for ydotool"
 }
 
 # ---------------------------------------------------------------- mpvpaper

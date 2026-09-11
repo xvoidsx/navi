@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# navi-install — the navi system installer (Mika RC11)
+# navi-install — the navi system installer (Mika RC12)
 #     by rav3ndust.xyz (xvoidsx)
 #
 # Boots from the navi installer ISO (root autologin on tty1) and installs
@@ -21,7 +21,7 @@
 #   bootloader/initramfs, and provisioning. Everything else — packages,
 #   /wired, commands, identity, agents, wallpapers, flatpak, services —
 #   is provisioning, and runs from /opt/navi-iso/install.sh --yes as the
-#   installed user, right here in the installer chroot (RC11: the installer's
+#   installed user, right here in the installer chroot (RC10: the installer's
 #   network is proven, so first boot needs no network at all).
 #
 # Run as root on the installer ISO. UEFI and legacy BIOS both work (x86_64).
@@ -29,7 +29,7 @@
 set -euo pipefail
 
 # ============================== toggles ==============================
-# (RC11: provisioning happens inside the installer, not at first boot,
+# (RC10: provisioning happens inside the installer, not at first boot,
 # so there is no autologin toggle anymore — first boot is always
 # LUKS prompt(s) -> SDDM password login -> the wired.)
 
@@ -67,13 +67,16 @@ N_OFF=$'\e[0m'
 TIPS=(
   "the wired is navi's name for the desktop. this installer is its front door."
   "two passphrase prompts per boot — grub, then the system. that's normal."
-  "first boot provisions the wired: packages, agents, wallpapers. needs network."
+  "the installer provisions the wired itself — first boot needs no network at all."
   "every tool navi installs shows up in the rofi launcher."
   "the clock syncs itself from the network. dead cmos batteries welcome."
   "grub unlocks with pbkdf2, not argon2 — grub can't do argon2. now you know."
-  "wifi profiles ride into the installed system. first boot is already online."
+  "your full name lands in the system — the login screen knows who you are."
   "the cli installer is intentional. it is indeed very navi."
   "hostname defaults to 'navi'. name it like you'd name a ship."
+  "sddm is the front door: pick wayland or x11, then your password."
+  "timezone is guessed from your network — type to overrule it."
+  "∅ is the empty set. it is also the navi logo. both mean: nothing missing."
   "the wired will provide."
 )
 
@@ -135,18 +138,32 @@ _ui_draw() {
   el=$(tput el 2>/dev/null || true)
 
   # pinned header: wordmark + progress bar. never scrolls away.
-  printf '%s%s\n' "${N_MAGENTA}                       ∅${N_OFF}" "$el"
+  # the empty set breathes: magenta/cyan pulse, one breath per second.
+  if [ $(( $(date +%s) % 2 )) -eq 0 ]; then empty_c="$N_MAGENTA"; else empty_c="$N_CYAN"; fi
+  printf '%s%s\n' "${empty_c}                       ∅${N_OFF}" "$el"
   printf '%s\n' "$el"
   printf '%s%s\n' "${N_GREEN}  █   █   ███   █   █  █████${N_OFF}" "$el"
   printf '%s%s\n' "${N_GREEN}  ██  █  █   █  █   █    █${N_OFF}" "$el"
   printf '%s%s\n' "${N_GREEN}  █ █ █  █████  █   █    █${N_OFF}" "$el"
   printf '%s%s\n' "${N_GREEN}  █  ██  █   █   █ █     █${N_OFF}" "$el"
   printf '%s%s\n' "${N_GREEN}  █   █  █   █    █    █████${N_OFF}" "$el"
-  printf '%s%s\n' "${N_CYAN}         1.2 \"mika\" RC11${N_OFF}" "$el"
+  printf '%s%s\n' "${N_CYAN}         1.2 \"mika\" RC12${N_OFF}" "$el"
   printf '  %s %s%3d%%%s%s\n' \
     "$(_ui_bar "$n" "$PHASE_TOTAL" 30)" "$N_DIM" "$(( n * 100 / PHASE_TOTAL ))" "$N_OFF" "$el"
-  pline="  phase $n/$PHASE_TOTAL · $label"
-  printf '%s%s%s%s\n' "$N_DIM" "${pline:0:$cols}" "$N_OFF" "$el"
+  # phase changes shimmer: the phase line flashes green for a few seconds,
+  # then settles back to dim. a little katakana-rain energy, console-safe.
+  if [ "$(cat "$UI_DIR/phase_drawn" 2>/dev/null)" != "$n|$label" ]; then
+    printf '%s|%s' "$n" "$label" >"$UI_DIR/phase_drawn"
+    date +%s >"$UI_DIR/phase_ts"
+  fi
+  _pts=$(cat "$UI_DIR/phase_ts" 2>/dev/null || echo 0)
+  if [ $(( $(date +%s) - _pts )) -lt 4 ]; then pline_c="$N_GREEN"; else pline_c="$N_DIM"; fi
+  case $(( $(date +%s) % 4 )) in
+    0) _spin="|";; 1) _spin="/";;
+    2) _spin="-";; *) _spin="\\";;
+  esac
+  pline="  $_spin phase $n/$PHASE_TOTAL · $label"
+  printf '%s%s%s%s\n' "$pline_c" "${pline:0:$cols}" "$N_OFF" "$el"
 
   # live log window: the last few lines of the install, nothing else
   printf '%s%s\n' "${N_DIM}── install log ──${N_OFF}" "$el"
@@ -411,8 +428,93 @@ read_secret_twice() { # <prompt> <var> — reads twice, must match + non-empty
   done
 }
 
+# ---------------------------------------------------------------- locale picker
+
+# _filter_pick <prompt> <default> <choices...> — type-to-filter chooser.
+# A leading "/" just means "show me the list". Empty input takes the
+# default. Prints the choice to stdout; everything human-facing goes to
+# stderr so $(_filter_pick ...) captures only the answer.
+_filter_pick() {
+  local prompt="$1" def="$2"; shift 2
+  local input frag pick i n list_all
+  local -a matches
+  frag=""; list_all=0
+  while true; do
+    if [ -z "$frag" ] && [ "$list_all" -eq 0 ]; then
+      read -r -p "    $prompt [$def]: " input >&2
+      if [ "$input" = "/" ]; then
+        list_all=1          # browse mode: list every choice
+      elif [ -z "$input" ]; then
+        printf '%s' "$def"; return 0
+      else
+        frag="${input#/}"
+      fi
+    fi
+    matches=()
+    for i in "$@"; do
+      if [ "$list_all" -eq 1 ] || [[ "${i,,}" == *"${frag,,}"* ]]; then
+        matches+=("$i")
+      fi
+    done
+    if [ "$list_all" -eq 0 ]; then
+      # exact match (case-insensitive) wins without a list
+      for i in "${matches[@]}"; do
+        if [[ "${i,,}" == "${frag,,}" ]]; then printf '%s' "$i"; return 0; fi
+      done
+      n=${#matches[@]}
+      if [ "$n" -eq 1 ]; then printf '%s' "${matches[0]}"; return 0; fi
+      if [ "$n" -eq 0 ]; then echo "    no match — try again." >&2; frag=""; continue; fi
+    fi
+    n=${#matches[@]}
+    echo "    ${n} matches:" >&2
+    for i in "${!matches[@]}"; do
+      if [ "$i" -ge 15 ]; then
+        echo "    …and $(( n - 15 )) more — refine the filter." >&2; break
+      fi
+      printf '      %2d) %s\n' "$(( i + 1 ))" "${matches[$i]}" >&2
+    done
+    read -r -p "    number, or type more to refine: " pick >&2
+    pick="${pick#/}"
+    if [ -z "$pick" ]; then frag=""; list_all=0; continue; fi
+    if [[ "$pick" =~ ^[0-9]+$ ]] && [ "$pick" -ge 1 ] && [ "$pick" -le "$n" ]; then
+      if [ "$pick" -le 15 ]; then printf '%s' "${matches[$(( pick - 1 ))]}"; return 0; fi
+      echo "    only the first 15 are listed — refine the filter." >&2
+      frag=""; list_all=0; continue
+    fi
+    frag="$pick"; list_all=0
+  done
+}
+
+# timezone (geolocated default), locale, and console keymap. the keymap
+# matters: the LUKS passphrase is typed at a bare console prompt, so a
+# wrong map can lock you out of your own disk.
+get_locale() {
+  local tz_list geo_tz key_list
+
+  tz_list="$(timedatectl list-timezones 2>/dev/null \
+    || find /usr/share/zoneinfo -type f -printf '%P\n' 2>/dev/null | grep -v '^posix/\|^right/' | sort)"
+  geo_tz="$(curl -s --max-time 8 'http://ip-api.com/json/?fields=status,timezone' \
+    2>/dev/null | sed -n 's/.*"timezone":"\([^"]*\)".*/\1/p')"
+  if [ -n "$geo_tz" ] && ! grep -qxF "$geo_tz" <<<"$tz_list"; then geo_tz=""; fi
+  [ -z "$geo_tz" ] && geo_tz="UTC"
+  # shellcheck disable=SC2207
+  TIMEZONE="$(_filter_pick "timezone" "$geo_tz" $tz_list)"
+  ok "timezone: $TIMEZONE"
+
+  LOCALE_NAME="$(_filter_pick "locale" "en_US.UTF-8" \
+    en_US.UTF-8 en_GB.UTF-8 de_DE.UTF-8 fr_FR.UTF-8 es_ES.UTF-8 it_IT.UTF-8 \
+    pt_BR.UTF-8 pt_PT.UTF-8 nl_NL.UTF-8 pl_PL.UTF-8 ru_RU.UTF-8 ja_JP.UTF-8 \
+    zh_CN.UTF-8 zh_TW.UTF-8 ko_KR.UTF-8)"
+  ok "locale: $LOCALE_NAME"
+
+  key_list="$(localectl list-keymaps 2>/dev/null || echo "us uk de fr es it")"
+  # shellcheck disable=SC2207
+  KEYMAP="$(_filter_pick "console keymap" "us" $key_list)"
+  ok "keymap: $KEYMAP"
+}
+
 get_credentials() {
-  phase "user + hostname + encryption"
+  phase "user + locale + encryption"
   while true; do
     read -r -p "    username: " NAVI_USER
     if [[ "$NAVI_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] && [ "$NAVI_USER" != "root" ]; then
@@ -454,6 +556,9 @@ get_credentials() {
     if [ "${#LUKS_PASS}" -ge 8 ]; then break; fi
     echo "    too short — the passphrase guards the entire disk."
   done
+
+  # where and how: timezone, locale, console keymap.
+  get_locale
   ok "$FULLNAME ($NAVI_USER) on $HOSTNAME + encryption passphrase set"
 }
 
@@ -604,6 +709,28 @@ ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
 
+echo "  [chroot] timezone + locale + keymap"
+ln -sf "/usr/share/zoneinfo/@TIMEZONE@" /etc/localtime
+echo "@TIMEZONE@" > /etc/timezone
+apt-get install -y locales
+sed -i "s/^# *@LOCALE@ UTF-8/@LOCALE@ UTF-8/" /etc/locale.gen
+locale-gen
+update-locale LANG=@LOCALE@ LANGUAGE=
+printf 'LANG=%s\n' "@LOCALE@" > /etc/locale.conf
+printf 'KEYMAP=%s\n' "@KEYMAP@" > /etc/vconsole.conf
+# X11/Wayland layout, best-effort from the console keymap name
+xkb_layout="@KEYMAP@"
+xkb_layout="${xkb_layout%-latin1*}"
+[ "$xkb_layout" = "uk" ] && xkb_layout="gb"
+cat > /etc/default/keyboard <<'EOF'
+XKBMODEL="pc105"
+XKBLAYOUT="__XKB_LAYOUT__"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF
+sed -i "s/__XKB_LAYOUT__/$xkb_layout/" /etc/default/keyboard
+
 echo "  [chroot] crypttab + fstab"
 echo "@MAPPER_NAME@ UUID=@LUKS_UUID@ none luks,discard" > /etc/crypttab
 cat > /etc/fstab <<'EOF'
@@ -672,6 +799,9 @@ CHROOT_EOF
     -e "s/@ROOT_UUID@/$ROOT_UUID/g" \
     -e "s/@ESP_UUID@/$ESP_UUID/g" \
     -e "s/@NAVI_USER@/$NAVI_USER/g" \
+    -e "s|@TIMEZONE@|$TIMEZONE|g" \
+    -e "s|@LOCALE@|$LOCALE_NAME|g" \
+    -e "s|@KEYMAP@|$KEYMAP|g" \
     -e "s|@DISK@|$DISK|g" \
     "$TARGET/root/navi-chroot-setup.sh"
   chmod 700 "$TARGET/root/navi-chroot-setup.sh"
@@ -682,7 +812,7 @@ CHROOT_EOF
 }
 
 # ---------------------------------------------------------------- provisioning
-# RC11: the wired is provisioned HERE, inside the installer, not at first
+# RC10: the wired is provisioned HERE, inside the installer, not at first
 # boot. Learned on the x200 bench (RC9): first-boot provisioning bets the
 # whole install on the new system's network coming up by itself — and old
 # wifi chips don't always cooperate. The installer's network is proven (it
@@ -841,15 +971,19 @@ main() {
 
   cat <<EOF
 
+${N_MAGENTA}                       ∅${N_OFF}
+
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.2 "mika" RC11 is installed.                    ║
+  ║   ✓  navi 1.2 "mika" RC12 is installed.                      ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase (twice:           ║
   ║      once at the boot menu, once as boot begins)             ║
   ║   2. log in at the navi login screen                         ║
   ║   3. you land in the wired. welcome home.                    ║
+  ║                                                              ║
+  ║   ${N_CYAN}the wired will provide.${N_OFF}                                   ║
   ║                                                              ║
   ╚══════════════════════════════════════════════════════════════╝
 
