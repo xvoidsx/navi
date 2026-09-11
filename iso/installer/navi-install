@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# navi-install — the navi system installer (Mika RC12)
+# navi-install — the navi system installer (Mika RC13)
 #     by rav3ndust.xyz (xvoidsx)
 #
 # Boots from the navi installer ISO (root autologin on tty1) and installs
@@ -77,6 +77,11 @@ TIPS=(
   "sddm is the front door: pick wayland or x11, then your password."
   "timezone is guessed from your network — type to overrule it."
   "∅ is the empty set. it is also the navi logo. both mean: nothing missing."
+  "the wired ships with agents — ollama, opencode, omp. everybody has already entered."
+  "if a download host is down, the installer skips it and carries on. the wired provides. eventually."
+  "thirteen phases. lucky number thirteen."
+  "that stopwatch is timing your wifi, not you. probably."
+  "the ∅ breathes while it works. watch it. it's calming."
   "the wired will provide."
 )
 
@@ -89,6 +94,15 @@ ui_log() {
 }
 
 phase() { # <label> — a major installer phase; moves the pinned progress bar
+  # per-phase stopwatch: how long the previous phase took lands in the log,
+  # so a slow step (like a big download) is visible, not mysterious.
+  local now prev
+  now=$(date +%s)
+  if [ -f "$UI_DIR/phase_start" ]; then
+    prev=$(cat "$UI_DIR/phase_start" 2>/dev/null || echo "$now")
+    ui_log "    · previous phase took $(fmt_dur $(( now - prev )))"
+  fi
+  [ -d "$UI_DIR" ] && printf '%s' "$now" >"$UI_DIR/phase_start"
   PHASE_N=$((PHASE_N + 1))
   printf '%s|%s\n' "$PHASE_N" "$1" >"$UI_PHASE"
   ui_log ""
@@ -118,8 +132,15 @@ _ui_bar() { # <n> <total> <width> — the pinned progress bar
   printf '%s%s' "$out" "$N_OFF"
 }
 
+fmt_dur() { # <seconds> -> H:MM:SS (or M:SS under an hour) — installer stopwatch
+  local s="$1" h m
+  h=$(( s / 3600 )); m=$(( (s % 3600) / 60 )); s=$(( s % 60 ))
+  if [ "$h" -gt 0 ]; then printf '%d:%02d:%02d' "$h" "$m" "$s"
+  else printf '%d:%02d' "$m" "$s"; fi
+}
+
 _ui_draw() {
-  local lines cols log_n n label tip_i tip el shown line pline
+  local lines cols log_n n label tip_i tip el shown line pline _t0 _now _el
   lines=$(tput lines 2>/dev/null || echo 24)
   cols=$(tput cols 2>/dev/null || echo 80)
   [ "$lines" -ge 18 ] || lines=18
@@ -147,7 +168,12 @@ _ui_draw() {
   printf '%s%s\n' "${N_GREEN}  █ █ █  █████  █   █    █${N_OFF}" "$el"
   printf '%s%s\n' "${N_GREEN}  █  ██  █   █   █ █     █${N_OFF}" "$el"
   printf '%s%s\n' "${N_GREEN}  █   █  █   █    █    █████${N_OFF}" "$el"
-  printf '%s%s\n' "${N_CYAN}         1.2 \"mika\" RC12${N_OFF}" "$el"
+  # live stopwatch: total elapsed since the installer started, ticking
+  # once per second with the frame redraw.
+  _t0=$(cat "$UI_DIR/t0" 2>/dev/null || echo 0)
+  _now=$(date +%s)
+  if [ "$_t0" -gt 0 ]; then _el="  ${N_DIM}T+$(fmt_dur $(( _now - _t0 )))"; else _el=""; fi
+  printf '%s%s\n' "${N_CYAN}         1.2 \"mika\" RC13${_el}${N_OFF}" "$el"
   printf '  %s %s%3d%%%s%s\n' \
     "$(_ui_bar "$n" "$PHASE_TOTAL" 30)" "$N_DIM" "$(( n * 100 / PHASE_TOTAL ))" "$N_OFF" "$el"
   # phase changes shimmer: the phase line flashes green for a few seconds,
@@ -194,6 +220,7 @@ ui_start() { # frame on, from here until ui_stop
   mkdir -p "$UI_DIR"
   : >"$UI_LOG"
   printf '0|starting\n' >"$UI_PHASE"
+  date +%s >"$UI_DIR/t0"   # installer stopwatch starts here
   trap '_ui_loop_kill; tput cnorm 2>/dev/null || true' EXIT
   ui_resume
 }
@@ -975,7 +1002,7 @@ ${N_MAGENTA}                       ∅${N_OFF}
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.2 "mika" RC12 is installed.                      ║
+  ║   ✓  navi 1.2 "mika" RC13 is installed.                      ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase (twice:           ║
@@ -988,6 +1015,10 @@ ${N_MAGENTA}                       ∅${N_OFF}
   ╚══════════════════════════════════════════════════════════════╝
 
 EOF
+  _t0=$(cat "$UI_DIR/t0" 2>/dev/null || echo 0)
+  if [ "$_t0" -gt 0 ]; then
+    printf '\n    total install time: %s\n' "$(fmt_dur $(( $(date +%s) - _t0 )))"
+  fi
   local ans
   read -r -p "    reboot now? [Y/n] " ans
   case "${ans:-Y}" in [Yy]*) reboot ;; *) echo "    reboot when ready: reboot";; esac

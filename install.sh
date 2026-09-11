@@ -17,6 +17,8 @@
 
 set -euo pipefail
 
+INSTALL_T0=$SECONDS   # provision stopwatch: total time lands in done_banner
+
 # ---------------------------------------------------------------- config
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -77,10 +79,26 @@ banner() {
 EOF
 }
 
-step()  { echo; echo "──▶ $1"; }
+step()  {
+  # per-step stopwatch: how long the previous step took, so slow steps
+  # (big downloads, long builds) are visible in the log, not mysterious.
+  local now=$SECONDS
+  if [ -n "${STEP_T0:-}" ]; then
+    printf '    · previous step took %s\n' "$(fmt_dur $(( now - STEP_T0 )))"
+  fi
+  STEP_T0=$now
+  echo; echo "──▶ $1"
+}
 ok()    { echo "    ✓ $1"; }
 info()  { echo "    · $1"; }
 warn()  { echo "    ! $1"; }
+
+fmt_dur() { # <seconds> -> H:MM:SS (or M:SS under an hour)
+  local s="$1" h m
+  h=$(( s / 3600 )); m=$(( (s % 3600) / 60 )); s=$(( s % 60 ))
+  if [ "$h" -gt 0 ]; then printf '%d:%02d:%02d' "$h" "$m" "$s"
+  else printf '%d:%02d' "$m" "$s"; fi
+}
 
 confirm() {
   # confirm "question" -> 0 if yes
@@ -189,43 +207,75 @@ build_mpvpaper() {
 
 # Agent-native from the first boot: ollama runtime, opencode, and omp.
 # Binaries land in /usr/bin so every user on the machine gets them.
+#
+# Downloads go through fetch() (timeouts + retries) so a stalled host fails
+# fast instead of hanging the install forever — learned the hard way on the
+# x200, where a dead ollama.com connection sat silent for an hour. Each
+# agent host is probed first; a host that's down (or a download that fails
+# after retries) warns and moves on to the next agent instead of killing a
+# two-hour provision. Anything skipped here can be picked up later with
+# ./install.sh --yes once the network cooperates.
+fetch() { # fetch <url> [curl args...] — curl with sane timeouts and retries
+  curl -fsSL --connect-timeout 20 --max-time 600 \
+       --retry 3 --retry-all-errors "$@"
+}
+
+host_up() { # host_up <url> -> 0 if the host answers a quick probe
+  curl -fsS --connect-timeout 10 --max-time 15 -o /dev/null "$1" 2>/dev/null
+}
+
 setup_agents() {
   step "agent runtime (ollama, opencode, omp)"
 
   if command -v ollama >/dev/null 2>&1; then
     ok "ollama already installed"
+  elif ! host_up https://ollama.com/install.sh; then
+    warn "ollama.com unreachable — skipping ollama (re-run install.sh --yes later)"
   else
     info "installing ollama..."
     local tmp
     tmp="$(mktemp)"
-    curl -fsSL https://ollama.com/install.sh -o "$tmp"
-    $DOAS sh "$tmp"
-    rm -f "$tmp"
-    if $DOAS systemctl enable --now ollama 2>/dev/null; then
-      ok "ollama installed and enabled"
+    if fetch https://ollama.com/install.sh -o "$tmp" && $DOAS sh "$tmp"; then
+      if $DOAS systemctl enable --now ollama 2>/dev/null; then
+        ok "ollama installed and enabled"
+      else
+        warn "ollama installed but the service did not enable — run: doas systemctl enable --now ollama"
+      fi
     else
-      warn "ollama installed but the service did not enable — run: doas systemctl enable --now ollama"
+      warn "ollama download/install failed — skipping (re-run install.sh --yes later)"
     fi
+    rm -f "$tmp"
   fi
 
   # the official installer drops the binary in ~/.opencode/bin; promote it
   # to /usr/bin so it's on every user's PATH.
   if [ -x /usr/bin/opencode ]; then
     ok "opencode already in /usr/bin"
+  elif ! host_up https://opencode.ai/install; then
+    warn "opencode.ai unreachable — skipping opencode (re-run install.sh --yes later)"
   else
     info "installing opencode..."
-    curl -fsSL https://opencode.ai/install | bash
-    $DOAS install -m 0755 "$HOME/.opencode/bin/opencode" /usr/bin/opencode
-    ok "opencode -> /usr/bin/opencode"
+    if fetch https://opencode.ai/install | bash \
+        && [ -x "$HOME/.opencode/bin/opencode" ] \
+        && $DOAS install -m 0755 "$HOME/.opencode/bin/opencode" /usr/bin/opencode; then
+      ok "opencode -> /usr/bin/opencode"
+    else
+      warn "opencode install failed — skipping (re-run install.sh --yes later)"
+    fi
   fi
 
   # the omp installer honors PI_INSTALL_DIR — straight into /usr/bin.
   if [ -x /usr/bin/omp ]; then
     ok "omp already in /usr/bin"
+  elif ! host_up https://omp.sh/install; then
+    warn "omp.sh unreachable — skipping omp (re-run install.sh --yes later)"
   else
     info "installing omp (oh-my-pi)..."
-    curl -fsSL https://omp.sh/install | $DOAS env PI_INSTALL_DIR=/usr/bin sh
-    ok "omp -> /usr/bin/omp"
+    if fetch https://omp.sh/install | $DOAS env PI_INSTALL_DIR=/usr/bin sh; then
+      ok "omp -> /usr/bin/omp"
+    else
+      warn "omp install failed — skipping (re-run install.sh --yes later)"
+    fi
   fi
 }
 
@@ -513,6 +563,7 @@ done_banner() {
   ╚══════════════════════════════════════════════════════════════╝
 
 EOF
+  printf '    total provision time: %s\n' "$(fmt_dur $(( SECONDS - INSTALL_T0 )))"
 }
 
 # ---------------------------------------------------------------- main
