@@ -48,6 +48,10 @@ PKGS=(
   # sddm's "sddm-theme" requirement with a 1.3 MB theme, so apt never reaches
   # for sddm-theme-debian-breeze — which would drag in plasma-workspace.
   glow pipx wl-clipboard wlr-randr jq imagemagick-7.q16 tmux shotman nwg-look fastfetch sddm-theme-maldives sddm qml6-module-qtmultimedia xwayland zenity
+  # SDDM navi theme imports these QML modules explicitly (Main.qml lines 2-3);
+  # minimal installs don't pull them in on their own, and without them the
+  # greeter falls back to the default theme with a module-not-installed error.
+  qml6-module-qtquick-controls qml6-module-qtquick-layouts
   fonts-jetbrains-mono fonts-firacode fonts-noto wdisplays papirus-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak
