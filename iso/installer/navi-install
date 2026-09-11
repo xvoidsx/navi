@@ -733,6 +733,17 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 echo "  [chroot] package lists"
+# Full update stream: debootstrap only leaves the base trixie suite behind.
+# Without trixie-security and trixie-updates the machine can never receive
+# security updates (chromium, firefox-esr, ...) — apt upgrade would keep
+# reporting "all packages are up to date" while CVEs pile up. (Seen on the
+# Acer bench: chromium stuck at 150, firefox-esr at 140.)
+cat > /etc/apt/sources.list.d/trixie-security.list <<'EOF'
+deb https://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+EOF
+cat > /etc/apt/sources.list.d/trixie-updates.list <<'EOF'
+deb http://deb.debian.org/debian trixie-updates main contrib non-free non-free-firmware
+EOF
 apt-get update -qq
 
 echo "  [chroot] network stack (NetworkManager + WiFi)"
