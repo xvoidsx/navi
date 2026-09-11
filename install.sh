@@ -40,7 +40,7 @@ PKGS=(
   i3 i3lock-fancy nitrogen pamixer wget curl git htop opendoas lsd
   nsxiv pulseaudio-utils xcompmgr picom waybar alacritty fonts-inter xterm
   arandr nemo rofi xss-lock feh pandoc volumeicon-alsa polybar blueman dunst
-  flameshot meteo-qt pasystray ffmpeg kitty stterm surf conky-all suckless-tools
+  flameshot meteo-qt pasystray ffmpeg mpv kitty stterm surf conky-all suckless-tools zathura zathura-pdf-poppler
   lxpolkit lxappearance vim nnn cmus cava xscreensaver amfora sway swaylock
   swayidle swaybg grimshot xdg-desktop-portal-wlr qt5ct tty-clock wf-recorder
   brightnessctl sakura foot gsimplecal calcurse pavucontrol yaru-theme-gtk yaru-theme-icon
