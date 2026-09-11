@@ -21,7 +21,7 @@ on:
   push:
     branches: [mika]
     paths:
-      - .github/workflows/publish-rc13.yml
+      - .github/workflows/publish-rc14.yml
 
 jobs:
   publish:
