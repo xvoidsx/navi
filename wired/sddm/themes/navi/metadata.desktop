@@ -1,0 +1,13 @@
+[SddmGreeterTheme]
+Name=navi
+Description=navi's nightshadeNeon login — Lain, live in the wired
+Author=xvoidsx
+Version=1.2
+License=GPL-3.0-or-later
+Type=sddm-theme
+MainScript=Main.qml
+ConfigFile=theme.conf
+# QtVersion=6 tells SDDM to run this theme with the Qt6 greeter.
+# without it SDDM may try the Qt5 greeter, which cannot load this
+# Qt6-style QML — and the login falls back to something bland.
+QtVersion=6

@@ -20,16 +20,17 @@ Rectangle {
         id: wallpaper
         anchors.fill: parent
         fillMode: Image.PreserveAspectCrop
-        source: "file:///usr/share/navi/wired/wp/SElain3.jpg"
+        source: "file:///usr/share/navi/wired/wp/navi-lain-rgbsplit.jpg"
     }
 
-    // ---- animated background: drop a muted loop at
-    //      /usr/share/navi/wired/wp/login-loop.mp4
-    //      (ffmpeg -i navi-lain.gif -movflags +faststart -pix_fmt yuv420p login-loop.mp4)
-    //      and it plays over the static image. missing file = static only.
-    //      Qt6 has no Video type (that was Qt5); MediaPlayer + VideoOutput
-    //      is the Qt6 way. a gif-sourced mp4 has no audio track, so no
-    //      AudioOutput/mute handling is needed.
+    // ---- animated background: login-loop.mp4 plays over the static image.
+    //      regenerate it from the default gifpaper with:
+    //      ffmpeg -i navi-lain-rgbsplit.gif -movflags +faststart -pix_fmt yuv420p login-loop.mp4
+    //      missing/unplayable file = static only. Qt6 has no Video type
+    //      (that was Qt5); MediaPlayer + VideoOutput is the Qt6 way. a
+    //      gif-sourced mp4 has no audio track, so no AudioOutput/mute
+    //      handling is needed. on broken graphics (EGL) the player errors
+    //      out and the video layer hides itself — the static image stays.
     VideoOutput {
         id: motion
         anchors.fill: parent
@@ -41,6 +42,7 @@ Rectangle {
         videoOutput: motion
         loops: MediaPlayer.Infinite
         autoPlay: true
+        onErrorOccurred: (error, errorString) => motion.visible = false
     }
 
     // ---- readability veil

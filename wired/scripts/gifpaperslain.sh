@@ -23,6 +23,9 @@ main () {
 		exit 0
 	fi
 	kill_last_instance
+	# a manual pick overrides the "animated unsupported here" marker, so
+	# the chosen gifpaper gets a fair shot even on a flagged machine
+	rm -f "$HOME/.local/share/navi-wallpaper.noanim"
 	mpvpaper ALL -o "loop panscan=1" "$gifpaper" 
 }
 main

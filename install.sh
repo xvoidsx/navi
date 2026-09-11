@@ -52,6 +52,8 @@ PKGS=(
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak
   chromium firefox-esr
+  # zstd: the ollama installer needs it to unpack its payload.
+  zstd
   # wifi firmware bundle: every common wireless chipset, so networking is
   # seamless on any machine. firmware blobs are inert without matching
   # hardware, so shipping them all is safe.
@@ -281,6 +283,31 @@ setup_agents() {
       warn "omp install failed — skipping (re-run install.sh --yes later)"
     fi
   fi
+
+  # herdr (agent multiplexer): pinned release, one static binary, no
+  # installer script. arch-aware — upstream ships x86_64 and aarch64.
+  if [ -x /usr/bin/herdr ]; then
+    ok "herdr already in /usr/bin"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping herdr (re-run install.sh --yes later)"
+  else
+    info "installing herdr v0.9.0..."
+    local herdr_arch herdr_tmp
+    case "$(uname -m)" in
+      x86_64)  herdr_arch="x86_64" ;;
+      aarch64) herdr_arch="aarch64" ;;
+      *)       herdr_arch="" ;;
+    esac
+    herdr_tmp="$(mktemp)"
+    if [ -n "$herdr_arch" ] \
+        && fetch "https://github.com/ogulcancelik/herdr/releases/download/v0.9.0/herdr-linux-${herdr_arch}" -o "$herdr_tmp" \
+        && $DOAS install -m 0755 "$herdr_tmp" /usr/bin/herdr; then
+      ok "herdr v0.9.0 -> /usr/bin/herdr"
+    else
+      warn "herdr install failed — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$herdr_tmp"
+  fi
 }
 
 # ---------------------------------------------------------------- deploy: /usr/share/navi
@@ -359,7 +386,16 @@ deploy_configs() {
   # nothing else in the installer does this (flatpak theming is separate).
   deploy_config "gtk-3.0/settings.ini"        "$HOME/.config/gtk-3.0/settings.ini"
   deploy_config "gtk-4.0/settings.ini"        "$HOME/.config/gtk-4.0/settings.ini"
-  deploy_config "tmux/tmux.conf"              "$HOME/.tmux.conf"
+  # tmux reads ~/.config/tmux/tmux.conf first (since 3.1) — the XDG path
+  # is the real config. the old ~/.tmux.conf target is retired below so a
+  # stale copy can never shadow it.
+  deploy_config "tmux/tmux.conf"              "$HOME/.config/tmux/tmux.conf"
+  if [ -e "$HOME/.tmux.conf" ]; then
+    [ -e "$HOME/.tmux.conf.navi-orig" ] \
+      || cp -a "$HOME/.tmux.conf" "$HOME/.tmux.conf.navi-orig"
+    rm -f "$HOME/.tmux.conf"
+    ok "retired stale ~/.tmux.conf (config now lives at ~/.config/tmux/tmux.conf)"
+  fi
   deploy_config "vimrc"                       "$HOME/.vimrc"
   # best-effort agent configs; paths to be confirmed against the apps
   deploy_config "ai/opencode/tui.json"        "$HOME/.config/opencode/tui.json"
@@ -382,7 +418,7 @@ deploy_configs() {
 verify_wallpaper_wiring() {
   # the canonical sway config execs /usr/bin/navi-wallpaper, which paints the
   # animated wallpaper first (mpvpaper) and falls back to the static swaybg
-  # image at /usr/share/navi/wired/wp/SElain3.jpg.
+  # image at /usr/share/navi/wired/wp/navi-lain-rgbsplit.jpg.
   local cfg="$HOME/.config/sway/config"
   if grep -q "navi-wallpaper" "$cfg" 2>/dev/null; then
     ok "sway config wires navi-wallpaper (mpvpaper + swaybg fallback)"
@@ -527,6 +563,13 @@ setup_sddm() {
   $DOAS install -m 644 "$WIRED_DIR/sddm/navi.conf" /etc/sddm.conf.d/navi.conf
   $DOAS rm -rf /usr/share/sddm/themes/navi
   $DOAS cp -r "$WIRED_DIR/sddm/themes/navi" /usr/share/sddm/themes/navi
+  # the theme is dead on arrival without these — a missing Main.qml or
+  # metadata.desktop (which pins the Qt6 greeter) is how a login silently
+  # falls back to something bland.
+  for f in Main.qml metadata.desktop theme.conf; do
+    [ -f "/usr/share/sddm/themes/navi/$f" ] \
+      || warn "sddm theme file missing after deploy: $f"
+  done
   $DOAS install -m 644 "$WIRED_DIR/sessions/navi.desktop" \
     /usr/share/wayland-sessions/navi.desktop
   $DOAS install -m 644 "$WIRED_DIR/sessions/navi-x11.desktop" \
