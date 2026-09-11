@@ -49,6 +49,7 @@ PKGS=(
   fonts-jetbrains-mono fonts-firacode fonts-noto wdisplays papirus-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak
+  chromium firefox-esr
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the

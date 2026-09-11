@@ -128,10 +128,10 @@ bindsym Mod1+s exec --no-startup-id "alacritty -e vim /tmp/$(date -I).txt"
 bindsym Mod1+e exec --no-startup-id "remoji"
 
 # browser keybinds
-# alt+B for gecko-based browser
-# alt+Shift+B for chromium-based browser
-bindsym Mod1+b exec --no-startup-id "firefox-nightly"
-bindsym Mod1+Shift+b exec --no-startup-id "brave-browser-nightly"
+# alt+B for firefox-esr
+# alt+Shift+B for chromium
+bindsym Mod1+b exec --no-startup-id "firefox-esr"
+bindsym Mod1+Shift+b exec --no-startup-id "chromium"
 
 # navi-Q (pop-up terminal/agent)
 # alt+A for pop-up agent
