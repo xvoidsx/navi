@@ -43,7 +43,7 @@ PKGS=(
   flameshot meteo-qt pasystray ffmpeg kitty stterm surf conky-all suckless-tools
   lxpolkit lxappearance vim nnn cmus cava xscreensaver amfora sway swaylock
   swayidle swaybg grimshot xdg-desktop-portal-wlr qt5ct tty-clock wf-recorder
-  sakura foot gsimplecal calcurse pavucontrol yaru-theme-gtk yaru-theme-icon
+  brightnessctl sakura foot gsimplecal calcurse pavucontrol yaru-theme-gtk yaru-theme-icon
   # sddm-theme-maldives is installed alongside sddm on purpose: it satisfies
   # sddm's "sddm-theme" requirement with a 1.3 MB theme, so apt never reaches
   # for sddm-theme-debian-breeze — which would drag in plasma-workspace.
