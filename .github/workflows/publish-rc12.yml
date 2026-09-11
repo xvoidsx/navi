@@ -6,7 +6,7 @@ on:
       run_id:
         description: "Successful ISO build run ID to publish"
         required: true
-        default: "34545569505"
+        default: "34553548101"
       tag:
         description: "Release tag (must already point at the ISO build commit)"
         required: true
@@ -14,14 +14,14 @@ on:
       target_sha:
         description: "Commit the tag points at"
         required: true
-        default: "152a9dd3dde2ed53f720e1d1ec75b1d17a305970"
+        default: "bbe7b44f2de9484e600ea274cf679c623d3f87f9"
   # Push trigger exists so GitHub registers/executes this workflow from the
   # mika branch (workflow_dispatch alone is not reliably dispatchable until
   # the file lands on the default branch). Pushing this file publishes RC12.
   push:
     branches: [mika]
     paths:
-      - .github/workflows/publish-rc11.yml
+      - .github/workflows/publish-rc12.yml
 
 jobs:
   publish:
@@ -40,7 +40,7 @@ jobs:
         with:
           name: navi-1.2-mika-RC12.iso
           # inputs.* only exist on workflow_dispatch; fall back on push events
-          run-id: ${{ inputs.run_id || '34545569505' }}
+          run-id: ${{ inputs.run_id || '34553548101' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: dist
 
