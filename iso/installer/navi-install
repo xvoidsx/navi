@@ -468,7 +468,7 @@ _filter_pick() {
   frag=""; list_all=0
   while true; do
     if [ -z "$frag" ] && [ "$list_all" -eq 0 ]; then
-      read -r -p "    $prompt [$def] (type to filter, / lists all): " input >&2
+      read -r -p "    $prompt [$def] (type to filter + enter, / + enter lists all): " input >&2
       if [ "$input" = "/" ]; then
         list_all=1          # browse mode: list every choice
       elif [ -z "$input" ]; then
