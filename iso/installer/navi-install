@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# navi-install — the navi system installer (Mika RC10)
+# navi-install — the navi system installer (Mika RC11)
 #     by rav3ndust.xyz (xvoidsx)
 #
 # Boots from the navi installer ISO (root autologin on tty1) and installs
@@ -21,7 +21,7 @@
 #   bootloader/initramfs, and provisioning. Everything else — packages,
 #   /wired, commands, identity, agents, wallpapers, flatpak, services —
 #   is provisioning, and runs from /opt/navi-iso/install.sh --yes as the
-#   installed user, right here in the installer chroot (RC10: the installer's
+#   installed user, right here in the installer chroot (RC11: the installer's
 #   network is proven, so first boot needs no network at all).
 #
 # Run as root on the installer ISO. UEFI and legacy BIOS both work (x86_64).
@@ -29,7 +29,7 @@
 set -euo pipefail
 
 # ============================== toggles ==============================
-# (RC10: provisioning happens inside the installer, not at first boot,
+# (RC11: provisioning happens inside the installer, not at first boot,
 # so there is no autologin toggle anymore — first boot is always
 # LUKS prompt(s) -> SDDM password login -> the wired.)
 
@@ -142,7 +142,7 @@ _ui_draw() {
   printf '%s%s\n' "${N_GREEN}  █ █ █  █████  █   █    █${N_OFF}" "$el"
   printf '%s%s\n' "${N_GREEN}  █  ██  █   █   █ █     █${N_OFF}" "$el"
   printf '%s%s\n' "${N_GREEN}  █   █  █   █    █    █████${N_OFF}" "$el"
-  printf '%s%s\n' "${N_CYAN}         1.2 \"mika\" RC10${N_OFF}" "$el"
+  printf '%s%s\n' "${N_CYAN}         1.2 \"mika\" RC11${N_OFF}" "$el"
   printf '  %s %s%3d%%%s%s\n' \
     "$(_ui_bar "$n" "$PHASE_TOTAL" 30)" "$N_DIM" "$(( n * 100 / PHASE_TOTAL ))" "$N_OFF" "$el"
   pline="  phase $n/$PHASE_TOTAL · $label"
@@ -682,7 +682,7 @@ CHROOT_EOF
 }
 
 # ---------------------------------------------------------------- provisioning
-# RC10: the wired is provisioned HERE, inside the installer, not at first
+# RC11: the wired is provisioned HERE, inside the installer, not at first
 # boot. Learned on the x200 bench (RC9): first-boot provisioning bets the
 # whole install on the new system's network coming up by itself — and old
 # wifi chips don't always cooperate. The installer's network is proven (it
@@ -843,7 +843,7 @@ main() {
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.2 "mika" RC10 is installed.                    ║
+  ║   ✓  navi 1.2 "mika" RC11 is installed.                    ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase (twice:           ║

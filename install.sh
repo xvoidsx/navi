@@ -42,7 +42,10 @@ PKGS=(
   lxpolkit lxappearance vim nnn cmus cava xscreensaver amfora sway swaylock
   swayidle swaybg grimshot xdg-desktop-portal-wlr qt5ct tty-clock wf-recorder
   sakura foot gsimplecal calcurse pavucontrol yaru-theme-gtk yaru-theme-icon
-  glow pipx wl-clipboard wlr-randr jq imagemagick-7.q16 tmux shotman nwg-look fastfetch sddm qml6-module-qtmultimedia
+  # sddm-theme-maldives is installed alongside sddm on purpose: it satisfies
+  # sddm's "sddm-theme" requirement with a 1.3 MB theme, so apt never reaches
+  # for sddm-theme-debian-breeze — which would drag in plasma-workspace.
+  glow pipx wl-clipboard wlr-randr jq imagemagick-7.q16 tmux shotman nwg-look fastfetch sddm-theme-maldives sddm qml6-module-qtmultimedia
   fonts-jetbrains-mono fonts-firacode fonts-noto wdisplays papirus-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak
@@ -251,6 +254,13 @@ backup_if_changed() {
     cp -a "$dest" "$BACKUP_DIR/$rel"
     info "backed up ~/$rel"
   fi
+}
+
+backup_file() {
+  # backup_file <path> — stashes the original at <path>.navi-orig if it exists
+  local f="$1"
+  [ -e "$f" ] || return 0
+  [ -e "$f.navi-orig" ] || $DOAS cp -a "$f" "$f.navi-orig"
 }
 
 deploy_config() {
