@@ -47,11 +47,15 @@ PKGS=(
   # sddm-theme-maldives is installed alongside sddm on purpose: it satisfies
   # sddm's "sddm-theme" requirement with a 1.3 MB theme, so apt never reaches
   # for sddm-theme-debian-breeze — which would drag in plasma-workspace.
-  glow pipx wl-clipboard wlr-randr jq imagemagick-7.q16 tmux shotman nwg-look fastfetch sddm-theme-maldives sddm qml6-module-qtmultimedia
+  glow pipx wl-clipboard wlr-randr jq imagemagick-7.q16 tmux shotman nwg-look fastfetch sddm-theme-maldives sddm qml6-module-qtmultimedia xwayland zenity
   fonts-jetbrains-mono fonts-firacode fonts-noto wdisplays papirus-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak
   chromium firefox-esr
+  # wifi firmware bundle: every common wireless chipset, so networking is
+  # seamless on any machine. firmware blobs are inert without matching
+  # hardware, so shipping them all is safe.
+  firmware-realtek firmware-iwlwifi firmware-atheros firmware-brcm80211 firmware-mediatek
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -351,6 +355,10 @@ deploy_configs() {
   deploy_config "herdr/config.toml"          "$HOME/.config/herdr/config.toml"
   deploy_config "conky.conf"                  "$HOME/.config/conky/conky.conf"
   deploy_config "dunstrc"                     "$HOME/.config/dunst/dunstrc"
+  # native GTK apps (e.g. gsimplecal) need a theme set explicitly —
+  # nothing else in the installer does this (flatpak theming is separate).
+  deploy_config "gtk-3.0/settings.ini"        "$HOME/.config/gtk-3.0/settings.ini"
+  deploy_config "gtk-4.0/settings.ini"        "$HOME/.config/gtk-4.0/settings.ini"
   deploy_config "tmux/tmux.conf"              "$HOME/.tmux.conf"
   deploy_config "vimrc"                       "$HOME/.vimrc"
   # best-effort agent configs; paths to be confirmed against the apps
@@ -372,12 +380,12 @@ deploy_configs() {
 }
 
 verify_wallpaper_wiring() {
-  # the canonical sway config should paint the animated wallpaper first boot:
-  #   exec swaybg  -i /usr/share/navi/wired/wp/lain3wp.jpg -m fill   (fallback)
-  #   exec mpvpaper ALL -o "loop panscan=1" /usr/share/navi/wired/wp/gifpaperslain/navi-lain.gif
+  # the canonical sway config execs /usr/bin/navi-wallpaper, which paints the
+  # animated wallpaper first (mpvpaper) and falls back to the static swaybg
+  # image at /usr/share/navi/wired/wp/SElain3.jpg.
   local cfg="$HOME/.config/sway/config"
-  if grep -q "mpvpaper" "$cfg" 2>/dev/null && grep -q "swaybg" "$cfg" 2>/dev/null; then
-    ok "sway config wires mpvpaper + swaybg fallback"
+  if grep -q "navi-wallpaper" "$cfg" 2>/dev/null; then
+    ok "sway config wires navi-wallpaper (mpvpaper + swaybg fallback)"
   else
     warn "sway config lacks wallpaper exec lines — check wired/sway/config"
   fi
@@ -430,7 +438,10 @@ install_commands() {
 
 setup_doas() {
   step "doas"
-  if [ -f /etc/doas.conf ] && grep -q "permit persist $USER as root" /etc/doas.conf; then
+  # Respect ANY existing permit rule for this user — e.g. the installer's
+  # temporary 'permit nopass' during provisioning. Appending a second rule
+  # flips doas to last-match-wins and would silently revoke the nopass.
+  if [ -f /etc/doas.conf ] && grep -q "permit .*$USER as root" /etc/doas.conf; then
     ok "doas already configured for $USER"
   else
     printf 'permit persist %s as root\n' "$USER" | $DOAS tee -a /etc/doas.conf >/dev/null

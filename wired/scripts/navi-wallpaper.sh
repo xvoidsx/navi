@@ -21,14 +21,17 @@ if pgrep -x mpvpaper >/dev/null 2>&1 || pgrep -x swaybg >/dev/null 2>&1; then
 fi
 
 # 1. animated default
+# mpvpaper's own output goes to a log file (not /dev/null) so a runtime
+# failure can actually be diagnosed on the machine.
 if command -v mpvpaper >/dev/null 2>&1 && [ -f "$ANIMATED" ]; then
-  mpvpaper ALL -o "loop panscan=1" "$ANIMATED" >/dev/null 2>&1 &
+  mkdir -p "$HOME/.local/share"
+  mpvpaper ALL -o "loop panscan=1" "$ANIMATED" >>"$HOME/.local/share/navi-wallpaper.log" 2>&1 &
   sleep 2
   if pgrep -x mpvpaper >/dev/null 2>&1; then
     log "animated wallpaper running (mpvpaper)"
     exit 0
   fi
-  log "mpvpaper failed to stay up — falling back to static"
+  log "mpvpaper failed to stay up — see ~/.local/share/navi-wallpaper.log; falling back to static"
 else
   [ -f "$ANIMATED" ] || log "no animated wallpaper at $ANIMATED"
   command -v mpvpaper >/dev/null 2>&1 || log "mpvpaper not installed"

@@ -14,13 +14,13 @@
 # build on real Debian tooling: live-build, debootstrap, and friends from
 # trixie itself.
 
-name: navi ISO (Mika RC13)
+name: navi ISO (Mika RC14)
 
 # Bump these two for each release candidate; everything downstream derives
 # the image name, volume label, and artifact name from them.
 env:
-  RC_LABEL: RC13
-  ISO_BASENAME: navi-1.2-mika-RC13
+  RC_LABEL: RC14
+  ISO_BASENAME: navi-1.2-mika-RC14
 
 on:
   workflow_dispatch:

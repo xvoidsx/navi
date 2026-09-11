@@ -5,7 +5,9 @@
 * {
     font-size: 10px; /* Font size for better readability */
     /* font-family: Cascadia Code; */
-    font-family: Noto Sans;
+    /* Font Awesome first: the battery/network glyphs are FA codepoints,
+       which Noto Sans doesn't carry. Noto covers everything else. */
+    font-family: "Font Awesome 6 Free", "Noto Sans";
     font-weight: bold; /* Make all text bold */
 }
 

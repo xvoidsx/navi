@@ -114,7 +114,7 @@ bindsym $mod+Shift+g exec --no-startup-id "swaymsg 'gaps inner 0; gaps outer 0' 
 # navi launchers
 bindsym $mod+d exec dmenu_run -fn "NotoSans-10" -nb black -nf pink -sb green -sf red -p "nightshade - run command: "
 bindsym $mod+Shift+a exec --no-startup-id i3-dmenu-desktop --dmenu='dmenu -fn "NotoSans-10" -i -nb black -nf pink -sb green -sf red -p "nightshade - Applications List: "'
-bindsym $mod+Tab exec --no-startup-id "rofi -show combi drun,run"
+bindsym $mod+Tab exec --no-startup-id "rofi -show combi -combi-modi window,drun,run"
 
 # other useful binds
 bindsym $mod+Shift+n exec --no-startup-id "dunstctl history-pop"

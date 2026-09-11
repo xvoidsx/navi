@@ -20,6 +20,13 @@ network-manager
 wpasupplicant
 iw
 
+# wifi firmware bundle for the live environment (matches the target's bundle
+# in install.sh) — the installer's own wifi must work on any machine.
+firmware-realtek
+firmware-iwlwifi
+firmware-atheros
+firmware-brcm80211
+firmware-mediatek
 
 systemd-timesyncd
 

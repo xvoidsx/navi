@@ -27,14 +27,20 @@ Rectangle {
     //      /usr/share/navi/wired/wp/login-loop.mp4
     //      (ffmpeg -i navi-lain.gif -movflags +faststart -pix_fmt yuv420p login-loop.mp4)
     //      and it plays over the static image. missing file = static only.
-    Video {
+    //      Qt6 has no Video type (that was Qt5); MediaPlayer + VideoOutput
+    //      is the Qt6 way. a gif-sourced mp4 has no audio track, so no
+    //      AudioOutput/mute handling is needed.
+    VideoOutput {
         id: motion
         anchors.fill: parent
         fillMode: VideoOutput.PreserveAspectCrop
+    }
+    MediaPlayer {
+        id: player
         source: "file:///usr/share/navi/wired/wp/login-loop.mp4"
-        autoPlay: true
+        videoOutput: motion
         loops: MediaPlayer.Infinite
-        muted: true
+        autoPlay: true
     }
 
     // ---- readability veil
