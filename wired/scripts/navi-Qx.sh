@@ -14,8 +14,8 @@ export PATH="$HOME/.local/bin:$HOME/.opencode/bin:/usr/local/bin:/usr/bin:/bin:$
 PI="pi"
 OMP="omp"
 OC="opencode"
+G="goose"
 CX="codex"
-AGY="agy"
 
 APP_ID="navi-Q"
 
