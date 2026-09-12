@@ -16,7 +16,7 @@ PI="pi"
 OMP="omp"
 OC="opencode"
 G="goose"
-HERMES="hermes"
+H="hermes"
 CX="codex"
 # - - - - - - - 
 APP_ID="navi-Q"
