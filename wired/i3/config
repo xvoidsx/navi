@@ -1,0 +1,402 @@
+################################################################
+#                                                              #
+#                                      ##                      #
+#                                      ##                      #
+#                                      ##                      #
+#                                                              #
+#     ##.####    :####    ##:  :##   ####                      #
+#     #######    ######    ##  ##    ####                      #
+#     ###  :##   #:  :##  :##  ##:     ##                      #
+#     ##    ##    :#####   ##..##      ##                      #
+#     ##    ##  .#######   ##::##      ##                      #
+#     ##    ##  ## .  ##   :####:      ##                      #
+#     ##    ##  ##:  ###    ####       ##                      #
+#     ##    ##  ########    ####    ########                   #
+#     ##    ##    ###.##    :##:    ########                   #
+#                                                              #
+################################################################
+# wired config ( X11 version )
+#
+# This file should live at:
+#   ~/.config/i3/config
+#
+# The configuration is intentionally kept in parity with the
+# Wayland/Sway wired configuration wherever possible.
+#
+# wiredWM:
+#   https://github.com/rav3ndust/wiredWM
+#   https://codeberg.org/rav3ndust/wiredWM
+#
+# In this config:
+#   $mod = Super / Windows key
+#   Mod1 = Alt
+################################################################
+
+set $mod Mod4
+
+
+################################################################
+# ENVIRONMENT / SESSION
+################################################################
+
+# Import the user's current environment into the systemd user
+# session. This keeps applications launched by wired consistent
+# with applications launched elsewhere in the desktop session.
+exec --no-startup-id systemctl --user import-environment DISPLAY XAUTHORITY PATH XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP
+
+exec_always --no-startup-id systemctl --user set-environment PATH="/usr/games:$HOME/.local/bin:$PATH"
+
+# Secret store
+# A GUI for inspecting the keyring is available through `seahorse`.
+exec --no-startup-id "gnome-keyring-daemon --components=secrets"
+
+
+################################################################
+# APPEARANCE
+################################################################
+
+# Window borders
+for_window [class="^.*"] border pixel 2
+
+# Gaps
+gaps inner 3
+gaps outer 3
+
+# nightshadeNeon
+client.focused          #ff10f0 #000000 #39ff14 #39ff14 #ff10f0
+client.focused_inactive #333333 #000000 #00ffff #ffffff #333333
+client.unfocused        #222222 #000000 #ff3131 #ffffff #222222
+
+# Window title font
+font pango:Noto Sans 10
+
+
+################################################################
+# INPUT
+################################################################
+
+# Mouse / floating window movement
+floating_modifier $mod
+
+# Keyboard layout
+exec --no-startup-id "setxkbmap -layout us,de"
+
+
+################################################################
+# STARTUP APPLICATIONS
+################################################################
+
+# Notifications
+exec --no-startup-id dunst
+
+# Network management
+exec --no-startup-id nm-applet
+
+# Bluetooth
+exec --no-startup-id sh -c "sleep 1 && blueman-applet &"
+
+# Weather
+exec --no-startup-id sh -c "sleep 1 && meteo-qt &"
+
+# Privilege escalation
+exec --no-startup-id lxpolkit
+
+# Wallpaper
+exec --no-startup-id nitrogen --restore
+
+# X11 compositor
+exec --no-startup-id "picom -f -e 0.9 --corner-radius 3"
+
+# Desktop information
+exec --no-startup-id conky
+
+
+################################################################
+# LOCK / POWER MANAGEMENT
+################################################################
+
+# Lock the X11 session before suspend and when idle.
+#
+# xss-lock integrates the lock command with X11/logind suspend
+# handling. i3lock-fancy provides the actual lock screen.
+exec --no-startup-id "xss-lock --transfer-sleep-lock -- i3lock-fancy"
+
+# Lock after 10 minutes of inactivity.
+exec --no-startup-id "xautolock -time 10 -locker 'i3lock-fancy'"
+
+# Suspend after 15 minutes of inactivity.
+#
+# This is intentionally separate from the lock timer so that:
+#   10m = lock
+#   15m = suspend
+#
+# xss-lock handles locking around system suspend as well.
+exec --no-startup-id "xautolock -time 15 -locker 'systemctl suspend'"
+
+# Suspend when the laptop lid is closed.
+exec --no-startup-id "xss-lock --transfer-sleep-lock -- i3lock-fancy"
+
+
+################################################################
+# AUDIO
+################################################################
+
+set $refresh_i3status killall -SIGUSR1 i3status
+
+bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +10% && $refresh_i3status && notify-send "wired helper" "volume +10"
+
+bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -10% && $refresh_i3status && notify-send "wired helper" "volume -10"
+
+bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && $refresh_i3status && notify-send "wired helper" "volume muted"
+
+bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && $refresh_i3status
+
+
+################################################################
+# CORE APPLICATIONS
+################################################################
+
+# Terminal
+bindsym $mod+Return exec alacritty
+
+# Kill focused window
+bindsym $mod+Shift+q kill
+
+
+################################################################
+# GAPS
+################################################################
+
+bindsym $mod+g exec --no-startup-id "i3-msg 'gaps inner 3; gaps outer 3' && notify-send 'wired helper' 'Gaps enabled.'"
+
+bindsym $mod+Shift+g exec --no-startup-id "i3-msg 'gaps inner 0; gaps outer 0' && notify-send 'wired helper' 'Gaps disabled.'"
+
+
+################################################################
+# LAUNCHERS
+################################################################
+
+# Command launcher
+bindsym $mod+d exec --no-startup-id "dmenu_run -fn 'NotoSans-10' -nb black -nf pink -sb green -sf red -p 'nightshade - run command: '"
+
+# Applications
+bindsym $mod+Shift+a exec --no-startup-id "i3-dmenu-desktop --dmenu='dmenu -fn \"NotoSans-10\" -i -nb black -nf pink -sb green -sf red -p \"nightshade - Applications List: \"'"
+
+# Rofi
+bindsym $mod+Tab exec --no-startup-id "rofi -show combi -combi-modi window,drun,run"
+
+
+################################################################
+# WIRED HELPERS
+################################################################
+
+# Notification history
+bindsym $mod+Shift+n exec --no-startup-id "dunstctl history-pop"
+
+# Calendar
+bindsym $mod+c exec --no-startup-id "gsimplecal"
+
+# Terminal calendar / agenda
+bindsym Mod1+c exec --no-startup-id "alacritty -e calcurse"
+
+# File manager
+bindsym $mod+Shift+f exec --no-startup-id "nemo"
+
+# Caps Lock notification
+bindsym Caps_Lock exec --no-startup-id "notify-send 'wired helper' 'Caps Lock pressed.'"
+
+# Screenshot
+# X11-native screenshot implementation.
+bindsym $mod+p exec --no-startup-id "flameshot gui"
+
+# System monitor
+bindsym Mod1+h exec --no-startup-id "alacritty -e htop"
+
+# Disposable scratchpad note
+bindsym Mod1+s exec --no-startup-id "alacritty -e vim /tmp/$(date -I).txt"
+
+# Emoji picker
+bindsym Mod1+e exec --no-startup-id "remoji"
+
+# Learn
+bindsym $mod+Shift+h exec --no-startup-id "learn"
+
+
+################################################################
+# BROWSERS
+################################################################
+
+# firefox-esr
+bindsym Mod1+b exec --no-startup-id "firefox-esr"
+
+# chromium
+bindsym Mod1+Shift+b exec --no-startup-id "chromium"
+
+
+################################################################
+# NAVI-Q
+################################################################
+
+# Pop-up agent
+bindsym Mod1+a exec --no-startup-id "navi-Qx agent"
+
+# Pop-up terminal
+bindsym Mod1+Shift+a exec --no-startup-id "navi-Qx terminal"
+
+
+################################################################
+# FOCUS
+################################################################
+
+bindsym $mod+j focus left
+bindsym $mod+k focus down
+bindsym $mod+l focus up
+bindsym $mod+semicolon focus right
+
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+
+
+################################################################
+# MOVE WINDOWS
+################################################################
+
+bindsym $mod+Shift+j move left
+bindsym $mod+Shift+k move down
+bindsym $mod+Shift+l move up
+bindsym $mod+Shift+semicolon move right
+
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+
+
+################################################################
+# LAYOUT
+################################################################
+
+bindsym $mod+h split h
+bindsym $mod+v split v
+
+bindsym $mod+f fullscreen toggle
+
+bindsym $mod+s layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+e layout toggle split
+
+bindsym $mod+Shift+space floating toggle
+bindsym $mod+space focus mode_toggle
+
+bindsym $mod+a focus parent
+
+bindsym $mod+Shift+s sticky toggle
+
+
+################################################################
+# WORKSPACES
+################################################################
+
+set $ws1 "1"
+set $ws2 "2"
+set $ws3 "3"
+set $ws4 "4"
+set $ws5 "5"
+set $ws6 "6"
+set $ws7 "7"
+set $ws8 "8"
+set $ws9 "9"
+set $ws10 "10"
+
+# Switch workspace
+bindsym $mod+1 workspace number $ws1
+bindsym $mod+2 workspace number $ws2
+bindsym $mod+3 workspace number $ws3
+bindsym $mod+4 workspace number $ws4
+bindsym $mod+5 workspace number $ws5
+bindsym $mod+6 workspace number $ws6
+bindsym $mod+7 workspace number $ws7
+bindsym $mod+8 workspace number $ws8
+bindsym $mod+9 workspace number $ws9
+bindsym $mod+0 workspace number $ws10
+
+# Move focused container
+bindsym $mod+Shift+1 move container to workspace number $ws1
+bindsym $mod+Shift+2 move container to workspace number $ws2
+bindsym $mod+Shift+3 move container to workspace number $ws3
+bindsym $mod+Shift+4 move container to workspace number $ws4
+bindsym $mod+Shift+5 move container to workspace number $ws5
+bindsym $mod+Shift+6 move container to workspace number $ws6
+bindsym $mod+Shift+7 move container to workspace number $ws7
+bindsym $mod+Shift+8 move container to workspace number $ws8
+bindsym $mod+Shift+9 move container to workspace number $ws9
+bindsym $mod+Shift+0 move container to workspace number $ws10
+
+
+################################################################
+# LOCK / WIRED CONTROLS
+################################################################
+
+# Manual lock
+bindsym $mod+Shift+z exec --no-startup-id "i3lock-fancy"
+
+# Resize mode
+bindsym $mod+r mode "resize"
+
+mode "resize" {
+    bindsym j resize shrink width 10 px or 10 ppt
+    bindsym k resize grow height 10 px or 10 ppt
+    bindsym l resize shrink height 10 px or 10 ppt
+    bindsym semicolon resize grow width 10 px or 10 ppt
+
+    bindsym Left resize shrink width 10 px or 10 ppt
+    bindsym Down resize grow height 10 px or 10 ppt
+    bindsym Up resize shrink height 10 px or 10 ppt
+    bindsym Right resize grow width 10 px or 10 ppt
+
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+    bindsym $mod+r mode "default"
+}
+
+
+################################################################
+# SESSION CONTROL
+################################################################
+
+# Reload configuration
+bindsym $mod+Shift+c reload
+
+# Restart i3 in-place
+bindsym $mod+Shift+r restart
+
+# Logout confirmation
+bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit command detected. Are you sure you would like to logout of wiredWM? This session will be closed.' -B 'Yes, log out of wiredWM' 'i3-msg exit'"
+
+
+################################################################
+# POLYBAR
+################################################################
+
+# polybar is the status bar we use in the X session
+exec --no-startup-id polybar
+
+
+################################################################
+# I3 DEFAULTS
+################################################################
+
+default_border pixel 3
+
+
+################################################################
+# LOCAL MACHINE
+################################################################
+#
+# Put machine-specific commands below this line.
+# Do not commit local-machine configuration to the public repo.
+#
+################################################################
+

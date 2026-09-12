@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=navi (X11)
+Comment=the wired desktop (X11 fallback session)
+Exec=i3
+TryExec=i3

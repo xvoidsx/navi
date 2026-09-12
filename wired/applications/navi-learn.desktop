@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=learn
+Comment=The navi help system — learn the wired
+Exec=learn
+Terminal=true
+Icon=help-browser
+Categories=Utility;Documentation;
+NoDisplay=false

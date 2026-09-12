@@ -1,0 +1,38 @@
+#!/bin/sh
+# 0100-navi-iso.hook.chroot — runs inside the ISO chroot during lb build.
+#
+# Installs the navi system installer and wires the ISO to boot straight
+# into it: root autologin on tty1, and root's login shell runs navi-install.
+# Expects the navi payload staged at /opt/navi-iso (see iso/stage.sh).
+
+set -e
+
+ISO_ROOT="/opt/navi-iso"
+
+if [ ! -f "$ISO_ROOT/installer/navi-install" ]; then
+  echo "navi-iso hook: $ISO_ROOT/installer/navi-install missing — did stage.sh run?" >&2
+  exit 1
+fi
+
+install -m 0755 "$ISO_ROOT/installer/navi-install" /usr/local/bin/navi-install
+echo "navi-iso hook: navi-install -> /usr/local/bin/navi-install"
+
+# tty1: autologin root, no password prompt
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+cat > /etc/systemd/system/getty@tty1.service.d/navi-autologin.conf <<'EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+EOF
+
+# root's login shell boots straight into the installer. after a successful
+# install the flag file exists and root just gets a shell (for debugging).
+cat > /root/.bash_profile <<'EOF'
+# navi installer ISO — boot straight into the system installer
+if [ ! -f /tmp/navi-install.done ]; then
+  /usr/local/bin/navi-install
+fi
+EOF
+chmod 644 /root/.bash_profile
+
+echo "navi-iso hook: tty1 autologin + installer-on-boot wired"

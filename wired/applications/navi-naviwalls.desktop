@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=naviWalls
+Comment=Switch wallpapers through a GUI
+Exec=naviWalls
+Icon=preferences-desktop-wallpaper
+Categories=Utility;
+NoDisplay=false

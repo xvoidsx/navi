@@ -1,0 +1,104 @@
+# navi ISO builder (Mika RC6).
+#
+# Builds the installer ISO inside a privileged debian:trixie container and
+# uploads it as a workflow artifact. These builds are heavy (debootstrap +
+# a full live image), so the push trigger is path-filtered to ISO-relevant
+# changes only.
+#
+# NOTE on triggers: GitHub only registers workflows it sees on the default
+# branch, and mika is unmerged by design — so `workflow_dispatch` cannot
+# start a run until this lands on main. The push trigger below is what runs
+# RC builds in the meantime; dispatch takes over after the merge.
+#
+# The container route (instead of ubuntu-latest + sudo) keeps the whole
+# build on real Debian tooling: live-build, debootstrap, and friends from
+# trixie itself.
+
+name: navi ISO (Mika RC16)
+
+# Bump these two for each release candidate; everything downstream derives
+# the image name, volume label, and artifact name from them.
+env:
+  RC_LABEL: RC16
+  ISO_BASENAME: navi-1.2-mika-RC16
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [mika]
+    paths:
+      - 'iso/**'
+      - 'install.sh'
+      - 'wired/**'
+      - '.github/workflows/iso.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-24.04
+    container:
+      image: debian:trixie
+      options: --privileged
+    steps:
+      # NOTE: actions/checkout needs node, which debian:trixie-slim lacks,
+      # so the repo is cloned with plain git instead.
+      - name: Clone navi (mika)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates
+          git clone --depth 1 --branch mika \
+            "https://x-access-token:${GH_TOKEN}@github.com/xvoidsx/navi.git" src
+          cd src && git rev-parse --short HEAD
+
+      # nodejs: JS actions (upload-artifact) run inside the container and
+      # need node; trixie ships node 20, which actions/*@v4 require.
+      - name: Install live-build
+        run: |
+          set -euo pipefail
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq live-build nodejs
+
+      - name: Stage the live-build tree
+        run: |
+          set -euo pipefail
+          cd src && ./iso/stage.sh
+
+      - name: Build the ISO
+        run: |
+          set -euo pipefail
+          cd src/iso/build
+          # NOTE: the lb config flags are inline here on purpose. live-build
+          # auto-executes an executable auto/config script — and ours has to
+          # call `lb config` itself, which recursed forever and red-lit the
+          # first build. With no auto/config in the tree, `lb config` below
+          # just configures.
+          lb config \
+            --distribution trixie \
+            --archive-areas "main contrib non-free non-free-firmware" \
+            --bootloaders "syslinux grub-efi" \
+            --binary-images iso-hybrid \
+            --debian-installer false \
+            --memtest none \
+            --iso-application "navi" \
+            --iso-publisher "xvoidsx" \
+            --iso-volume "navi 1.2 mika $RC_LABEL" \
+            --image-name "$ISO_BASENAME"
+          lb build
+
+      - name: Collect the ISO
+        run: |
+          set -euo pipefail
+          iso_path="$(ls src/iso/build/${ISO_BASENAME}-*.hybrid.iso | head -n 1)"
+          cp "$iso_path" "/tmp/${ISO_BASENAME}.iso"
+          ls -lh "/tmp/${ISO_BASENAME}.iso"
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ISO_BASENAME }}.iso
+          path: /tmp/${{ env.ISO_BASENAME }}.iso
+          if-no-files-found: error

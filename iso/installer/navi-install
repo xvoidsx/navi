@@ -1,0 +1,1053 @@
+#!/usr/bin/env bash
+#
+# navi-install — the navi system installer (Mika RC16)
+#     by rav3ndust.xyz (xvoidsx)
+#
+# Boots from the navi installer ISO (root autologin on tty1) and installs
+# navi to a disk: GPT layout, bios_grub + EFI system partition, one
+# LUKS2-encrypted root (ext4), Debian 13 (trixie) via debootstrap, kernel +
+# GRUB with cryptodisk support so the LUKS passphrase prompt appears at boot.
+#
+# Boots on UEFI and legacy BIOS: the disk gets both an EFI system partition
+# and a bios_grub partition, and GRUB is installed for both targets.
+#
+# Network: the installer downloads Debian mid-install and first boot
+# provisions the wired — both need the machine online. Ethernet (DHCP)
+# just works; otherwise the installer offers WiFi (scan, pick, password)
+# and carries the profile into the installed system.
+#
+# Hard separation, by design:
+#   THIS script does partitioning, filesystems, LUKS, debootstrap, users,
+#   bootloader/initramfs, and provisioning. Everything else — packages,
+#   /wired, commands, identity, agents, wallpapers, flatpak, services —
+#   is provisioning, and runs from /opt/navi-iso/install.sh --yes as the
+#   installed user, right here in the installer chroot (RC10: the installer's
+#   network is proven, so first boot needs no network at all).
+#
+# Run as root on the installer ISO. UEFI and legacy BIOS both work (x86_64).
+
+set -euo pipefail
+
+# ============================== toggles ==============================
+# (RC10: provisioning happens inside the installer, not at first boot,
+# so there is no autologin toggle anymore — first boot is always
+# LUKS prompt(s) -> SDDM password login -> the wired.)
+
+HOSTNAME="navi"            # hostname for the installed system
+TARGET="/mnt/navi"         # where the new system is assembled
+ISO_ROOT="/opt/navi-iso"   # navi payload shipped on the ISO
+MAPPER_NAME="cryptroot"    # dm-crypt name for the LUKS root
+# =====================================================================
+
+# ---------------------------------------------------------------- ui
+#
+# The installer is navi's front door — it stays on screen the whole time.
+# A persistent nightshadeNeon frame: the ASCII navi wordmark and the
+# progress bar are pinned at the top and never scroll away, the live
+# install log streams through a window in the middle, and a rotating tip
+# sits pinned at the bottom. Noisy command output goes to the log file;
+# the frame tails it. Interactive prompts pause the frame and use a
+# plain screen instead.
+
+PHASE_TOTAL=13
+PHASE_N=0
+
+UI_DIR="/tmp/navi-ui"
+UI_LOG="$UI_DIR/install.log"
+UI_PHASE="$UI_DIR/phase"      # "n|label"
+
+# nightshadeNeon, as close as the linux console gets: bright ansi on black
+N_GREEN=$'\e[1;92m'     # navi green #39FF14
+N_MAGENTA=$'\e[1;95m'   # navi magenta #FF10F0
+N_CYAN=$'\e[1;96m'      # cyan #00FFFF
+N_RED=$'\e[1;91m'       # red #FF3131
+N_DIM=$'\e[2m'
+N_OFF=$'\e[0m'
+
+TIPS=(
+  "the wired is navi's name for the desktop. this installer is its front door."
+  "two passphrase prompts per boot — grub, then the system. that's normal."
+  "the installer provisions the wired itself — first boot needs no network at all."
+  "every tool navi installs shows up in the rofi launcher."
+  "the clock syncs itself from the network. dead cmos batteries welcome."
+  "grub unlocks with pbkdf2, not argon2 — grub can't do argon2. now you know."
+  "your full name lands in the system — the login screen knows who you are."
+  "the cli installer is intentional. it is indeed very navi."
+  "hostname defaults to 'navi'. name it like you'd name a ship."
+  "sddm is the front door: pick wayland or x11, then your password."
+  "timezone is guessed from your network — type to overrule it."
+  "∅ is the empty set. it is also the navi logo. both mean: nothing missing."
+  "the wired ships with agents — ollama, opencode, omp. everybody has already entered."
+  "if a download host is down, the installer skips it and carries on. the wired provides. eventually."
+  "thirteen phases. lucky number thirteen."
+  "that stopwatch is timing your wifi, not you. probably."
+  "the ∅ breathes while it works. watch it. it's calming."
+  "the wired will provide."
+)
+
+# log: everything the installer says, plus everything noisy commands say.
+# while the frame runs it stays in the log window; while paused (prompts)
+# it also prints to the terminal so the conversation stays visible.
+ui_log() {
+  printf '%s\n' "$*" >>"$UI_LOG"
+  if [ -z "${UI_PID:-}" ]; then printf '%s\n' "$*"; fi
+}
+
+phase() { # <label> — a major installer phase; moves the pinned progress bar
+  # per-phase stopwatch: how long the previous phase took lands in the log,
+  # so a slow step (like a big download) is visible, not mysterious.
+  local now prev
+  now=$(date +%s)
+  if [ -f "$UI_DIR/phase_start" ]; then
+    prev=$(cat "$UI_DIR/phase_start" 2>/dev/null || echo "$now")
+    ui_log "    · previous phase took $(fmt_dur $(( now - prev )))"
+  fi
+  [ -d "$UI_DIR" ] && printf '%s' "$now" >"$UI_DIR/phase_start"
+  PHASE_N=$((PHASE_N + 1))
+  printf '%s|%s\n' "$PHASE_N" "$1" >"$UI_PHASE"
+  ui_log ""
+  ui_log "──▶ [$PHASE_N/$PHASE_TOTAL] $1"
+}
+
+step() { ui_log ""; ui_log "──▶ $1"; }
+ok()   { ui_log "    ✓ $1"; }
+info() { ui_log "    · $1"; }
+die() {
+  ui_stop
+  clear
+  printf '%s    ✗ %s%s\n' "$N_RED" "$1" "$N_OFF" >&2
+  echo "    last lines of the install log:" >&2
+  tail -n 25 "$UI_LOG" 2>/dev/null | sed 's/^/    /' >&2 || true
+  echo "    full log: $UI_LOG" >&2
+  exit 1
+}
+
+_ui_bar() { # <n> <total> <width> — the pinned progress bar
+  local n="$1" total="$2" width="$3" filled i out
+  filled=$(( n * width / total ))
+  out="${N_GREEN}"
+  for ((i=0; i<filled; i++)); do out="${out}█"; done
+  out="${out}${N_DIM}"
+  for ((i=filled; i<width; i++)); do out="${out}░"; done
+  printf '%s%s' "$out" "$N_OFF"
+}
+
+fmt_dur() { # <seconds> -> H:MM:SS (or M:SS under an hour) — installer stopwatch
+  local s="$1" h m
+  h=$(( s / 3600 )); m=$(( (s % 3600) / 60 )); s=$(( s % 60 ))
+  if [ "$h" -gt 0 ]; then printf '%d:%02d:%02d' "$h" "$m" "$s"
+  else printf '%d:%02d' "$m" "$s"; fi
+}
+
+_ui_draw() {
+  local lines cols log_n n label tip_i tip el shown line pline _t0 _now _el
+  lines=$(tput lines 2>/dev/null || echo 24)
+  cols=$(tput cols 2>/dev/null || echo 80)
+  [ "$lines" -ge 18 ] || lines=18
+  [ "$cols" -ge 50 ] || cols=50
+  log_n=$(( lines - 13 ))   # fixed chrome: 13 lines, rest is log window
+  [ "$log_n" -lt 2 ] && log_n=2
+
+  IFS='|' read -r n label <"$UI_PHASE" 2>/dev/null || { n="$PHASE_N"; label="starting"; }
+  [ -n "$n" ] || n=0
+
+  tip_i=$(( $(date +%s) / 8 % ${#TIPS[@]} ))
+  tip="${TIPS[$tip_i]}"
+
+  tput civis 2>/dev/null || true
+  tput cup 0 0 2>/dev/null || true
+  el=$(tput el 2>/dev/null || true)
+
+  # pinned header: wordmark + progress bar. never scrolls away.
+  # the empty set breathes: magenta/cyan pulse, one breath per second.
+  if [ $(( $(date +%s) % 2 )) -eq 0 ]; then empty_c="$N_MAGENTA"; else empty_c="$N_CYAN"; fi
+  printf '%s%s\n' "${empty_c}                       ∅${N_OFF}" "$el"
+  printf '%s\n' "$el"
+  printf '%s%s\n' "${N_GREEN}  █   █   ███   █   █  █████${N_OFF}" "$el"
+  printf '%s%s\n' "${N_GREEN}  ██  █  █   █  █   █    █${N_OFF}" "$el"
+  printf '%s%s\n' "${N_GREEN}  █ █ █  █████  █   █    █${N_OFF}" "$el"
+  printf '%s%s\n' "${N_GREEN}  █  ██  █   █   █ █     █${N_OFF}" "$el"
+  printf '%s%s\n' "${N_GREEN}  █   █  █   █    █    █████${N_OFF}" "$el"
+  # live stopwatch: total elapsed since the installer started, ticking
+  # once per second with the frame redraw.
+  _t0=$(cat "$UI_DIR/t0" 2>/dev/null || echo 0)
+  _now=$(date +%s)
+  if [ "$_t0" -gt 0 ]; then _el="  ${N_DIM}T+$(fmt_dur $(( _now - _t0 )))"; else _el=""; fi
+  printf '%s%s\n' "${N_CYAN}         1.2 \"mika\" RC16${_el}${N_OFF}" "$el"
+  printf '  %s %s%3d%%%s%s\n' \
+    "$(_ui_bar "$n" "$PHASE_TOTAL" 30)" "$N_DIM" "$(( n * 100 / PHASE_TOTAL ))" "$N_OFF" "$el"
+  # phase changes shimmer: the phase line flashes green for a few seconds,
+  # then settles back to dim. a little katakana-rain energy, console-safe.
+  if [ "$(cat "$UI_DIR/phase_drawn" 2>/dev/null)" != "$n|$label" ]; then
+    printf '%s|%s' "$n" "$label" >"$UI_DIR/phase_drawn"
+    date +%s >"$UI_DIR/phase_ts"
+  fi
+  _pts=$(cat "$UI_DIR/phase_ts" 2>/dev/null || echo 0)
+  if [ $(( $(date +%s) - _pts )) -lt 4 ]; then pline_c="$N_GREEN"; else pline_c="$N_DIM"; fi
+  case $(( $(date +%s) % 4 )) in
+    0) _spin="|";; 1) _spin="/";;
+    2) _spin="-";; *) _spin="\\";;
+  esac
+  pline="  $_spin phase $n/$PHASE_TOTAL · $label"
+  printf '%s%s%s%s\n' "$pline_c" "${pline:0:$cols}" "$N_OFF" "$el"
+
+  # live log window: the last few lines of the install, nothing else
+  printf '%s%s\n' "${N_DIM}── install log ──${N_OFF}" "$el"
+  shown=0
+  while IFS= read -r line && [ "$shown" -lt "$log_n" ]; do
+    printf '%s%s\n' "${line:0:$cols}" "$el"
+    shown=$((shown + 1))
+  done < <(tail -n "$log_n" "$UI_LOG" 2>/dev/null)
+  while [ "$shown" -lt "$log_n" ]; do printf '%s\n' "$el"; shown=$((shown + 1)); done
+
+  # pinned tip, always on screen
+  printf '%s%s\n' "${N_DIM}── tip ──${N_OFF}" "$el"
+  printf '  %s∅ %s%s%s%s\n' "$N_MAGENTA" "$N_CYAN" "${tip:0:$((cols - 8))}" "$N_OFF" "$el"
+
+  tput ed 2>/dev/null || true
+  return 0
+}
+
+_ui_loop_kill() {
+  if [ -n "${UI_PID:-}" ]; then
+    kill "$UI_PID" 2>/dev/null || true
+    wait "$UI_PID" 2>/dev/null || true
+    UI_PID=""
+  fi
+}
+
+ui_start() { # frame on, from here until ui_stop
+  mkdir -p "$UI_DIR"
+  : >"$UI_LOG"
+  printf '0|starting\n' >"$UI_PHASE"
+  date +%s >"$UI_DIR/t0"   # installer stopwatch starts here
+  trap '_ui_loop_kill; tput cnorm 2>/dev/null || true' EXIT
+  ui_resume
+}
+
+ui_resume() { # (re)start the frame renderer
+  _ui_loop_kill
+  ( while :; do _ui_draw || true; sleep 1; done ) & UI_PID=$!
+}
+
+ui_pause() { # frame off for an interactive prompt; plain screen
+  _ui_loop_kill
+  tput cnorm 2>/dev/null || true
+  clear
+}
+
+ui_stop() { # frame off for good (success screen / fatal error)
+  trap - EXIT
+  _ui_loop_kill
+  tput cnorm 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------- preflight
+
+preflight() {
+  phase "preflight"
+  [ "$EUID" -eq 0 ] || die "run as root (this installer owns the disks)."
+
+  # UEFI and legacy BIOS both work — the disk layout below boots either way.
+  if [ -d /sys/firmware/efi ]; then
+    BOOT_MODE="UEFI"
+  else
+    BOOT_MODE="legacy BIOS"
+  fi
+
+  local t
+  for t in debootstrap cryptsetup parted mkfs.fat mkfs.ext4 blkid nmcli curl; do
+    command -v "$t" >/dev/null 2>&1 || die "missing tool: $t (broken installer ISO)."
+  done
+
+  [ -f "$ISO_ROOT/install.sh" ] && [ -d "$ISO_ROOT/wired" ] \
+    || die "$ISO_ROOT is missing install.sh/wired (broken installer ISO)."
+
+  ok "preflight: root, $BOOT_MODE boot, tools, navi payload"
+}
+
+# ---------------------------------------------------------------- network
+#
+# The installer downloads Debian mid-install and first boot provisions the
+# wired — both need the machine online. Ethernet (DHCP) just works; for
+# WiFi we connect here with NetworkManager and carry the profile into the
+# installed system so first boot is already online.
+
+net_is_up() {
+  # TCP-level check against the same mirror debootstrap uses.
+  curl -sI --max-time 8 http://deb.debian.org/debian/ >/dev/null 2>&1
+}
+
+net_describe() {
+  local dev
+  dev="$(ip -o route get 1.1.1.1 2>/dev/null | awk '{print $5; exit}')"
+  [ -n "$dev" ] && echo "via $dev" || echo "link up"
+}
+
+wifi_iface() {
+  nmcli -t -f DEVICE,TYPE dev 2>/dev/null | awk -F: '$2=="wifi" {print $1; exit}'
+}
+
+wifi_available() {
+  [ -n "$(wifi_iface)" ]
+}
+
+wifi_connect() {
+  local ifname ssid pass try
+  ifname="$(wifi_iface)"
+  [ -n "$ifname" ] || { echo "    no WiFi radio found."; return 1; }
+
+  echo "    scanning for networks…"
+  nmcli dev wifi rescan ifname "$ifname" >/dev/null 2>&1 || true
+  sleep 4
+
+  local i=0
+  declare -a NETS=()
+  while IFS= read -r ssid; do
+    [ -n "$ssid" ] && [ "$ssid" != "--" ] || continue
+    NETS+=("$ssid")
+    i=$((i+1))
+    printf '    [%d] %s\n' "$i" "$ssid"
+    [ "$i" -ge 20 ] && break
+  done < <(nmcli -t -f SSID dev wifi list ifname "$ifname" 2>/dev/null | awk '!seen[$0]++')
+
+  [ "${#NETS[@]}" -gt 0 ] || { echo "    no networks found in range."; return 1; }
+  echo "    [0] type the network name manually (hidden network)"
+
+  local choice
+  while true; do
+    read -r -p "    network number: " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 0 ] && [ "$choice" -le "${#NETS[@]}" ]; then
+      break
+    fi
+    echo "    pick 0–${#NETS[@]}."
+  done
+  if [ "$choice" -eq 0 ]; then
+    read -r -p "    network name (SSID): " ssid
+    [ -n "$ssid" ] || { echo "    empty network name."; return 1; }
+  else
+    ssid="${NETS[$((choice-1))]}"
+  fi
+
+  read -r -s -p "    password for '$ssid' (empty for open networks): " pass; echo
+
+  for try in 1 2 3; do
+    echo "    connecting (attempt $try/3)…"
+    if [ -n "$pass" ]; then
+      nmcli dev wifi connect "$ssid" password "$pass" ifname "$ifname" >/dev/null 2>&1
+    else
+      nmcli dev wifi connect "$ssid" ifname "$ifname" >/dev/null 2>&1
+    fi
+    if net_is_up; then
+      ok "joined '$ssid'"
+      unset pass
+      return 0
+    fi
+    echo "    didn't connect."
+    if [ "$try" -lt 3 ]; then
+      local ans
+      read -r -p "    try a different password? [Y/n] " ans
+      case "${ans:-Y}" in
+        [Yy]*) read -r -s -p "    password for '$ssid': " pass; echo ;;
+      esac
+    fi
+  done
+  unset pass
+  return 1
+}
+
+setup_network() {
+  phase "network"
+
+  # NetworkManager drives both wired and wireless on the live ISO.
+  if command -v nmcli >/dev/null 2>&1; then
+    systemctl start NetworkManager 2>/dev/null || true
+    sleep 2
+  fi
+
+  if net_is_up; then
+    ok "already online $(net_describe) — carrying on"
+    return 0
+  fi
+
+  echo "    no connection yet. the installer downloads Debian as it works,"
+  echo "    and first boot provisions the wired — both need you online."
+  echo
+
+  if wifi_available; then
+    local ans
+    read -r -p "    no wired link — set up WiFi instead? [Y/n] " ans
+    case "${ans:-Y}" in
+      [Yy]*) wifi_connect || die "couldn't get online — plug in ethernet and re-run." ;;
+      *) die "offline — plug in ethernet and re-run the installer." ;;
+    esac
+  else
+    die "offline and no WiFi radio detected — plug in ethernet and re-run."
+  fi
+
+  net_is_up || die "still offline — re-check the password/cable and re-run."
+  ok "online $(net_describe)"
+}
+
+# Carry live-ISO network profiles (WiFi passphrases included) into the
+# installed system, so first boot is online for provisioning. The profiles
+# live on the LUKS-encrypted root, guarded by the disk passphrase.
+persist_network() {
+  phase "carrying network profiles"
+  local src=/etc/NetworkManager/system-connections
+  [ -d "$src" ] || return 0
+  local files=( "$src"/*.nmconnection )
+  [ -e "${files[0]}" ] || return 0
+  mkdir -p "$TARGET/etc/NetworkManager/system-connections"
+  cp -a "$src"/*.nmconnection "$TARGET/etc/NetworkManager/system-connections/"
+  chmod 600 "$TARGET"/etc/NetworkManager/system-connections/*.nmconnection
+  ok "network profile(s) carried into the installed system (${#files[@]} file(s))"
+}
+
+# ---------------------------------------------------------------- disk selection
+
+pick_disk() {
+  phase "disk selection"
+  echo "    available disks:"
+  # NOTE: NAME,TYPE only — MODEL can contain spaces, which breaks field parsing
+  mapfile -t DISKS < <(lsblk -dnp -o NAME,TYPE | awk '$2=="disk" {print $1}')
+  [ "${#DISKS[@]}" -gt 0 ] || die "no disks found."
+
+  local i
+  for i in "${!DISKS[@]}"; do
+    printf '    [%d] %s %s\n' "$((i+1))" "${DISKS[$i]}" \
+      "$(lsblk -rn -o SIZE,MODEL "${DISKS[$i]}")"
+  done
+
+  local choice
+  while true; do
+    read -r -p "    install navi to disk number: " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#DISKS[@]}" ]; then
+      DISK="${DISKS[$((choice-1))]}"
+      break
+    fi
+    echo "    pick a number between 1 and ${#DISKS[@]}."
+  done
+  ok "target disk: $DISK"
+
+  echo
+  echo "    !!!  ALL DATA ON $DISK WILL BE DESTROYED  !!!"
+  lsblk -o NAME,SIZE,FSTYPE,LABEL,MODEL "$DISK"
+  echo
+  local confirm
+  read -r -p "    type YES in capitals to continue: " confirm
+  [ "$confirm" = "YES" ] || die "aborted — nothing was touched."
+  ok "destructive confirmation accepted"
+}
+
+# ---------------------------------------------------------------- credentials
+
+read_secret_twice() { # <prompt> <var> — reads twice, must match + non-empty
+  local prompt="$1" var="$2" a b
+  while true; do
+    read -r -s -p "    $prompt: " a; echo
+    read -r -s -p "    again: " b; echo
+    if [ -z "$a" ]; then echo "    must not be empty — try again."; continue; fi
+    if [ "$a" != "$b" ]; then echo "    mismatch — try again."; continue; fi
+    if [[ "$a" == *:* ]]; then echo "    may not contain ':' — try again."; continue; fi
+    printf -v "$var" '%s' "$a"
+    return 0
+  done
+}
+
+# ---------------------------------------------------------------- locale picker
+
+# _filter_pick <prompt> <default> <choices...> — type-to-filter chooser.
+# A leading "/" just means "show me the list". Empty input takes the
+# default. Prints the choice to stdout; everything human-facing goes to
+# stderr so $(_filter_pick ...) captures only the answer.
+_filter_pick() {
+  local prompt="$1" def="$2"; shift 2
+  local input frag pick i n list_all
+  local -a matches
+  frag=""; list_all=0
+  while true; do
+    if [ -z "$frag" ] && [ "$list_all" -eq 0 ]; then
+      read -r -p "    $prompt [$def] (type to filter + enter, / + enter lists all): " input >&2
+      if [ "$input" = "/" ]; then
+        list_all=1          # browse mode: list every choice
+      elif [ -z "$input" ]; then
+        printf '%s' "$def"; return 0
+      else
+        frag="${input#/}"
+      fi
+    fi
+    matches=()
+    for i in "$@"; do
+      if [ "$list_all" -eq 1 ] || [[ "${i,,}" == *"${frag,,}"* ]]; then
+        matches+=("$i")
+      fi
+    done
+    if [ "$list_all" -eq 0 ]; then
+      # exact match (case-insensitive) wins without a list
+      for i in "${matches[@]}"; do
+        if [[ "${i,,}" == "${frag,,}" ]]; then printf '%s' "$i"; return 0; fi
+      done
+      n=${#matches[@]}
+      if [ "$n" -eq 1 ]; then printf '%s' "${matches[0]}"; return 0; fi
+      if [ "$n" -eq 0 ]; then echo "    no match — try again." >&2; frag=""; continue; fi
+    fi
+    n=${#matches[@]}
+    echo "    ${n} matches:" >&2
+    for i in "${!matches[@]}"; do
+      if [ "$i" -ge 15 ]; then
+        echo "    …and $(( n - 15 )) more — refine the filter." >&2; break
+      fi
+      printf '      %2d) %s\n' "$(( i + 1 ))" "${matches[$i]}" >&2
+    done
+    read -r -p "    number, or type more to refine: " pick >&2
+    pick="${pick#/}"
+    if [ -z "$pick" ]; then frag=""; list_all=0; continue; fi
+    if [[ "$pick" =~ ^[0-9]+$ ]] && [ "$pick" -ge 1 ] && [ "$pick" -le "$n" ]; then
+      if [ "$pick" -le 15 ]; then printf '%s' "${matches[$(( pick - 1 ))]}"; return 0; fi
+      echo "    only the first 15 are listed — refine the filter." >&2
+      frag=""; list_all=0; continue
+    fi
+    frag="$pick"; list_all=0
+  done
+}
+
+# timezone (geolocated default), locale, and console keymap. the keymap
+# matters: the LUKS passphrase is typed at a bare console prompt, so a
+# wrong map can lock you out of your own disk.
+get_locale() {
+  local tz_list geo_tz key_list
+
+  tz_list="$(timedatectl list-timezones 2>/dev/null \
+    || find /usr/share/zoneinfo -type f -printf '%P\n' 2>/dev/null | grep -v '^posix/\|^right/' | sort)"
+  geo_tz="$(curl -s --max-time 8 'http://ip-api.com/json/?fields=status,timezone' \
+    2>/dev/null | sed -n 's/.*"timezone":"\([^"]*\)".*/\1/p')"
+  if [ -n "$geo_tz" ] && ! grep -qxF "$geo_tz" <<<"$tz_list"; then geo_tz=""; fi
+  [ -z "$geo_tz" ] && geo_tz="UTC"
+  # shellcheck disable=SC2207
+  TIMEZONE="$(_filter_pick "timezone" "$geo_tz" $tz_list)"
+  ok "timezone: $TIMEZONE"
+
+  # full menu of generatable locales — every one of these exists in the
+  # chroot's /etc/locale.gen as "# xx_YY.UTF-8 UTF-8", so the uncomment
+  # step below works for any of them. the filter makes the long list
+  # usable: type a fragment, or "/" to browse everything.
+  LOCALE_NAME="$(_filter_pick "locale" "en_US.UTF-8" \
+    af_ZA.UTF-8 ar_EG.UTF-8 ar_SA.UTF-8 bg_BG.UTF-8 bn_IN.UTF-8 \
+    ca_ES.UTF-8 cs_CZ.UTF-8 cy_GB.UTF-8 da_DK.UTF-8 de_AT.UTF-8 \
+    de_CH.UTF-8 de_DE.UTF-8 el_GR.UTF-8 en_AU.UTF-8 en_CA.UTF-8 \
+    en_GB.UTF-8 en_US.UTF-8 es_AR.UTF-8 es_ES.UTF-8 es_MX.UTF-8 \
+    es_US.UTF-8 et_EE.UTF-8 eu_ES.UTF-8 fa_IR.UTF-8 fi_FI.UTF-8 \
+    fil_PH.UTF-8 fr_BE.UTF-8 fr_CA.UTF-8 fr_CH.UTF-8 fr_FR.UTF-8 \
+    ga_IE.UTF-8 gl_ES.UTF-8 he_IL.UTF-8 hi_IN.UTF-8 hr_HR.UTF-8 \
+    hu_HU.UTF-8 id_ID.UTF-8 is_IS.UTF-8 it_CH.UTF-8 it_IT.UTF-8 \
+    ja_JP.UTF-8 ko_KR.UTF-8 lt_LT.UTF-8 lv_LV.UTF-8 ms_MY.UTF-8 \
+    nb_NO.UTF-8 nl_BE.UTF-8 nl_NL.UTF-8 nn_NO.UTF-8 pl_PL.UTF-8 \
+    pt_BR.UTF-8 pt_PT.UTF-8 ro_RO.UTF-8 ru_RU.UTF-8 sk_SK.UTF-8 \
+    sl_SI.UTF-8 sr_RS.UTF-8 sv_SE.UTF-8 sw_KE.UTF-8 ta_IN.UTF-8 \
+    te_IN.UTF-8 th_TH.UTF-8 tr_TR.UTF-8 uk_UA.UTF-8 ur_PK.UTF-8 \
+    vi_VN.UTF-8 zh_CN.UTF-8 zh_HK.UTF-8 zh_TW.UTF-8 zu_ZA.UTF-8)"
+  ok "locale: $LOCALE_NAME"
+
+  key_list="$(localectl list-keymaps 2>/dev/null || echo "us uk de fr es it")"
+  # shellcheck disable=SC2207
+  KEYMAP="$(_filter_pick "console keymap" "us" $key_list)"
+  ok "keymap: $KEYMAP"
+}
+
+get_credentials() {
+  phase "user + locale + encryption"
+  while true; do
+    read -r -p "    username: " NAVI_USER
+    if [[ "$NAVI_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] && [ "$NAVI_USER" != "root" ]; then
+      break
+    fi
+    echo "    lowercase letters, digits, _ or -, may not be root."
+  done
+
+  # full name: the human behind the account. lands in the GECOS field —
+  # the login screen and the system address you by name, not by handle.
+  while true; do
+    read -r -p "    full name (e.g. Raven Blackfeather): " FULLNAME
+    FULLNAME="${FULLNAME#"${FULLNAME%%[![:space:]]*}"}"
+    FULLNAME="${FULLNAME%"${FULLNAME##*[![:space:]]}"}"
+    # regex in a variable: a literal apostrophe can't sit in the class inline
+    local name_re="^[A-Za-z][A-Za-z. '-]{0,62}$"
+    if [[ "$FULLNAME" =~ $name_re ]]; then
+      break
+    fi
+    echo "    letters, spaces, . ' - ; may not contain ':'."
+  done
+
+  read_secret_twice "password for $NAVI_USER" USER_PASS
+
+  # hostname: the machine gets a name. default is just "navi".
+  while true; do
+    read -r -p "    hostname [navi]: " h
+    h="${h:-navi}"
+    if [[ "$h" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
+      HOSTNAME="$h"
+      break
+    fi
+    echo "    lowercase letters, digits, hyphens; must start and end alphanumeric."
+  done
+
+  # LUKS passphrase: strength matters here, it guards the whole disk.
+  while true; do
+    read_secret_twice "disk encryption passphrase (min 8 chars)" LUKS_PASS
+    if [ "${#LUKS_PASS}" -ge 8 ]; then break; fi
+    echo "    too short — the passphrase guards the entire disk."
+  done
+
+  # where and how: timezone, locale, console keymap.
+  get_locale
+  ok "$FULLNAME ($NAVI_USER) on $HOSTNAME + encryption passphrase set"
+}
+
+# ---------------------------------------------------------------- partitioning
+
+partition_disk() {
+  phase "partitioning $DISK"
+
+  # make sure nothing on the disk is mounted or mapped
+  umount -R "$TARGET" 2>/dev/null || true
+  cryptsetup close "$MAPPER_NAME" 2>/dev/null || true
+  swapoff -a 2>/dev/null || true
+
+  # One layout boots everywhere: a tiny bios_grub partition lets legacy BIOS
+  # GRUB embed its core image, the ESP serves UEFI, and the rest is LUKS.
+  parted -s "$DISK" mklabel gpt
+  parted -s "$DISK" mkpart primary 1MiB 3MiB
+  parted -s "$DISK" set 1 bios_grub on
+  parted -s "$DISK" mkpart ESP fat32 3MiB 515MiB
+  parted -s "$DISK" set 2 esp on
+  parted -s "$DISK" mkpart primary 515MiB 100%
+  partprobe "$DISK"
+  sleep 2
+
+  # nvme0n1 -> nvme0n1p1 ; sda -> sda1
+  local suffix=""
+  if [[ "$DISK" =~ [0-9]$ ]]; then suffix="p"; fi
+  ESP_PART="${DISK}${suffix}2"
+  ROOT_PART="${DISK}${suffix}3"
+  [ -b "$ESP_PART" ] && [ -b "$ROOT_PART" ] \
+    || die "partitions did not appear ($ESP_PART / $ROOT_PART)."
+
+  ok "bios_grub: ${DISK}${suffix}1 · EFI: $ESP_PART · root: $ROOT_PART"
+}
+
+format_encrypt() {
+  phase "encrypting + formatting"
+
+  # PBKDF2, not argon2: GRUB unlocks /boot from the encrypted root and GRUB
+  # cannot do argon2. iter-time 5000ms keeps the GRUB unlock delay sane.
+  printf '%s' "$LUKS_PASS" | cryptsetup luksFormat \
+    --type luks2 --pbkdf pbkdf2 --iter-time 5000 -q "$ROOT_PART" --key-file -
+  printf '%s' "$LUKS_PASS" | cryptsetup open \
+    "$ROOT_PART" "$MAPPER_NAME" --key-file -
+  unset LUKS_PASS
+  ok "LUKS2 (pbkdf2) on $ROOT_PART, open as $MAPPER_NAME"
+
+  mkfs.ext4 -q -L navi-root "/dev/mapper/$MAPPER_NAME"
+  mkfs.fat -F32 -n NAVI-EFI "$ESP_PART" >/dev/null
+  ok "ext4 root + FAT32 EFI system partition"
+
+  LUKS_UUID="$(blkid -s UUID -o value "$ROOT_PART")"
+  ROOT_UUID="$(blkid -s UUID -o value "/dev/mapper/$MAPPER_NAME")"
+  ESP_UUID="$(blkid -s UUID -o value "$ESP_PART")"
+}
+
+mount_target() {
+  phase "mounting target"
+  mkdir -p "$TARGET"
+  mount "/dev/mapper/$MAPPER_NAME" "$TARGET"
+  mkdir -p "$TARGET/boot/efi"
+  mount "$ESP_PART" "$TARGET/boot/efi"
+  ok "target at $TARGET"
+}
+
+# ---------------------------------------------------------------- base system
+
+run_debootstrap() {
+  phase "base system (debootstrap)"
+  # Last word on the clock: the interactive steps above (disk choice,
+  # passwords, partitioning, LUKS) take minutes, and old hardware can lose
+  # the time in that window. Re-sync right before we trust signatures.
+  # Sub-header only here — the clock already had its phase.
+  SYNC_CLOCK_SUB=1
+  sync_clock
+  unset SYNC_CLOCK_SUB
+  local attempt
+  for attempt in 1 2; do
+    if debootstrap \
+      --arch=amd64 \
+      --components=main,contrib,non-free,non-free-firmware \
+      --include=linux-image-amd64,grub-efi-amd64,grub-pc,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,console-setup,ca-certificates,firmware-linux,firmware-realtek \
+      trixie "$TARGET" http://deb.debian.org/debian >>"$UI_LOG" 2>&1; then
+      ok "base system installed"
+      return 0
+    fi
+    if [ "$attempt" = "1" ]; then
+      info "debootstrap failed — re-syncing clock, then one retry"
+      SYNC_CLOCK_SUB=1
+      sync_clock 2>/dev/null || info "clock re-sync failed, retrying anyway"
+      unset SYNC_CLOCK_SUB
+    fi
+  done
+  # Name the actual culprit: the debootstrap log records which package
+  # refused to configure, so the next fix targets the right thing.
+  info "failing package(s) per $TARGET/debootstrap/debootstrap.log:"
+  grep -a "error processing package" "$TARGET/debootstrap/debootstrap.log" 2>/dev/null \
+    | tail -4 | sed 's/^/    /' || true
+  die "debootstrap failed twice — culprits above (full log: $TARGET/debootstrap/debootstrap.log), then re-run."
+}
+
+# ---------------------------------------------------------------- chroot configuration
+
+configure_target() {
+  phase "configuring the installed system"
+
+  mount --bind /dev  "$TARGET/dev"
+  mount --bind /proc "$TARGET/proc"
+  mount --bind /sys  "$TARGET/sys"
+  mount --bind /run  "$TARGET/run"
+  cp /etc/resolv.conf "$TARGET/etc/resolv.conf"
+
+  # navi payload -> the target, where installer-phase provisioning runs it
+  mkdir -p "$TARGET/opt/navi-iso"
+  cp -a "$ISO_ROOT"/. "$TARGET/opt/navi-iso/"
+  ok "navi payload -> /opt/navi-iso"
+
+  # user password, via a locked-down file (never on a command line)
+  printf '%s:%s' "$NAVI_USER" "$USER_PASS" > "$TARGET/root/.navi-user-pass"
+  chmod 600 "$TARGET/root/.navi-user-pass"
+  unset USER_PASS
+  # full name for the GECOS field (read by the chroot script, then removed)
+  printf '%s' "$FULLNAME" > "$TARGET/root/.navi-fullname"
+  chmod 600 "$TARGET/root/.navi-fullname"
+
+  # the chroot script: static body (quoted heredoc) + sed-injected values.
+  # all injected values are charset-validated above, so sed is safe.
+  cat > "$TARGET/root/navi-chroot-setup.sh" <<'CHROOT_EOF'
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+echo "  [chroot] package lists"
+# Full update stream: debootstrap only leaves the base trixie suite behind.
+# Without trixie-security and trixie-updates the machine can never receive
+# security updates (chromium, firefox-esr, ...) — apt upgrade would keep
+# reporting "all packages are up to date" while CVEs pile up. (Seen on the
+# Acer bench: chromium stuck at 150, firefox-esr at 140.)
+cat > /etc/apt/sources.list.d/trixie-security.list <<'EOF'
+deb https://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+EOF
+cat > /etc/apt/sources.list.d/trixie-updates.list <<'EOF'
+deb http://deb.debian.org/debian trixie-updates main contrib non-free non-free-firmware
+EOF
+apt-get update -qq
+
+echo "  [chroot] network stack (NetworkManager + WiFi)"
+# Installed here, NOT in debootstrap --include: NM's postinst needs a
+# configured system and dies in debootstrap's minimal configure phase
+# ("Failure while configuring base packages" — seen on the Toshiba bench).
+apt-get install -y network-manager wpasupplicant iw
+
+echo "  [chroot] hostname"
+echo "@HOSTNAME@" > /etc/hostname
+cat > /etc/hosts <<'EOF'
+127.0.0.1 localhost
+127.0.1.1 @HOSTNAME@
+::1 localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+EOF
+
+echo "  [chroot] timezone + locale + keymap"
+ln -sf "/usr/share/zoneinfo/@TIMEZONE@" /etc/localtime
+echo "@TIMEZONE@" > /etc/timezone
+apt-get install -y locales
+sed -i "s/^# *@LOCALE@ UTF-8/@LOCALE@ UTF-8/" /etc/locale.gen
+locale-gen
+update-locale LANG=@LOCALE@ LANGUAGE=
+printf 'LANG=%s\n' "@LOCALE@" > /etc/locale.conf
+printf 'KEYMAP=%s\n' "@KEYMAP@" > /etc/vconsole.conf
+# X11/Wayland layout, best-effort from the console keymap name
+xkb_layout="@KEYMAP@"
+xkb_layout="${xkb_layout%-latin1*}"
+[ "$xkb_layout" = "uk" ] && xkb_layout="gb"
+cat > /etc/default/keyboard <<'EOF'
+XKBMODEL="pc105"
+XKBLAYOUT="__XKB_LAYOUT__"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF
+sed -i "s/__XKB_LAYOUT__/$xkb_layout/" /etc/default/keyboard
+
+echo "  [chroot] crypttab + fstab"
+echo "@MAPPER_NAME@ UUID=@LUKS_UUID@ none luks,discard" > /etc/crypttab
+cat > /etc/fstab <<'EOF'
+UUID=@ROOT_UUID@ / ext4 errors=remount-ro 0 1
+UUID=@ESP_UUID@ /boot/efi vfat umask=0077 0 1
+EOF
+
+echo "  [chroot] GRUB with cryptodisk (unlocks /boot inside LUKS)"
+sed -i 's/^#\?GRUB_ENABLE_CRYPTODISK=.*/GRUB_ENABLE_CRYPTODISK=y/' /etc/default/grub
+# Debian's stock grub defaults carry no GRUB_ENABLE_CRYPTODISK line at all,
+# so the sed above can no-op — and then grub-install refuses to touch the
+# encrypted disk ("attempt to install to encrypted disk without cryptodisk
+# enabled"). Append as fallback, then PROVE it landed: this failed silently
+# once on the Toshiba bench and must never do so again.
+grep -q '^GRUB_ENABLE_CRYPTODISK=y' /etc/default/grub \
+  || echo 'GRUB_ENABLE_CRYPTODISK=y' >> /etc/default/grub
+grep -q '^GRUB_ENABLE_CRYPTODISK=y' /etc/default/grub \
+  || { echo "  [chroot] FATAL: GRUB_ENABLE_CRYPTODISK=y missing from /etc/default/grub"; exit 1; }
+
+echo "  [chroot] navi boot branding (menu says navi, not Debian)"
+sed -i 's/^#\?GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR=navi/' /etc/default/grub
+grep -q '^GRUB_DISTRIBUTOR=' /etc/default/grub \
+  || echo 'GRUB_DISTRIBUTOR=navi' >> /etc/default/grub
+sed -i 's/^#\?GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' /etc/default/grub
+if [ -f /opt/navi-iso/wired/wp/SElain3.jpg ]; then
+  cp /opt/navi-iso/wired/wp/SElain3.jpg /boot/grub/navi-bg.jpg
+  grep -q '^GRUB_BACKGROUND=' /etc/default/grub \
+    && sed -i 's|^GRUB_BACKGROUND=.*|GRUB_BACKGROUND=/boot/grub/navi-bg.jpg|' /etc/default/grub \
+    || echo 'GRUB_BACKGROUND=/boot/grub/navi-bg.jpg' >> /etc/default/grub
+fi
+
+echo "  [chroot] user"
+useradd -m -s /bin/bash -c "$(cat /root/.navi-fullname)" "@NAVI_USER@"
+chpasswd < /root/.navi-user-pass
+shred -u /root/.navi-user-pass
+rm -f /root/.navi-fullname
+passwd -l root
+
+echo "  [chroot] doas (temporary nopass rule for installer-phase provisioning;"
+echo "           locked down to 'persist' once the wired is provisioned)"
+printf 'permit nopass %s as root\n' "@NAVI_USER@" > /etc/doas.conf
+chmod 644 /etc/doas.conf
+
+systemctl set-default graphical.target
+systemctl enable NetworkManager-wait-online.service
+
+echo "  [chroot] bootloader (legacy BIOS + UEFI) + initramfs"
+# MBR for legacy BIOS: always written, harmless on UEFI-only machines.
+grub-install --target=i386-pc --bootloader-id=navi --recheck "@DISK@"
+# EFI boot entry: only when the installer itself booted via UEFI,
+# because efibootmgr needs UEFI runtime to register it.
+if [ -d /sys/firmware/efi ]; then
+  grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+    --bootloader-id=navi --recheck
+fi
+update-grub
+update-initramfs -u -k all
+
+echo "  [chroot] done"
+CHROOT_EOF
+
+  sed -i \
+    -e "s/@HOSTNAME@/$HOSTNAME/g" \
+    -e "s/@MAPPER_NAME@/$MAPPER_NAME/g" \
+    -e "s/@LUKS_UUID@/$LUKS_UUID/g" \
+    -e "s/@ROOT_UUID@/$ROOT_UUID/g" \
+    -e "s/@ESP_UUID@/$ESP_UUID/g" \
+    -e "s/@NAVI_USER@/$NAVI_USER/g" \
+    -e "s|@TIMEZONE@|$TIMEZONE|g" \
+    -e "s|@LOCALE@|$LOCALE_NAME|g" \
+    -e "s|@KEYMAP@|$KEYMAP|g" \
+    -e "s|@DISK@|$DISK|g" \
+    "$TARGET/root/navi-chroot-setup.sh"
+  chmod 700 "$TARGET/root/navi-chroot-setup.sh"
+
+  chroot "$TARGET" /bin/bash /root/navi-chroot-setup.sh >>"$UI_LOG" 2>&1
+  rm -f "$TARGET/root/navi-chroot-setup.sh"
+  ok "target configured: $HOSTNAME, user $NAVI_USER, GRUB, initramfs"
+}
+
+# ---------------------------------------------------------------- provisioning
+# RC10: the wired is provisioned HERE, inside the installer, not at first
+# boot. Learned on the x200 bench (RC9): first-boot provisioning bets the
+# whole install on the new system's network coming up by itself — and old
+# wifi chips don't always cooperate. The installer's network is proven (it
+# just downloaded the base system), so provision while it's up. After this,
+# first boot needs no network at all: LUKS prompt(s) -> SDDM login -> wired.
+provision_target() {
+  phase "provisioning the wired (packages, agents, wallpapers)"
+
+  cat > "$TARGET/root/navi-chroot-provision.sh" <<'CHROOT_EOF'
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+echo "  [chroot] provisioning the wired as @NAVI_USER@ (install.sh --yes)"
+# install.sh refuses root: run it as the installed user with a clean env,
+# exactly the way first-boot provisioning used to do it.
+# NOTE on systemctl in this chroot: /run is bind-mounted from the live ISO,
+# so the system bus reaches the LIVE session's systemd. `systemctl enable`
+# does its symlink work client-side (landing in the target's /etc) and the
+# D-Bus daemon-reload lands on the disposable live system — harmless. A
+# start against a unit that exists only in the target fails gracefully into
+# install.sh's warn path. Nothing here starts target services.
+runuser -u "@NAVI_USER@" -- env -i \
+  HOME="/home/@NAVI_USER@" USER="@NAVI_USER@" LOGNAME="@NAVI_USER@" \
+  PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+  SHELL="/bin/bash" \
+  bash /opt/navi-iso/install.sh --yes
+
+echo "  [chroot] doas locked down to 'permit persist'"
+printf 'permit persist %s as root\n' "@NAVI_USER@" > /etc/doas.conf
+chmod 644 /etc/doas.conf
+
+echo "  [chroot] provisioned"
+CHROOT_EOF
+
+  sed -i -e "s/@NAVI_USER@/$NAVI_USER/g" "$TARGET/root/navi-chroot-provision.sh"
+  chmod 700 "$TARGET/root/navi-chroot-provision.sh"
+
+  chroot "$TARGET" /bin/bash /root/navi-chroot-provision.sh >>"$UI_LOG" 2>&1 \
+    || die "provisioning failed (full log: $UI_LOG) — fix and re-run the installer."
+  rm -f "$TARGET/root/navi-chroot-provision.sh"
+  ok "wired provisioned for $NAVI_USER"
+}
+
+# ---------------------------------------------------------------- teardown
+
+teardown() {
+  phase "unmounting"
+  umount -R "$TARGET" 2>/dev/null || true
+  cryptsetup close "$MAPPER_NAME" 2>/dev/null || true
+  sync
+  ok "disks synced, LUKS closed"
+}
+
+# ---------------------------------------------------------------- clock
+# Package signatures are time-sensitive. Old laptops (the machines navi
+# loves most) often have dead CMOS batteries and boot with a wrong date —
+# debootstrap then dies with "Invalid Release signature". Sync before we
+# trust the network for packages.
+#
+# Lesson from the Toshiba bench (RC4): a year-range sanity check is not a
+# sync. The dead RTC read "April 2026", which passed the old check while
+# being months off. Now network time is ground truth: fetch it, compare,
+# set the clock if it disagrees, and VERIFY the set took.
+net_time_epoch() {
+  # epoch seconds from an HTTP Date header; tries several sources
+  local url hdr
+  for url in http://deb.debian.org/debian/ http://www.google.com/ http://www.cloudflare.com/; do
+    hdr="$(curl -sI --max-time 10 "$url" | grep -i '^date:' | cut -d' ' -f2- | tr -d '\r')"
+    if [ -n "$hdr" ]; then
+      date -u -d "$hdr" +%s 2>/dev/null && return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+sync_clock() {
+  # Its own phase when called from main(); a quiet sub-header when
+  # re-syncing right before debootstrap (the clock already had its phase).
+  if [ -n "${SYNC_CLOCK_SUB:-}" ]; then
+    echo; echo "──▶ re-syncing clock (package signatures need the right time)"
+  else
+    phase "syncing clock (package signatures need the right time)"
+  fi
+
+  # real NTP when the live image carries it
+  if systemctl cat systemd-timesyncd.service >/dev/null 2>&1; then
+    systemctl start systemd-timesyncd 2>/dev/null || true
+    timedatectl set-ntp true 2>/dev/null || true
+    local i
+    for i in $(seq 1 15); do
+      timedatectl show 2>/dev/null | grep -q "NTPSynchronized=yes" && break
+      sleep 2
+    done
+  fi
+
+  # ground truth: network time via HTTP Date. If the system clock disagrees
+  # by more than 5 minutes, set it — then prove the set took.
+  local net now diff
+  if net="$(net_time_epoch)"; then
+    now="$(date -u +%s)"
+    diff=$(( net > now ? net - now : now - net ))
+    if [ "$diff" -gt 300 ]; then
+      date -u -s "@$net" 2>/dev/null || true
+      info "clock was off by ${diff}s — set from network time"
+      now="$(date -u +%s)"
+      diff=$(( net > now ? net - now : now - net ))
+    fi
+    if [ "$diff" -le 300 ]; then
+      ok "clock: $(date -u '+%Y-%m-%d %H:%M UTC') (agrees with network time)"
+      return 0
+    fi
+  fi
+  die "clock is wrong and time sync failed (system: $(date -u), network: ${net:-unreachable}) — package signatures will not verify. Set it by hand: date -u -s 'YYYY-MM-DD HH:MM:SS'"
+}
+
+# ---------------------------------------------------------------- main
+
+main() {
+  # Never let the machine sleep mid-install: a suspend/resume cycle drops the
+  # network and can re-read a dead hardware clock (classic old-laptop
+  # failure). Inhibit sleep, idle sleep, and lid-switch handling for the
+  # whole run.
+  if [ -z "${NAVI_INHIBITED:-}" ] && command -v systemd-inhibit >/dev/null 2>&1; then
+    export NAVI_INHIBITED=1
+    exec systemd-inhibit --what=sleep:idle:handle-lid-switch \
+      --who="navi installer" --why="installation in progress" \
+      --mode=block "$0" "$@"
+  fi
+  ui_start
+  preflight
+  # setup_network can prompt for WiFi; pick_disk/get_credentials always do.
+  # the frame pauses for the conversation, then resumes.
+  ui_pause
+  setup_network
+  ui_resume
+  sync_clock
+  ui_pause
+  pick_disk
+  get_credentials
+  ui_resume
+  partition_disk
+  format_encrypt
+  mount_target
+  run_debootstrap
+  configure_target
+  provision_target
+  persist_network
+  teardown
+
+  # don't offer the installer again on this boot's root shell
+  touch /tmp/navi-install.done
+
+  ui_stop
+  clear
+
+  cat <<EOF
+
+${N_MAGENTA}                       ∅${N_OFF}
+
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                                                              ║
+  ║   ✓  navi 1.2 "mika" RC16 is installed.                      ║
+  ║                                                              ║
+  ║   remove the ISO and reboot.                                 ║
+  ║   1. enter your disk encryption passphrase (twice:           ║
+  ║      once at the boot menu, once as boot begins)             ║
+  ║   2. log in at the navi login screen                         ║
+  ║   3. you land in the wired. welcome home.                    ║
+  ║                                                              ║
+  ║   ${N_CYAN}the wired will provide.${N_OFF}                                   ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+EOF
+  _t0=$(cat "$UI_DIR/t0" 2>/dev/null || echo 0)
+  if [ "$_t0" -gt 0 ]; then
+    printf '\n    total install time: %s\n' "$(fmt_dur $(( $(date +%s) - _t0 )))"
+  fi
+  local ans
+  read -r -p "    reboot now? [Y/n] " ans
+  case "${ans:-Y}" in [Yy]*) reboot ;; *) echo "    reboot when ready: reboot";; esac
+}
+
+main "$@"

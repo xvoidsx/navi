@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=remoji
+Comment=Search and insert emoji, kaomoji style
+Exec=remoji
+Icon=face-smile
+Categories=Utility;
+NoDisplay=false
