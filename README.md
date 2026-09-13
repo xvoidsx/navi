@@ -3,6 +3,12 @@
 
 ###### the minimal **navi** desktop
 
+> **navi 1.2 "mika" RC16** is live now.
+>
+> Not intended for stable use yet, but if you want to test out navi on a spare machine or in a VM, feel free!
+>
+> **navi** release candidate images are in the [Releases](https://github.com/xvoidsx/navi/releases/tag/v1.2-mika-RC16) section.
+
 **navi** is a new GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx).
 
 It uses [wiredWM](https://github.com/rav3ndust/wiredWM), our fork of the `sway` wayland compositor, as its flagship desktop.
