@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-fetch
+Comment=System info with navi's animated shimmer emblem
+Exec=navi-fetch
+Icon=utilities-system-monitor
+Categories=System;Utility;
+Terminal=true
+NoDisplay=false

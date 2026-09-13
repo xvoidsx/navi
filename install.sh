@@ -62,6 +62,9 @@ PKGS=(
   # seamless on any machine. firmware blobs are inert without matching
   # hardware, so shipping them all is safe.
   firmware-realtek firmware-iwlwifi firmware-atheros firmware-brcm80211 firmware-mediatek
+  # small system utilities we love (2026-09-13): archives, rainbow cat,
+  # python3 dev conveniences, pandora radio, firewall, node runtime.
+  zip unzip lolcat python-dev-is-python3 pianobar ufw nodejs npm
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -447,6 +450,7 @@ install_commands() {
   install_bin "naviWalls.sh"        "naviWalls"
   install_bin "gifpaperslain.sh"    "gifpaperslain"
   install_bin "navi-wallpaper.sh"   "navi-wallpaper"
+  install_bin "navi-fetch.sh"      "navi-fetch"
   install_bin "wired_power_menu.sh" "power_menu"
   install_bin "remoji.sh"           "remoji"
   install_bin "learn.sh"            "learn"
