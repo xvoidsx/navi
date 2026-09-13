@@ -591,6 +591,23 @@ setup_sddm() {
   ok "sddm serves the navi login; pick Wayland or X11 at the prompt"
 }
 
+# ---------------------------------------------------------------- chromium
+
+# Chromium ships navi-flavored: the nightshadeNeon theme (by rav3ndust, on
+# the Chrome Web Store) installs itself via managed enterprise policy on
+# first launch — no clicks, no profile surgery. Force-install means the
+# theme stays put while the policy is in place; that's the price of a
+# curated default. Dark page rendering needs no policy at all: Chromium
+# follows the system GTK theme, and navi already ships Yaru-magenta-dark
+# with prefer-dark-theme, so pages render dark out of the box.
+setup_chromium() {
+  step "chromium (nightshadeNeon theme via managed policy)"
+  $DOAS install -d -m 755 /etc/chromium/policies/managed
+  $DOAS install -m 644 "$WIRED_DIR/chromium/policies/managed/navi.json" \
+    /etc/chromium/policies/managed/navi.json
+  ok "nightshadeNeon theme installs on first Chromium launch"
+}
+
 # ---------------------------------------------------------------- identity
 
 # Brand the machine as navi: /etc/os-release, lsb-release, login banners,
@@ -663,6 +680,7 @@ main() {
   setup_flatpak
   setup_dirs
   setup_sddm
+  setup_chromium
   run_app_installers
   done_banner
 }
