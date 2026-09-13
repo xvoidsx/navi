@@ -387,6 +387,11 @@ deploy_configs() {
   deploy_config "terminals/foot.ini"          "$HOME/.config/foot/foot.ini"
   deploy_config "cliamp/config.toml"         "$HOME/.config/cliamp/config.toml"
   deploy_config "herdr/config.toml"          "$HOME/.config/herdr/config.toml"
+  # cmus + cava: the nightshadeNeon music setup. the cmus rc selects the
+  # theme; the theme and cava config ship the full aesthetic.
+  deploy_config "cmus/rc"                    "$HOME/.config/cmus/rc"
+  deploy_config "cmus/nightshadeNeon.theme"  "$HOME/.config/cmus/nightshadeNeon.theme"
+  deploy_config "cava/config"                "$HOME/.config/cava/config"
   deploy_config "conky.conf"                  "$HOME/.config/conky/conky.conf"
   deploy_config "dunstrc"                     "$HOME/.config/dunst/dunstrc"
   # native GTK apps (e.g. gsimplecal) need a theme set explicitly —
