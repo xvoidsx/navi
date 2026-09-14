@@ -2,8 +2,9 @@
 Type=Application
 Name=naviApps
 Comment=the app store for navi — browse and install webapps
-Exec=chromium --allow-file-access-from-files --app=file:///usr/share/navi/wired/naviApps/index.html
+Exec=chromium --app=file:///usr/share/navi/wired/naviApps/index.html
 Icon=/usr/share/navi/wired/naviApps/icons/naviapps.svg
 Categories=System;Utility;
 Terminal=false
 NoDisplay=false
+

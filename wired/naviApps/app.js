@@ -1,4 +1,6 @@
-// naviApps — static local store: the curated webapp catalog in apps.json.
+// naviApps — static local store: the curated webapp catalog ships inlined
+// as catalog.js (generated from apps.json by build-catalog.sh), so the page
+// runs offline from file:// with no server and no browser flags.
 // Runs offline from the deployed tree; install via `navi-webapp <name>`.
 const grid = document.getElementById("grid");
 const naviGrid = document.getElementById("naviGrid");
@@ -11,16 +13,15 @@ const catEl = document.getElementById("category");
 let curated = [];
 let activeSource = "";
 
-async function load() {
-  try {
-    const res = await fetch("apps.json");
-    if (!res.ok) throw new Error(res.status);
-    curated = await res.json();
-  } catch {
+function load() {
+  // catalog.js inlines the catalog as a classic script, so this works from
+  // file:// with no fetch(), no local server, and no CORS workaround.
+  if (!Array.isArray(window.NAVIAPPS_CATALOG)) {
     statusEl.textContent =
-      "couldn't load the catalog — please open naviApps from the navi launcher.";
+      "couldn't load the catalog — catalog.js is missing; re-run build-catalog.sh.";
     return;
   }
+  curated = window.NAVIAPPS_CATALOG;
   buildCategories();
   render();
 }
