@@ -457,6 +457,7 @@ install_commands() {
   install_bin "gifpaperslain.sh"    "gifpaperslain"
   install_bin "navi-wallpaper.sh"   "navi-wallpaper"
   install_bin "navi-fetch.sh"      "navi-fetch"
+  install_bin "navi-logo.sh"       "navi-logo"
   install_bin "wired_power_menu.sh" "power_menu"
   install_bin "remoji.sh"           "remoji"
   install_bin "learn.sh"            "learn"
@@ -539,6 +540,16 @@ EOF
     ok "flatpak theme overrides applied"
   else
     info "flatpak overrides already exist"
+  fi
+  # Let sandboxed apps actually see the host icon/cursor themes: without
+  # this the ICON_THEME above is a dead letter, since /usr/share/icons is
+  # not in the sandbox by default. Mirrors the old wiredWM override_fp
+  # step (cursor consistency, e.g. firefox). Read-only, user-level.
+  if ! grep -q '^\[Context\]' "$override_dir/global" 2>/dev/null; then
+    printf '\n[Context]\nfilesystems=%s/.icons:ro;/usr/share/icons:ro;\n' "$HOME" >> "$override_dir/global"
+    ok "flatpak icon-directory overrides applied"
+  else
+    info "flatpak icon overrides already present"
   fi
 }
 

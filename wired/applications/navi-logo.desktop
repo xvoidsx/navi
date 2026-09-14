@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-logo
+Comment=navi's empty-set mark in the terminal
+Exec=navi-logo
+Icon=emblem-favorite
+Categories=System;Utility;
+Terminal=true
+NoDisplay=false
