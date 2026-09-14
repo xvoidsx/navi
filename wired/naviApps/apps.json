@@ -655,20 +655,6 @@
     "icon": "💬"
   },
   {
-    "id": "web-mastodon",
-    "name": "Mastodon",
-    "summary": "Flagship fediverse microblogging.",
-    "category": "Internet",
-    "source": "webapp",
-    "package": "mastodon",
-    "url": "https://mastodon.social",
-    "install": "navi-webapp mastodon",
-    "downloadUrl": "webapps/mastodon.desktop",
-    "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=Mastodon\\nExec=chromium --app=https://mastodon.social\\nComment=Flagship fediverse microblogging.\\nTerminal=false\\nType=Application\\nIcon=navi-mastodon\\nStartupNotify=true\\nCategories=Network;\\n",
-    "homepage": "https://mastodon.social",
-    "icon": "🐘"
-  },
-  {
     "id": "web-stoat",
     "name": "Stoat",
     "summary": "FOSS Discord-style chat, community-run. (formerly Revolt)",
@@ -837,20 +823,6 @@
     "icon": "📝"
   },
   {
-    "id": "web-trello",
-    "name": "Trello",
-    "summary": "Kanban boards for projects big and small.",
-    "category": "Productivity",
-    "source": "webapp",
-    "package": "trello",
-    "url": "https://trello.com",
-    "install": "navi-webapp trello",
-    "downloadUrl": "webapps/trello.desktop",
-    "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=Trello\\nExec=chromium --app=https://trello.com\\nComment=Kanban boards for projects big and small.\\nTerminal=false\\nType=Application\\nIcon=navi-trello\\nStartupNotify=true\\nCategories=Office;\\n",
-    "homepage": "https://trello.com",
-    "icon": "📋"
-  },
-  {
     "id": "web-crunchyroll",
     "name": "Crunchyroll",
     "summary": "Anime streaming.",
@@ -961,5 +933,33 @@
     "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=Ente\\nExec=chromium --app=https://ente.io\\nComment=FOSS encrypted photos.\\nTerminal=false\\nType=Application\\nIcon=navi-ente\\nStartupNotify=true\\nCategories=Graphics;\\n",
     "homepage": "https://ente.io",
     "icon": "🖼️"
+  },
+  {
+    "id": "web-fizzy",
+    "name": "Fizzy",
+    "summary": "Boards and tasks for team projects.",
+    "category": "Productivity",
+    "source": "webapp",
+    "package": "fizzy",
+    "url": "https://app.fizzy.do",
+    "install": "navi-webapp fizzy",
+    "downloadUrl": "webapps/fizzy.desktop",
+    "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=Fizzy\\nExec=chromium --app=https://app.fizzy.do\\nComment=Boards and tasks for team projects.\\nTerminal=false\\nType=Application\\nIcon=navi-fizzy\\nStartupNotify=true\\nCategories=Office;\\n",
+    "homepage": "https://app.fizzy.do",
+    "icon": "🫧"
+  },
+  {
+    "id": "web-weatherwise",
+    "name": "WeatherWise",
+    "summary": "Weather and radar, beautifully done.",
+    "category": "Webapps",
+    "source": "webapp",
+    "package": "weatherwise",
+    "url": "https://web.weatherwise.app",
+    "install": "navi-webapp weatherwise",
+    "downloadUrl": "webapps/weatherwise.desktop",
+    "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=WeatherWise\\nExec=chromium --app=https://web.weatherwise.app\\nComment=Weather and radar, beautifully done.\\nTerminal=false\\nType=Application\\nIcon=navi-weatherwise\\nStartupNotify=true\\nCategories=Utility;\\n",
+    "homepage": "https://web.weatherwise.app",
+    "icon": "🌦️"
   }
 ]

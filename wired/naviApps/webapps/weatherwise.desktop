@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=WeatherWise
+Exec=chromium --app=https://web.weatherwise.app
+Comment=Weather and radar, beautifully done.
+Terminal=false
+Type=Application
+Icon=navi-weatherwise
+StartupNotify=true
+Categories=Utility;
