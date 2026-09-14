@@ -16,8 +16,12 @@
 
 name: navi ISO (Mika RC19)
 
-# Bump these two for each release candidate; everything downstream derives
+# === RELEASE CHECKLIST ===
+# Bump BOTH values below for every new RC. Everything downstream derives
 # the image name, volume label, and artifact name from them.
+# Forgetting this ships a misnamed artifact and breaks the publish workflow
+# (this bit us on RC19: the build produced navi-1.2-mika-RC18.iso while
+# publish-rc19.yml looked for the RC19 name).
 env:
   RC_LABEL: RC19
   ISO_BASENAME: navi-1.2-mika-RC19
