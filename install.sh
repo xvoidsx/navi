@@ -52,7 +52,7 @@ PKGS=(
   # minimal installs don't pull them in on their own, and without them the
   # greeter falls back to the default theme with a module-not-installed error.
   qml6-module-qtquick-controls qml6-module-qtquick-layouts
-  fonts-jetbrains-mono fonts-firacode fonts-noto wdisplays papirus-icon-theme
+  fonts-jetbrains-mono fonts-firacode fonts-noto fonts-cascadia-code wdisplays papirus-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak dconf-cli
   chromium firefox-esr
@@ -641,6 +641,32 @@ setup_chromium() {
   ok "nightshadeNeon theme installs on first Chromium launch"
 }
 
+# ---------------------------------------------------------------- fonts
+
+# JetBrainsMono Nerd Font: Debian ships no nerd-fonts packages, so we
+# download it from the upstream release. Provides the PUA glyphs Waybar
+# and lsd need (brightness icons, devicons). Matches the already-shipped
+# JetBrains Mono.
+setup_fonts() {
+  step "nerd fonts (JetBrainsMono Nerd Font)"
+  local font_dir="/usr/share/fonts/truetype/jetbrainsmono-nerd"
+  if [ -f "$font_dir/JetBrainsMonoNerdFont-Regular.ttf" ]; then
+    ok "JetBrainsMono Nerd Font already installed"
+    return 0
+  fi
+  $DOAS mkdir -p "$font_dir"
+  local tmp_zip="/tmp/JetBrainsMonoNerdFont.zip"
+  if wget -q -O "$tmp_zip" "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"; then
+    $DOAS unzip -o -q "$tmp_zip" -d "$font_dir"
+    rm -f "$tmp_zip"
+    $DOAS fc-cache -f >/dev/null 2>&1 || true
+    ok "JetBrainsMono Nerd Font installed"
+  else
+    warn "could not download JetBrainsMono Nerd Font — skipping"
+    rm -f "$tmp_zip"
+  fi
+}
+
 # ---------------------------------------------------------------- identity
 
 # Brand the machine as navi: /etc/os-release, lsb-release, login banners,
@@ -715,6 +741,7 @@ main() {
   setup_dirs
   setup_sddm
   setup_chromium
+  setup_fonts
   run_app_installers
   done_banner
 }
