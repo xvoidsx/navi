@@ -545,7 +545,8 @@ EOF
 setup_dirs() {
   step "user directories"
   mkdir -p "$HOME/Pictures/Screenshots"
-  ok "~/Pictures/Screenshots ready"
+  mkdir $HOME/Documents $HOME/Downloads $HOME/Videos $HOME/Music
+  ok "user directories ready"
 }
 
 run_app_installers() {
