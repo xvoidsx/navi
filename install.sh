@@ -411,9 +411,12 @@ deploy_configs() {
   fi
   deploy_config "vimrc"                       "$HOME/.vimrc"
   # terminal browsers (the learn manual renders in elinks/lynx):
-  # pin dark nightshadeNeon palettes so light defaults can't wash out text
-  deploy_config "elinks/elinks.conf"          "$HOME/.config/elinks/elinks.conf"
-  deploy_config "lynx/lynx.cfg"               "$HOME/.lynx.cfg"
+  # pin dark nightshadeNeon palettes so light defaults can't wash out text.
+  # elinks uses the classic ~/.elinks/ location per elinks.conf(5);
+  # lynx colors live system-wide, and ~/.lynxrc forces color mode on.
+  deploy_config "elinks/elinks.conf"          "$HOME/.elinks/elinks.conf"
+  deploy_config "lynx/lynx.cfg"               "/etc/lynx.cfg"
+  deploy_config "lynx/lynxrc"                 "$HOME/.lynxrc"
   # best-effort agent configs; paths to be confirmed against the apps
   deploy_config "ai/opencode/tui.json"        "$HOME/.config/opencode/tui.json"
   deploy_config "ai/pi/agent/themes/nightshadeNeon.json" \

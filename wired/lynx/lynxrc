@@ -1,0 +1,4 @@
+# navi / wired Lynx personal settings
+# Forces color mode on so the COLOR directives in lynx.cfg take effect.
+# Without this, lynx can run in mono mode and ignore all color settings.
+show_color=always
