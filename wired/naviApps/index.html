@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>naviApps — the app store for navi</title>
+  <meta name="description" content="naviApps: install Linux software on navi without the terminal. .deb packages, flatpaks, and webapps." />
+  <link rel="stylesheet" href="style.css?v=glass2" />
+</head>
+<body>
+
+<header class="hero">
+  <h1>naviApps</h1>
+  <p class="tagline"><span>the app store for navi</span></p>
+  <div class="searchbar">
+    <input id="search" type="search" placeholder="search apps… (try 'browser', 'music', 'notes')" autocomplete="off" />
+    <select id="category" aria-label="category">
+      <option value="">all categories</option>
+    </select>
+  </div>
+</header>
+
+<hr class="breakHelper" />
+
+<nav class="filters" aria-label="source filters">
+  <button data-source="" class="active">all</button>
+  <button data-source="navi">navi</button>
+  <button data-source="apt">.deb / apt</button>
+  <button data-source="flatpak">flatpak</button>
+  <button data-source="webapp">webapps</button>
+  <button id="liveToggle" title="also search Flathub live">✦ live flathub: off</button>
+</nav>
+
+<main>
+  <p class="status" id="status">loading curated apps…</p>
+  <section class="grid" id="grid"></section>
+</main>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h2 id="mName"></h2>
+    <div class="meta" id="mMeta"></div>
+    <p id="mSummary"></p>
+    <div class="cmdbox">
+      <pre><code id="mCmd"></code></pre>
+      <button class="btn" id="mCopy">copy</button>
+    </div>
+    <div id="mRemoveWrap" hidden>
+      <p class="meta">remove it again:</p>
+      <div class="cmdbox">
+        <pre><code id="mRemove"></code></pre>
+        <button class="btn" id="mCopyRemove">copy</button>
+      </div>
+    </div>
+    <div class="row">
+      <a class="btn primary" id="mHome" href="#" target="_blank" rel="noopener">homepage</a>
+      <a class="btn" id="mDownload" href="#" download hidden>download .desktop</a>
+      <button class="btn" id="mClose">close</button>
+    </div>
+    <details id="mDesktopWrap" hidden>
+      <summary>view .desktop entry (webapps)</summary>
+      <div class="cmdbox"><pre><code id="mDesktop"></code></pre></div>
+    </details>
+    <p class="meta">paste into a terminal on navi. apt/flatpak commands run anywhere; webapp commands (<code>./install-webapp.sh …</code>) run from your naviApps checkout — or use <code>--all</code> to grab every webapp at once. flatpak apps need <code>flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo</code> once.</p>
+  </div>
+</div>
+
+<footer>
+  <p>~ ~ <a href="https://rav3ndust.xyz/wiki/nightshadeNeon.html">nightshadeNeon</a> themed · naviApps for navi · <a href="apps.json">apps.json</a> ~ ~</p>
+  <p>apt = Debian packages · flatpak = Flathub · webapps = site-specific browsers</p>
+</footer>
+
+<script src="app.js?v=glass2"></script>
+</body>
+</html>

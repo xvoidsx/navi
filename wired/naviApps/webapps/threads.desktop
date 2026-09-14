@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Threads
+Exec=chromium --app=https://www.threads.com
+Comment=Threads as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-threads
+StartupNotify=true
+Categories=Network;

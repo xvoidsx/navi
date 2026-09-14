@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=WhatsApp
+Exec=chromium --app=https://web.whatsapp.com
+Comment=WhatsApp Web as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-whatsapp
+StartupNotify=true
+Categories=Network;Chat;

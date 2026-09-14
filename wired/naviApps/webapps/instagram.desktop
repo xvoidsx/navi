@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Instagram
+Exec=chromium --app=https://www.instagram.com
+Comment=Instagram as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-instagram
+StartupNotify=true
+Categories=Network;

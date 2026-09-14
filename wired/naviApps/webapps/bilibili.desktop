@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Bilibili
+Exec=chromium --app=https://www.bilibili.tv
+Comment=Bilibili as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-bilibili
+StartupNotify=true
+Categories=AudioVideo;

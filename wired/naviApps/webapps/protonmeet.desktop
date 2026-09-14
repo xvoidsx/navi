@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Proton Meet
+Exec=chromium --app=https://meet.proton.me
+Comment=Proton Meet as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-protonmeet
+StartupNotify=true
+Categories=Network;Chat;

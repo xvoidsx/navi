@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Meta AI
+Exec=chromium --app=https://www.meta.ai
+Comment=Meta AI as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-metaai
+StartupNotify=true
+Categories=Network;

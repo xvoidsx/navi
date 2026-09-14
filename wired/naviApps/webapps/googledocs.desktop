@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Google Docs
+Exec=chromium --app=https://docs.google.com
+Comment=Google Docs as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-googledocs
+StartupNotify=true
+Categories=Office;

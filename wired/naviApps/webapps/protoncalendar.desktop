@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Proton Calendar
+Exec=chromium --app=https://calendar.proton.me
+Comment=Proton Calendar as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-protoncalendar
+StartupNotify=true
+Categories=Office;

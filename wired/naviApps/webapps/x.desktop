@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=X
+Exec=chromium --app=https://x.com
+Comment=X (formerly Twitter) as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-x
+StartupNotify=true
+Categories=Network;

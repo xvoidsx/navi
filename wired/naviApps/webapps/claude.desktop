@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Claude
+Exec=chromium --app=https://claude.ai
+Comment=Claude as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-claude
+StartupNotify=true
+Categories=Network;
