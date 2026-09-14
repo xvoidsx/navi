@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Basecamp
+Exec=chromium --app=https://basecamp.com
+Comment=37signals' calm project management.
+Terminal=false
+Type=Application
+Icon=navi-basecamp
+StartupNotify=true
+Categories=Office;

@@ -961,5 +961,33 @@
     "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=WeatherWise\\nExec=chromium --app=https://web.weatherwise.app\\nComment=Weather and radar, beautifully done.\\nTerminal=false\\nType=Application\\nIcon=navi-weatherwise\\nStartupNotify=true\\nCategories=Utility;\\n",
     "homepage": "https://web.weatherwise.app",
     "icon": "🌦️"
+  },
+  {
+    "id": "web-basecamp",
+    "name": "Basecamp",
+    "summary": "37signals' calm project management.",
+    "category": "Productivity",
+    "source": "webapp",
+    "package": "basecamp",
+    "url": "https://basecamp.com",
+    "install": "navi-webapp basecamp",
+    "downloadUrl": "webapps/basecamp.desktop",
+    "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=Basecamp\\nExec=chromium --app=https://basecamp.com\\nComment=37signals' calm project management.\\nTerminal=false\\nType=Application\\nIcon=navi-basecamp\\nStartupNotify=true\\nCategories=Office;\\n",
+    "homepage": "https://basecamp.com",
+    "icon": "🏕️"
+  },
+  {
+    "id": "web-hey",
+    "name": "HEY",
+    "summary": "Email, reimagined by 37signals.",
+    "category": "Internet",
+    "source": "webapp",
+    "package": "hey",
+    "url": "https://hey.com",
+    "install": "navi-webapp hey",
+    "downloadUrl": "webapps/hey.desktop",
+    "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=HEY\\nExec=chromium --app=https://hey.com\\nComment=Email, reimagined by 37signals.\\nTerminal=false\\nType=Application\\nIcon=navi-hey\\nStartupNotify=true\\nCategories=Network;\\n",
+    "homepage": "https://hey.com",
+    "icon": "💌"
   }
 ]
