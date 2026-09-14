@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Hugging Face
+Exec=chromium --app=https://huggingface.co
+Comment=Models, datasets, and AI spaces.
+Terminal=false
+Type=Application
+Icon=navi-huggingface
+StartupNotify=true
+Categories=Network;

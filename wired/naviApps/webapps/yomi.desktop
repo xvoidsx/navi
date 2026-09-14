@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Yomi
+Exec=chromium --app=https://yomi.to
+Comment=Free anime streaming.
+Terminal=false
+Type=Application
+Icon=navi-yomi
+StartupNotify=true
+Categories=AudioVideo;Video;

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Tuta
+Exec=chromium --app=https://app.tuta.com
+Comment=FOSS encrypted mail.
+Terminal=false
+Type=Application
+Icon=navi-tuta
+StartupNotify=true
+Categories=Network;

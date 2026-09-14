@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Trello
+Exec=chromium --app=https://trello.com
+Comment=Kanban boards for projects big and small.
+Terminal=false
+Type=Application
+Icon=navi-trello
+StartupNotify=true
+Categories=Office;

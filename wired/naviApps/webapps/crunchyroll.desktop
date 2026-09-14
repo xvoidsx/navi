@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Crunchyroll
+Exec=chromium --app=https://www.crunchyroll.com
+Comment=Anime streaming.
+Terminal=false
+Type=Application
+Icon=navi-crunchyroll
+StartupNotify=true
+Categories=AudioVideo;Video;

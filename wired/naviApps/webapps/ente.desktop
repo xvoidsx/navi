@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Ente
+Exec=chromium --app=https://ente.io
+Comment=FOSS encrypted photos.
+Terminal=false
+Type=Application
+Icon=navi-ente
+StartupNotify=true
+Categories=Graphics;

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=upd.dev
+Exec=chromium --app=https://upd.dev
+Comment=Independent code forge. A forge, not a factory.
+Terminal=false
+Type=Application
+Icon=navi-upd
+StartupNotify=true
+Categories=Development;
