@@ -26,10 +26,14 @@ NOANIM="$LOCAL_SHARE/navi-wallpaper.noanim"
 
 log() { printf 'navi-wallpaper: %s\n' "$*" >&2; }
 
-# don't stack instances on config reload
+# own the background: stop any existing wallpaper daemons (stale, bogus, or
+# from an unknown starter — e.g. a bare swaybg painting black) so we start
+# clean. harmless when none are running; also prevents stacking on reload.
 if pgrep -x mpvpaper >/dev/null 2>&1 || pgrep -x swaybg >/dev/null 2>&1; then
-  log "a wallpaper daemon is already running — leaving it alone"
-  exit 0
+  log "stopping existing wallpaper daemon(s) for a clean start"
+  pkill -x mpvpaper 2>/dev/null || true
+  pkill -x swaybg 2>/dev/null || true
+  sleep 1
 fi
 
 static_fallback() {
