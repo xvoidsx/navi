@@ -38,7 +38,7 @@ jobs:
       - name: Download the ISO artifact
         uses: actions/download-artifact@v4
         with:
-          name: navi-1.2-mika-RC19.iso
+          name: navi-1.2-mika-RC18.iso
           # inputs.* only exist on workflow_dispatch; fall back on push events
           run-id: ${{ inputs.run_id || '00000000000' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -48,6 +48,8 @@ jobs:
         run: |
           set -euo pipefail
           ls -lh dist
+          # The RC19 build artifact was misnamed RC18; rename for the release
+          mv dist/navi-1.2-mika-RC18.iso dist/navi-1.2-mika-RC19.iso
           ISO="$(ls dist/*.iso | head -n 1)"
           test -s "$ISO"
           ( cd dist && sha256sum "$(basename "$ISO")" > SHA256SUMS.txt )
