@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Pixelfed
+Exec=chromium --app=https://pixelfed.org
+Comment=Photo sharing without the surveillance.
+Terminal=false
+Type=Application
+Icon=navi-pixelfed
+StartupNotify=true
+Categories=Network;

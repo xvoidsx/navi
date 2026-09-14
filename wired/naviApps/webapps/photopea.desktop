@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Photopea
+Exec=chromium --app=https://www.photopea.com
+Comment=A Photoshop-class editor in a browser tab.
+Terminal=false
+Type=Application
+Icon=navi-photopea
+StartupNotify=true
+Categories=Graphics;

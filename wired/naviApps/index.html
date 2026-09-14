@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>naviApps — the app store for navi</title>
-  <meta name="description" content="naviApps: install Linux software on navi without the terminal. .deb packages, flatpaks, and webapps." />
+  <meta name="description" content="naviApps: the app store for navi — browse and install webapps." />
   <link rel="stylesheet" href="style.css?v=glass2" />
 </head>
 <body>
@@ -22,13 +22,9 @@
 
 <hr class="breakHelper" />
 
-<nav class="filters" aria-label="source filters">
+<nav class="filters" aria-label="filters">
   <button data-source="" class="active">all</button>
   <button data-source="navi">navi</button>
-  <button data-source="apt">.deb / apt</button>
-  <button data-source="flatpak">flatpak</button>
-  <button data-source="webapp">webapps</button>
-  <button id="liveToggle" title="also search Flathub live">✦ live flathub: off</button>
 </nav>
 
 <main>
@@ -61,13 +57,13 @@
       <summary>view .desktop entry (webapps)</summary>
       <div class="cmdbox"><pre><code id="mDesktop"></code></pre></div>
     </details>
-    <p class="meta">paste into a terminal on navi. apt/flatpak commands run anywhere; webapp commands (<code>./install-webapp.sh …</code>) run from your naviApps checkout — or use <code>--all</code> to grab every webapp at once. flatpak apps need <code>flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo</code> once.</p>
+    <p class="meta">paste into a terminal on navi. <code>navi-webapp --all</code> grabs every webapp at once; from a naviApps checkout, <code>./install-webapp.sh …</code> does the same.</p>
   </div>
 </div>
 
 <footer>
   <p>~ ~ <a href="https://rav3ndust.xyz/wiki/nightshadeNeon.html">nightshadeNeon</a> themed · naviApps for navi · <a href="apps.json">apps.json</a> ~ ~</p>
-  <p>apt = Debian packages · flatpak = Flathub · webapps = site-specific browsers</p>
+  <p>webapps = site-specific browsers, installed with <code>navi-webapp</code></p>
 </footer>
 
 <script src="app.js?v=glass2"></script>

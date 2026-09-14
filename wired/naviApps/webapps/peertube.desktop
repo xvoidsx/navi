@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=PeerTube
+Exec=chromium --app=https://joinpeertube.org
+Comment=Decentralized video. Pick an instance, escape the algorithm.
+Terminal=false
+Type=Application
+Icon=navi-peertube
+StartupNotify=true
+Categories=AudioVideo;Video;

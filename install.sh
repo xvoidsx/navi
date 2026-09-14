@@ -54,7 +54,7 @@ PKGS=(
   qml6-module-qtquick-controls qml6-module-qtquick-layouts
   fonts-jetbrains-mono fonts-firacode fonts-noto wdisplays papirus-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
-  cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak
+  cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak dconf-cli
   chromium firefox-esr
   # zstd: the ollama installer needs it to unpack its payload.
   zstd
@@ -396,6 +396,7 @@ deploy_configs() {
   deploy_config "dunstrc"                     "$HOME/.config/dunst/dunstrc"
   # native GTK apps (e.g. gsimplecal) need a theme set explicitly —
   # nothing else in the installer does this (flatpak theming is separate).
+  deploy_config "gtk-2.0/gtkrc"              "$HOME/.gtkrc-2.0"
   deploy_config "gtk-3.0/settings.ini"        "$HOME/.config/gtk-3.0/settings.ini"
   deploy_config "gtk-4.0/settings.ini"        "$HOME/.config/gtk-4.0/settings.ini"
   # tmux reads ~/.config/tmux/tmux.conf first (since 3.1) — the XDG path
@@ -461,6 +462,7 @@ install_commands() {
   install_bin "learn.sh"            "learn"
   install_bin "navi-Q.sh"           "navi-Q"
   install_bin "navi-Qx.sh"          "navi-Qx"
+  install_bin "navi-webapp.sh"      "navi-webapp"
 
   # remoji reads emojis.txt via $emojidir; point it at the share dir instead
   if grep -q '$HOME/wiredWM/scripts-config/remoji' /usr/bin/remoji 2>/dev/null; then
@@ -531,7 +533,7 @@ setup_flatpak() {
   if [ ! -f "$override_dir/global" ]; then
     cat > "$override_dir/global" <<'EOF'
 [Environment]
-GTK_THEME=Yaru-dark
+GTK_THEME=Yaru-magenta-dark
 ICON_THEME=Papirus-Dark
 EOF
     ok "flatpak theme overrides applied"
@@ -545,7 +547,7 @@ EOF
 setup_dirs() {
   step "user directories"
   mkdir -p "$HOME/Pictures/Screenshots"
-  mkdir $HOME/Documents $HOME/Downloads $HOME/Videos $HOME/Music
+  mkdir -p "$HOME/Documents" "$HOME/Downloads" "$HOME/Videos" "$HOME/Music"
   ok "user directories ready"
 }
 
@@ -565,6 +567,25 @@ run_app_installers() {
       info "skipped $name"
     fi
   done
+}
+
+# ---------------------------------------------------------------- gtk theme cohesion
+# settings.ini covers plain GTK apps, but GSettings-aware apps (nemo and
+# friends) read org.gnome.desktop.interface — whose schema default is
+# Adwaita, which is why installs kept falling back to it. seed system-wide
+# dconf defaults so Yaru-magenta-dark wins from first boot. no locks: users
+# can still override per-account with gsettings or a theme tool.
+setup_gtk_theme() {
+  step "gtk theme defaults (yaru-magenta-dark)"
+  $DOAS install -d -m 755 /etc/dconf/db/local.d
+  $DOAS tee /etc/dconf/db/local.d/00-navi-theme >/dev/null <<'EOF'
+[org/gnome/desktop/interface]
+gtk-theme='Yaru-magenta-dark'
+icon-theme='Papirus-Dark'
+color-scheme='prefer-dark'
+EOF
+  $DOAS dconf update
+  ok "yaru-magenta-dark seeded as the gtk default (user-overridable)"
 }
 
 # ---------------------------------------------------------------- login screen
@@ -679,6 +700,7 @@ main() {
   setup_agents
   setup_environment
   setup_flatpak
+  setup_gtk_theme
   setup_dirs
   setup_sddm
   setup_chromium
