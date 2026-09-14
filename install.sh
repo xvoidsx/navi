@@ -415,6 +415,7 @@ deploy_configs() {
   # elinks uses the classic ~/.elinks/ location per elinks.conf(5);
   # lynx colors live system-wide, and ~/.lynxrc forces color mode on.
   deploy_config "elinks/elinks.conf"          "$HOME/.elinks/elinks.conf"
+  deploy_config "elinks/navi.css"              "$HOME/.elinks/navi.css"
   deploy_config "lynx/lynx.cfg"               "/etc/lynx.cfg"
   deploy_config "lynx/lynxrc"                 "$HOME/.lynxrc"
   # best-effort agent configs; paths to be confirmed against the apps
