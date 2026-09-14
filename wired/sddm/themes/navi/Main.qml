@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtMultimedia
 
 Rectangle {
     id: root
@@ -15,34 +14,16 @@ Rectangle {
     readonly property color mute: "#a1a1aa"
     readonly property color panel: "#0b0b10"
 
-    // ---- background: static wallpaper, always there
+    // ---- background: static wallpaper only, by design.
+    //      the animated login-loop.mp4 segfaulted the Qt6 greeter on older
+    //      GPUs (frozen frame, dead input) — every machine gets in the door
+    //      with the static image; the animated wallpaper lives on after
+    //      login via mpvpaper on machines that can handle it.
     Image {
         id: wallpaper
         anchors.fill: parent
         fillMode: Image.PreserveAspectCrop
         source: "file:///usr/share/navi/wired/wp/navi-lain-rgbsplit.jpg"
-    }
-
-    // ---- animated background: login-loop.mp4 plays over the static image.
-    //      regenerate it from the default gifpaper with:
-    //      ffmpeg -i navi-lain-rgbsplit.gif -movflags +faststart -pix_fmt yuv420p login-loop.mp4
-    //      missing/unplayable file = static only. Qt6 has no Video type
-    //      (that was Qt5); MediaPlayer + VideoOutput is the Qt6 way. a
-    //      gif-sourced mp4 has no audio track, so no AudioOutput/mute
-    //      handling is needed. on broken graphics (EGL) the player errors
-    //      out and the video layer hides itself — the static image stays.
-    VideoOutput {
-        id: motion
-        anchors.fill: parent
-        fillMode: VideoOutput.PreserveAspectCrop
-    }
-    MediaPlayer {
-        id: player
-        source: "file:///usr/share/navi/wired/wp/login-loop.mp4"
-        videoOutput: motion
-        loops: MediaPlayer.Infinite
-        autoPlay: true
-        onErrorOccurred: (error, errorString) => motion.visible = false
     }
 
     // ---- readability veil
