@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Internet Archive
-Exec=chromium --app=https://archive.org
+Exec=chromium --force-dark-mode --app=https://archive.org
 Comment=The web's memory: books, media, and the Wayback Machine.
 Terminal=false
 Type=Application

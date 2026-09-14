@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Claude
-Exec=chromium --app=https://claude.ai
+Exec=chromium --force-dark-mode --app=https://claude.ai
 Comment=Claude as a navi webapp
 Terminal=false
 Type=Application

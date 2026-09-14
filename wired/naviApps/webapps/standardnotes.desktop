@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Standard Notes
-Exec=chromium --app=https://app.standardnotes.com
+Exec=chromium --force-dark-mode --app=https://app.standardnotes.com
 Comment=FOSS end-to-end encrypted notes.
 Terminal=false
 Type=Application

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Google Chat
-Exec=chromium --app=https://chat.google.com
+Exec=chromium --force-dark-mode --app=https://chat.google.com
 Comment=Google Chat as a navi webapp
 Terminal=false
 Type=Application

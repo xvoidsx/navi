@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=glyyph
-Exec=chromium --app=https://xvoidsx.github.io/glyyph
+Exec=chromium --force-dark-mode --app=https://xvoidsx.github.io/glyyph
 Comment=nostr client and relay for free expression
 Terminal=false
 Type=Application

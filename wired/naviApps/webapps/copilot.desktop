@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Copilot
-Exec=chromium --app=https://copilot.microsoft.com
+Exec=chromium --force-dark-mode --app=https://copilot.microsoft.com
 Comment=Microsoft Copilot as a navi webapp
 Terminal=false
 Type=Application

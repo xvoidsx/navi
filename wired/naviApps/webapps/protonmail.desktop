@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Proton Mail
-Exec=chromium --app=https://mail.proton.me
+Exec=chromium --force-dark-mode --app=https://mail.proton.me
 Comment=Proton Mail as a navi webapp
 Terminal=false
 Type=Application

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Penpot
-Exec=chromium --app=https://penpot.app
+Exec=chromium --force-dark-mode --app=https://penpot.app
 Comment=FOSS design tool for interfaces and prototypes.
 Terminal=false
 Type=Application

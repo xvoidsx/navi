@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=CryptPad
-Exec=chromium --app=https://cryptpad.fr
+Exec=chromium --force-dark-mode --app=https://cryptpad.fr
 Comment=Encrypted docs, sheets and whiteboards.
 Terminal=false
 Type=Application

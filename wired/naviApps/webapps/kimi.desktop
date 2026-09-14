@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Kimi
-Exec=chromium --app=https://kimi.com/en
+Exec=chromium --force-dark-mode --app=https://kimi.com/en
 Comment=Kimi as a navi webapp
 Terminal=false
 Type=Application

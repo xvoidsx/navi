@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=YouTube
-Exec=chromium --app=https://www.youtube.com
+Exec=chromium --force-dark-mode --app=https://www.youtube.com
 Comment=YouTube as a navi webapp
 Terminal=false
 Type=Application

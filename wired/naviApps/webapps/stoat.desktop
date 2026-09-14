@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Stoat
-Exec=chromium --app=https://stoat.chat
+Exec=chromium --force-dark-mode --app=https://stoat.chat
 Comment=FOSS Discord-style chat, community-run. (formerly Revolt)
 Terminal=false
 Type=Application

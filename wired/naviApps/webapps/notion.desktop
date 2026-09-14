@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Notion
-Exec=chromium --app=https://www.notion.so
+Exec=chromium --force-dark-mode --app=https://www.notion.so
 Comment=All-in-one workspace for notes and docs.
 Terminal=false
 Type=Application

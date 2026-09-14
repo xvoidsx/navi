@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=navi radio
-Exec=chromium --app=https://xvoidsx.github.io/navi-radio
+Exec=chromium --force-dark-mode --app=https://xvoidsx.github.io/navi-radio
 Comment=navi radio, our own music app
 Terminal=false
 Type=Application

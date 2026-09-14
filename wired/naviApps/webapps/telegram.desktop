@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Telegram
-Exec=chromium --app=https://web.telegram.org
+Exec=chromium --force-dark-mode --app=https://web.telegram.org
 Comment=Fast, cloud-synced messaging.
 Terminal=false
 Type=Application

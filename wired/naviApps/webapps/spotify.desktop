@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Spotify
-Exec=chromium --app=https://open.spotify.com
+Exec=chromium --force-dark-mode --app=https://open.spotify.com
 Comment=Spotify web player as a navi webapp
 Terminal=false
 Type=Application

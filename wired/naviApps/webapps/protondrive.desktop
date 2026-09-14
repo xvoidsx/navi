@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Proton Drive
-Exec=chromium --app=https://drive.proton.me
+Exec=chromium --force-dark-mode --app=https://drive.proton.me
 Comment=Proton Drive as a navi webapp
 Terminal=false
 Type=Application

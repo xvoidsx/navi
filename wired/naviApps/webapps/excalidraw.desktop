@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Excalidraw
-Exec=chromium --app=https://excalidraw.com
+Exec=chromium --force-dark-mode --app=https://excalidraw.com
 Comment=Sketch-style whiteboard for diagrams and ideas.
 Terminal=false
 Type=Application

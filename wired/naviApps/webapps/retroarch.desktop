@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=RetroArch Web
-Exec=chromium --app=https://web.libretro.com
+Exec=chromium --force-dark-mode --app=https://web.libretro.com
 Comment=Retro emulation right in the browser.
 Terminal=false
 Type=Application

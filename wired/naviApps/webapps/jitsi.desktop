@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Jitsi Meet
-Exec=chromium --app=https://meet.jit.si
+Exec=chromium --force-dark-mode --app=https://meet.jit.si
 Comment=FOSS video conferencing, no account needed.
 Terminal=false
 Type=Application

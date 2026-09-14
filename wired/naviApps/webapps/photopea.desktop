@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Photopea
-Exec=chromium --app=https://www.photopea.com
+Exec=chromium --force-dark-mode --app=https://www.photopea.com
 Comment=A Photoshop-class editor in a browser tab.
 Terminal=false
 Type=Application

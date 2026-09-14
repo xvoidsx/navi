@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Crunchyroll
-Exec=chromium --app=https://www.crunchyroll.com
+Exec=chromium --force-dark-mode --app=https://www.crunchyroll.com
 Comment=Anime streaming.
 Terminal=false
 Type=Application

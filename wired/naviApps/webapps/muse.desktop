@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Muse
-Exec=chromium --app=https://muse.ai
+Exec=chromium --force-dark-mode --app=https://muse.ai
 Comment=Muse, Meta's AI agent, as a navi webapp
 Terminal=false
 Type=Application

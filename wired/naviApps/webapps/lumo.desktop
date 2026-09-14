@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Lumo
-Exec=chromium --app=https://lumo.proton.me
+Exec=chromium --force-dark-mode --app=https://lumo.proton.me
 Comment=Lumo, Proton's private AI assistant, as a navi webapp
 Terminal=false
 Type=Application

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=WhatsApp
-Exec=chromium --app=https://web.whatsapp.com
+Exec=chromium --force-dark-mode --app=https://web.whatsapp.com
 Comment=WhatsApp Web as a navi webapp
 Terminal=false
 Type=Application

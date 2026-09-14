@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Bluesky
-Exec=chromium --app=https://bsky.app
+Exec=chromium --force-dark-mode --app=https://bsky.app
 Comment=Bluesky as a navi webapp
 Terminal=false
 Type=Application

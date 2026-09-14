@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Google Messages
-Exec=chromium --app=https://messages.google.com/web
+Exec=chromium --force-dark-mode --app=https://messages.google.com/web
 Comment=Google Messages for web as a navi webapp
 Terminal=false
 Type=Application

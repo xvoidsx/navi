@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Google Docs
-Exec=chromium --app=https://docs.google.com
+Exec=chromium --force-dark-mode --app=https://docs.google.com
 Comment=Google Docs as a navi webapp
 Terminal=false
 Type=Application

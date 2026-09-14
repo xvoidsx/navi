@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Rumble
-Exec=chromium --app=https://rumble.com
+Exec=chromium --force-dark-mode --app=https://rumble.com
 Comment=Rumble as a navi webapp
 Terminal=false
 Type=Application

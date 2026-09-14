@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Tuta
-Exec=chromium --app=https://app.tuta.com
+Exec=chromium --force-dark-mode --app=https://app.tuta.com
 Comment=FOSS encrypted mail.
 Terminal=false
 Type=Application

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Discord
-Exec=chromium --app=https://discord.com/channels/@me
+Exec=chromium --force-dark-mode --app=https://discord.com/channels/@me
 Comment=Discord as a navi webapp
 Terminal=false
 Type=Application

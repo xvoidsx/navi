@@ -2,7 +2,7 @@
 Type=Application
 Name=naviApps
 Comment=the app store for navi — browse and install webapps
-Exec=chromium --app=file:///usr/share/navi/wired/naviApps/index.html
+Exec=chromium --force-dark-mode --app=file:///usr/share/navi/wired/naviApps/index.html
 Icon=/usr/share/navi/wired/naviApps/icons/naviapps.svg
 Categories=System;Utility;
 Terminal=false

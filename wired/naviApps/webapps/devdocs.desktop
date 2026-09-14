@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=DevDocs
-Exec=chromium --app=https://devdocs.io
+Exec=chromium --force-dark-mode --app=https://devdocs.io
 Comment=Fast, offline-capable API documentation.
 Terminal=false
 Type=Application

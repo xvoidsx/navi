@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Basecamp
-Exec=chromium --app=https://basecamp.com
+Exec=chromium --force-dark-mode --app=https://basecamp.com
 Comment=37signals' calm project management.
 Terminal=false
 Type=Application
