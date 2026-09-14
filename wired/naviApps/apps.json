@@ -584,48 +584,6 @@
     "icon": "🎸"
   },
   {
-    "id": "web-peertube",
-    "name": "PeerTube",
-    "summary": "Decentralized video. Pick an instance, escape the algorithm.",
-    "category": "Multimedia",
-    "source": "webapp",
-    "package": "peertube",
-    "url": "https://joinpeertube.org",
-    "install": "navi-webapp peertube",
-    "downloadUrl": "webapps/peertube.desktop",
-    "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=PeerTube\\nExec=chromium --app=https://joinpeertube.org\\nComment=Decentralized video. Pick an instance, escape the algorithm.\\nTerminal=false\\nType=Application\\nIcon=navi-peertube\\nStartupNotify=true\\nCategories=AudioVideo;Video;",
-    "homepage": "https://joinpeertube.org",
-    "icon": "📺"
-  },
-  {
-    "id": "web-pixelfed",
-    "name": "Pixelfed",
-    "summary": "Photo sharing without the surveillance. Federated Instagram alternative.",
-    "category": "Internet",
-    "source": "webapp",
-    "package": "pixelfed",
-    "url": "https://pixelfed.org",
-    "install": "navi-webapp pixelfed",
-    "downloadUrl": "webapps/pixelfed.desktop",
-    "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=Pixelfed\\nExec=chromium --app=https://pixelfed.org\\nComment=Photo sharing without the surveillance. Federated Instagram alternative.\\nTerminal=false\\nType=Application\\nIcon=navi-pixelfed\\nStartupNotify=true\\nCategories=Network;",
-    "homepage": "https://pixelfed.org",
-    "icon": "📸"
-  },
-  {
-    "id": "web-lemmy",
-    "name": "Lemmy",
-    "summary": "Link aggregation without the enshittification. Federated Reddit alternative.",
-    "category": "Internet",
-    "source": "webapp",
-    "package": "lemmy",
-    "url": "https://join-lemmy.org",
-    "install": "navi-webapp lemmy",
-    "downloadUrl": "webapps/lemmy.desktop",
-    "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=Lemmy\\nExec=chromium --app=https://join-lemmy.org\\nComment=Link aggregation without the enshittification. Federated Reddit alternative.\\nTerminal=false\\nType=Application\\nIcon=navi-lemmy\\nStartupNotify=true\\nCategories=Network;",
-    "homepage": "https://join-lemmy.org",
-    "icon": "🗞️"
-  },
-  {
     "id": "web-writefreely",
     "name": "WriteFreely",
     "summary": "Minimalist, private publishing. Just write.",

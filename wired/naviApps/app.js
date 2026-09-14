@@ -1,6 +1,9 @@
 // naviApps — static local store: the curated webapp catalog in apps.json.
 // Runs offline from the deployed tree; install via `navi-webapp <name>`.
 const grid = document.getElementById("grid");
+const naviGrid = document.getElementById("naviGrid");
+const naviSection = document.getElementById("naviSection");
+const appsSection = document.getElementById("appsSection");
 const statusEl = document.getElementById("status");
 const searchEl = document.getElementById("search");
 const catEl = document.getElementById("category");
@@ -51,8 +54,8 @@ function artFor(a, size) {
   return `<span class="icon">${a.icon || "📦"}</span>`;
 }
 
-function cardHTML(a) {
-  return `<article class="card">
+function cardHTML(a, i) {
+  return `<article class="card" style="--d:${Math.min(i, 20) * 35}ms">
     <div class="top">${artFor(a, 32)}
     <h2>${escapeHTML(a.name)}</h2></div>
     <div class="badges">${badgeFor()}</div>
@@ -64,23 +67,42 @@ function cardHTML(a) {
   </article>`;
 }
 
+function paintGrid(el, apps) {
+  el.innerHTML = apps.map(cardHTML).join("");
+}
+
 function render() {
   const q = searchEl.value.trim();
   const cat = catEl.value;
-  const apps = curated.filter((a) => matches(a, q, cat));
-  grid.innerHTML = apps.map(cardHTML).join("") ||
-    `<p class="status">no apps found. try another search.</p>`;
-  statusEl.textContent = `${apps.length} app${apps.length === 1 ? "" : "s"}`;
+  const isNavi = (a) => a.category === "navi";
+  const naviApps = curated.filter((a) => isNavi(a) && matches(a, q, cat));
+  const rest = curated.filter((a) => !isNavi(a) && matches(a, q, cat));
+
+  // the "navi" filter spotlights first-party apps; "all" shows both sections
+  const showNavi = activeSource === "" || activeSource === "navi";
+  const showRest = activeSource === "";
+
+  naviSection.hidden = !(showNavi && naviApps.length);
+  appsSection.hidden = !(showRest && rest.length);
+  if (!naviSection.hidden) paintGrid(naviGrid, naviApps);
+  if (!appsSection.hidden) paintGrid(grid, rest);
+
+  const total = (showNavi ? naviApps.length : 0) + (showRest ? rest.length : 0);
+  statusEl.textContent = total
+    ? `${total} app${total === 1 ? "" : "s"}`
+    : "no apps found. try another search.";
   wireButtons();
 }
 
 function wireButtons() {
-  grid.querySelectorAll("[data-details]").forEach((b) =>
-    b.addEventListener("click", () => openModal(findApp(b.dataset.details)))
-  );
-  grid.querySelectorAll("[data-install]").forEach((b) =>
-    b.addEventListener("click", () => openModal(findApp(b.dataset.install), true))
-  );
+  for (const root of [grid, naviGrid]) {
+    root.querySelectorAll("[data-details]").forEach((b) =>
+      b.addEventListener("click", () => openModal(findApp(b.dataset.details)))
+    );
+    root.querySelectorAll("[data-install]").forEach((b) =>
+      b.addEventListener("click", () => openModal(findApp(b.dataset.install), true))
+    );
+  }
 }
 
 function findApp(id) {
