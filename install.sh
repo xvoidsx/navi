@@ -408,15 +408,22 @@ backup_file() {
 
 deploy_config() {
   # deploy_config <repo-relpath> <dest> [mode]
+  # destinations outside $HOME (e.g. /etc/lynx.cfg) are deployed with $DOAS,
+  # the same elevation install_identity/setup_environment use for /etc writes.
   local rel="$1" dest="$2" mode="${3:-644}"
   local src="$WIRED_SHARE/$rel"
   if [ ! -e "$src" ]; then
     warn "missing in wired/: $rel — skipping"
     return 0
   fi
-  mkdir -p "$(dirname "$dest")"
+  local elevate=""
+  case "$dest" in
+    "$HOME"/*) ;;
+    *) elevate="$DOAS" ;;
+  esac
+  $elevate mkdir -p "$(dirname "$dest")"
   backup_if_changed "$src" "$dest"
-  install -m "$mode" "$src" "$dest"
+  $elevate install -m "$mode" "$src" "$dest"
   ok "${dest#$HOME/} deployed"
 }
 
