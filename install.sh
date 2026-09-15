@@ -238,6 +238,11 @@ build_mpvpaper() {
 # after retries) warns and moves on to the next agent instead of killing a
 # two-hour provision. Anything skipped here can be picked up later with
 # ./install.sh --yes once the network cooperates.
+#
+# The installer scripts themselves get the same treatment: every one runs
+# under `timeout -k 30 300` with stdin from /dev/null, so a hung or
+# interactive installer degrades to a warning instead of wedging the whole
+# provision (seen on the Cloudbook with the omp and pi installers).
 fetch() { # fetch <url> [curl args...] — curl with sane timeouts and retries
   curl -fsSL --connect-timeout 20 --max-time 600 \
        --retry 3 --retry-all-errors "$@"
@@ -258,7 +263,8 @@ setup_agents() {
     info "installing ollama..."
     local tmp
     tmp="$(mktemp)"
-    if fetch https://ollama.com/install.sh -o "$tmp" && $DOAS sh "$tmp"; then
+    if fetch https://ollama.com/install.sh -o "$tmp" \
+        && $DOAS timeout -k 30 300 sh "$tmp" </dev/null; then
       if $DOAS systemctl enable --now ollama 2>/dev/null; then
         ok "ollama installed and enabled"
       else
@@ -278,13 +284,17 @@ setup_agents() {
     warn "opencode.ai unreachable — skipping opencode (re-run install.sh --yes later)"
   else
     info "installing opencode..."
-    if fetch https://opencode.ai/install | bash \
+    local octmp
+    octmp="$(mktemp)"
+    if fetch https://opencode.ai/install -o "$octmp" \
+        && timeout -k 30 300 bash "$octmp" </dev/null \
         && [ -x "$HOME/.opencode/bin/opencode" ] \
         && $DOAS install -m 0755 "$HOME/.opencode/bin/opencode" /usr/bin/opencode; then
       ok "opencode -> /usr/bin/opencode"
     else
       warn "opencode install failed — skipping (re-run install.sh --yes later)"
     fi
+    rm -f "$octmp"
   fi
 
   # the omp installer honors PI_INSTALL_DIR — straight into /usr/bin.
@@ -294,11 +304,15 @@ setup_agents() {
     warn "omp.sh unreachable — skipping omp (re-run install.sh --yes later)"
   else
     info "installing omp (oh-my-pi)..."
-    if fetch https://omp.sh/install | $DOAS env PI_INSTALL_DIR=/usr/bin sh; then
+    local omptmp
+    omptmp="$(mktemp)"
+    if fetch https://omp.sh/install -o "$omptmp" \
+        && $DOAS timeout -k 30 300 env PI_INSTALL_DIR=/usr/bin sh "$omptmp" </dev/null; then
       ok "omp -> /usr/bin/omp"
     else
       warn "omp install failed — skipping (re-run install.sh --yes later)"
     fi
+    rm -f "$omptmp"
   fi
 
   # pi (earendil-works/pi): minimal, extensible terminal coding agent.
@@ -312,12 +326,16 @@ setup_agents() {
     warn "npm not on PATH — skipping pi (re-run install.sh --yes later)"
   else
     info "installing pi..."
-    if fetch https://pi.dev/install.sh | sh >/dev/null 2>&1 \
+    local pitmp
+    pitmp="$(mktemp)"
+    if fetch https://pi.dev/install.sh -o "$pitmp" \
+        && timeout -k 30 300 sh "$pitmp" </dev/null >/dev/null 2>&1 \
         && command -v pi >/dev/null 2>&1; then
       ok "pi -> $(command -v pi)"
     else
       warn "pi install failed — skipping (re-run install.sh --yes later)"
     fi
+    rm -f "$pitmp"
   fi
 
   # crush (charmbracelet): glamorous agentic coding TUI in Go, LSP-aware.
@@ -331,7 +349,7 @@ setup_agents() {
     warn "npm not on PATH — skipping crush (re-run install.sh --yes later)"
   else
     info "installing crush..."
-    if $DOAS npm install -g --ignore-scripts @charmland/crush >/dev/null 2>&1 \
+    if $DOAS timeout -k 30 300 npm install -g --ignore-scripts @charmland/crush </dev/null >/dev/null 2>&1 \
         && command -v crush >/dev/null 2>&1; then
       ok "crush -> $(command -v crush)"
     else
