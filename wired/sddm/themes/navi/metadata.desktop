@@ -2,7 +2,7 @@
 Name=navi
 Description=navi's nightshadeNeon login — Lain, live in the wired
 Author=xvoidsx
-Version=1.2
+Version=1.3
 License=GPL-3.0-or-later
 Type=sddm-theme
 MainScript=Main.qml

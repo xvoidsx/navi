@@ -215,7 +215,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.margins: 24
-        text: "navi 1.2 \"mika\""
+        text: "navi 1.3 \"mika\""
         color: root.mute
         font.family: "JetBrains Mono"
         font.pixelSize: 12

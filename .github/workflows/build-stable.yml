@@ -1,4 +1,4 @@
-# navi ISO builder (1.2 mika STABLE).
+# navi ISO builder (1.3 mika STABLE).
 #
 # Builds the installer ISO inside a privileged debian:trixie container and
 # uploads it as a workflow artifact. Heavy (debootstrap + a full live
@@ -8,10 +8,10 @@
 # build on real Debian tooling: live-build, debootstrap, and friends from
 # trixie itself.
 
-name: navi ISO (1.2 mika stable)
+name: navi ISO (1.3 mika stable)
 
 env:
-  ISO_BASENAME: navi-1.2-mika
+  ISO_BASENAME: navi-1.3-mika
 
 on:
   workflow_dispatch:
@@ -69,7 +69,7 @@ jobs:
             --memtest none \
             --iso-application "navi" \
             --iso-publisher "xvoidsx" \
-            --iso-volume "navi 1.2 mika" \
+            --iso-volume "navi 1.3 mika" \
             --image-name "$ISO_BASENAME"
           lb build
 

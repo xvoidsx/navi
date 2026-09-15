@@ -32,3 +32,6 @@ systemd-timesyncd
 
 # tput, for the installer's nightshadeNeon frame renderer
 ncurses-bin
+
+# glow, for reading markdown docs in the live environment
+glow
