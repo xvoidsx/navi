@@ -411,9 +411,10 @@ deploy_configs() {
   fi
   deploy_config "vimrc"                       "$HOME/.vimrc"
   # terminal browsers (the learn manual renders in elinks/lynx):
-  # pin dark nightshadeNeon palettes so light defaults can't wash out text.
-  # elinks uses the classic ~/.elinks/ location per elinks.conf(5);
-  # lynx colors live system-wide, and ~/.lynxrc forces color mode on.
+  # both run in terminal-default/mono mode so the transparent nightshadeNeon
+  # terminal shows through — no white bars, no color clashes.
+  # elinks reads the XDG location on navi; lynx colors live system-wide
+  # in /etc/lynx.cfg while ~/.lynxrc forces color mode off.
   deploy_config "elinks/elinks.conf"          "$HOME/.config/elinks/elinks.conf"
   deploy_config "lynx/lynx.cfg"               "/etc/lynx.cfg"
   deploy_config "lynx/lynxrc"                 "$HOME/.lynxrc"
