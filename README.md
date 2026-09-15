@@ -1,7 +1,7 @@
 # navi
-<img width="1366" height="768" alt="the navi desktop with neighborli and glyyph open side by side" src="screenshots/desktop-neighborli-glyyph.png" />
+<img width="1366" height="768" alt="the navi desktop with an animated Lain gifpaper" src="screenshots/gifpaper-glitch-lain.png" />
 
-###### the minimal **navi** desktop
+###### welcome to the wired
 
 > **navi 1.2 "mika" is stable and available now.**
 >
@@ -25,21 +25,17 @@ It follows the [Serial Experiments Lain](#) aesthetic, and also uses our [nights
 
 A cozy computing environment is one that you look forward to using when you sit down at the computer. Not only does it feel good and functional to use, but it also looks beautiful as well! If you're going to be using your computer for hours every day doing work and play, don't you want to use a system that invites you to *have fun* while you do so?
 
+<img width="1366" height="768" alt="neighborli and the glyyph nostr client open side by side" src="screenshots/desktop-neighborli-glyyph.png" />
+
+###### your people, your protocols — neighborli and glyyph, side by side
+
 <img width="1366" height="768" alt="herdr running agent sessions with omp and hermes in tiled terminals" src="screenshots/herdr-agents.png" />
 
 ###### tiled windows, agents at work
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/ae36f014-77d4-4558-9a04-be57dbfd27b3" />
-
-###### floating windows
-
 <img width="1366" height="768" alt="elinks and amfora open on the smallweb" src="screenshots/smallweb-elinks-amfora.png" />
 
-###### browsing the web, and the smallweb
-
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/4c0589cb-6dee-45f7-85ab-1001626111c8" />
-
-###### neighborli, one of **navi**'s built-in webapps
+###### the smallweb, native
 
 <img width="1280" height="719" alt="the naviApps store showing the local webapp catalog" src="screenshots/naviapps-store.png" />
 
@@ -52,6 +48,10 @@ A cozy computing environment is one that you look forward to using when you sit 
 <img width="1280" height="719" alt="fastfetch showing navi 1.2 mika on a 2015 Acer Aspire Cloudbook" src="screenshots/fastfetch-cloudbook.png" />
 
 ###### proven on old iron — **navi** 1.2 on a 2015 Acer Cloudbook
+
+<img width="1366" height="768" alt="cmus and cava on the navi desktop" src="screenshots/music-desktop.png" />
+
+###### the wired has a pulse — cmus and cava, pre-tuned
 
 ### notes
 
