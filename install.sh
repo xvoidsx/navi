@@ -70,6 +70,15 @@ PKGS=(
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
 # machine gets them — navi is a multi-user system.
 
+# Webapps installed out of the box at the end of installation, via
+# `navi-webapp install`. Names must match .desktop filenames in
+# wired/naviApps/webapps/ exactly. Tweak freely — users can always
+# add/remove more from the naviApps store.
+DEFAULT_WEBAPPS=(
+  navi-radio neighborli glyyph telegram element pandora
+  github youtube yomi twitch discord
+)
+
 # ---------------------------------------------------------------- ui
 
 banner() {
@@ -588,6 +597,22 @@ run_app_installers() {
   done
 }
 
+# ---------------------------------------------------------------- default webapps
+# Installs the DEFAULT_WEBAPPS set for the current user via navi-webapp.
+# Per-user by design: launchers go to ~/.local/share/applications and
+# their icons to ~/.local/share/icons (handled inside install-webapp.sh),
+# so every user keeps their own set. Idempotent: re-running never
+# duplicates launchers or breaks existing ones.
+setup_webapps() {
+  step "default webapps (${#DEFAULT_WEBAPPS[@]} launchers)"
+  if command -v navi-webapp >/dev/null 2>&1; then
+    navi-webapp install "${DEFAULT_WEBAPPS[@]}"
+    ok "default webapps installed for $USER"
+  else
+    warn "navi-webapp not on PATH — skipping default webapp install"
+  fi
+}
+
 # ---------------------------------------------------------------- gtk theme cohesion
 # settings.ini covers plain GTK apps, but GSettings-aware apps (nemo and
 # friends) read org.gnome.desktop.interface — whose schema default is
@@ -751,6 +776,7 @@ main() {
   setup_chromium
   setup_fonts
   run_app_installers
+  setup_webapps
   done_banner
 }
 
