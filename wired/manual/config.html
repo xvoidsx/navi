@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<style>
+	a:link {color: #FF3131;}
+	a:visited {color: #39FF14;}
+	code {color: #ff10f0; font-size: 16px}
+	head {
+		background-color: #000000;
+		color: white
+	}
+	body {
+		background-color: #000000;
+		color: white
+	}
+	footer {
+		background-color: #000000;
+		color: white;
+		text-align: center
+	}
+	.center {
+  		display: block;
+  		margin-left: auto;
+  		margin-right: auto;
+  		width: 50%;
+	}
+</style>
+<head>
+	<!--meta information-->
+	<meta name="description" content="Configuration: making navi yours">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Configuring Navi</title>
+</head>
+<body>
+	<pre style="text-align:center;color:#ff10f0">.__   __.      ___   ____    ____  __
+|  \ |  |     /   \  \   \  /   / |  |
+|   \|  |    /  ^  \  \   \/   /  |  |
+|  . `  |   /  ^  \  \   \/   /  |  |
+|  |\   |  /  _____  \  \    /    |  |
+|__| \__| /__/     \__\  \__/     |__|</pre>
+	<h2 style="color:#39ff14;text-align:center">* * * * * * * * * * * * * * * * * * * * * * *</h2>
+	<h1 style="color:#ff10f0;text-align:center">configuration ~</h1>
+	<p><a href="manual.html">go back</a></p>
+	<p>navi is configured with plain text files — no registry, no mystery settings panels. If you can edit text, you can configure navi.</p>
+	<h3 style="color:#ff10f0">window manager config</h3>
+	<p>Your keybindings and window behavior live in <code>$HOME/.config/sway/config</code> (Wayland) or <code>$HOME/.config/i3/config</code> (X11). These are deployed from navi's own files at install time, and they're yours to edit — change any keybinding, add your own, tweak gaps and borders. Reload with <b>Super+Shift+R</b> (sway) to apply changes in place.</p>
+	<h3 style="color:#ff10f0">the panel</h3>
+	<p>The top panel is <code>waybar</code>, configured at <code>$HOME/.config/waybar/</code>. Each module — workspaces, clock, volume, networks, battery — can be rearranged, restyled, or removed.</p>
+	<h3 style="color:#ff10f0">theme</h3>
+	<p>navi follows the <b>nightshadeNeon</b> design language: deep blacks, neon pink, and phosphor green. GTK apps default to a dark magenta theme out of the box, and you can change it with <code>nwg-look</code> or your GTK settings tool of choice. The defaults are just a starting point — nothing is locked.</p>
+	<h3 style="color:#ff10f0">terminal and shell</h3>
+	<p>Your shell is configured via <code>$HOME/.bashrc</code>, which sources navi's shared bashrc. Terminal-specific settings live in each terminal's own config (for example, <code>$HOME/.config/alacritty/</code>).</p>
+	<h3 style="color:#ff10f0">a note on upgrades</h3>
+	<p>navi's own files live under <code>/usr/share/navi</code> and your personal configs live under <code>$HOME/.config</code>. Keep your customizations in your home directory and they'll survive reinstalls and updates of navi's files.</p>
+	<p><b>Up next</b>: <a href="misc.html">misc.</a></p>
+	</body>
+<footer>
+	<h2 style="color:#39ff14;text-align:center">* * * * * * * * * * * * * * * * * * * * * * *</h2>
+	<h6 style="color:#ff10f0;text-align:center">built with ❤️ by <a href="">xvoidsx</a></h6>
+</footer>
+</html>

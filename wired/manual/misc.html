@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<style>
+	a:link {color: #FF3131;}
+	a:visited {color: #39FF14;}
+	code {color: #ff10f0; font-size: 16px}
+	head {
+		background-color: #000000;
+		color: white
+	}
+	body {
+		background-color: #000000;
+		color: white
+	}
+	footer {
+		background-color: #000000;
+		color: white;
+		text-align: center
+	}
+	.center {
+  		display: block;
+  		margin-left: auto;
+  		margin-right: auto;
+  		width: 50%;
+	}
+</style>
+<head>
+	<!--meta information-->
+	<meta name="description" content="Miscellaneous navi knowledge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Navi Miscellany</title>
+</head>
+<body>
+	<pre style="text-align:center;color:#ff10f0">.__   __.      ___   ____    ____  __
+|  \ |  |     /   \  \   \  /   / |  |
+|   \|  |    /  ^  \  \   \/   /  |  |
+|  . `  |   /  ^  \  \   \/   /  |  |
+|  |\   |  /  _____  \  \    /    |  |
+|__| \__| /__/     \__\  \__/     |__|</pre>
+	<h2 style="color:#39ff14;text-align:center">* * * * * * * * * * * * * * * * * * * * * * *</h2>
+	<h1 style="color:#ff10f0;text-align:center">misc. ~</h1>
+	<p><a href="manual.html">go back</a></p>
+	<p>Assorted things worth knowing about your navi machine.</p>
+	<h3 style="color:#ff10f0">doas, not sudo</h3>
+	<p>navi uses <code>doas</code> instead of <code>sudo</code> for running commands as root. It works the same way you're used to: <code>doas apt update</code>. It's smaller, simpler, and configured at <code>/etc/doas.conf</code>.</p>
+	<h3 style="color:#ff10f0">installing software</h3>
+	<p>navi is based on Debian, so <code>apt</code> installs anything in the Debian repositories: <code>doas apt install &lt;package&gt;</code>. We also ship <b>flatpak</b> with Flathub enabled, so desktop apps are one install away. And don't forget <b>naviApps</b> — our curated webapp store, right in your launcher.</p>
+	<h3 style="color:#ff10f0">screenshots</h3>
+	<p>Press <b>Super+P</b> to capture a region of the screen. Screenshots are copied to your clipboard and saved in <code>$HOME/Pictures/Screenshots</code>.</p>
+	<h3 style="color:#ff10f0">locking and power</h3>
+	<p><b>Super+Shift+Z</b> locks your screen. By default the screen locks after 15 minutes of inactivity and the machine suspends after 20 — the little eye icon in the panel (the idle inhibitor) pauses that when you need it. The power icon at the panel's far right handles suspend, hibernate, reboot, and shutdown.</p>
+	<h3 style="color:#ff10f0">getting help</h3>
+	<p>This manual is always one keypress away: <b>Super+Shift+H</b>. It opens in a terminal browser, so it works even when your graphical browser doesn't.</p>
+	<h3 style="color:#ff10f0">about navi</h3>
+	<p>navi is built by <b>xvoidsx</b>, a small collective making computers fun again. It's free software, based on Debian, with a Wayland-first tiling desktop, agents baked in, and a soft spot for old hardware. Welcome to the wired.</p>
+	</body>
+<footer>
+	<h2 style="color:#39ff14;text-align:center">* * * * * * * * * * * * * * * * * * * * * * *</h2>
+	<h6 style="color:#ff10f0;text-align:center">built with ❤️ by <a href="">xvoidsx</a></h6>
+</footer>
+</html>
