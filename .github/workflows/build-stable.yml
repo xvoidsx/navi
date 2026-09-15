@@ -1,0 +1,88 @@
+# navi ISO builder (1.2 mika STABLE).
+#
+# Builds the installer ISO inside a privileged debian:trixie container and
+# uploads it as a workflow artifact. Heavy (debootstrap + a full live
+# image); runs on workflow_dispatch only now that mika has merged to main.
+#
+# The container route (instead of ubuntu-latest + sudo) keeps the whole
+# build on real Debian tooling: live-build, debootstrap, and friends from
+# trixie itself.
+
+name: navi ISO (1.2 mika stable)
+
+env:
+  ISO_BASENAME: navi-1.2-mika
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-24.04
+    container:
+      image: debian:trixie
+      options: --privileged
+    steps:
+      # NOTE: actions/checkout needs node, which debian:trixie-slim lacks,
+      # so the repo is cloned with plain git instead.
+      - name: Clone navi (main)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates
+          git clone --depth 1 --branch main \
+            "https://x-access-token:${GH_TOKEN}@github.com/xvoidsx/navi.git" src
+          cd src && git rev-parse --short HEAD
+
+      # nodejs: JS actions (upload-artifact) run inside the container and
+      # need node; trixie ships node 20, which actions/*@v4 require.
+      - name: Install live-build
+        run: |
+          set -euo pipefail
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq live-build nodejs
+
+      - name: Stage the live-build tree
+        run: |
+          set -euo pipefail
+          cd src && ./iso/stage.sh
+
+      - name: Build the ISO
+        run: |
+          set -euo pipefail
+          cd src/iso/build
+          # NOTE: the lb config flags are inline here on purpose. live-build
+          # auto-executes an executable auto/config script — and ours has to
+          # call `lb config` itself, which recursed forever and red-lit the
+          # first build. With no auto/config in the tree, `lb config` below
+          # just configures.
+          lb config \
+            --distribution trixie \
+            --archive-areas "main contrib non-free non-free-firmware" \
+            --bootloaders "syslinux grub-efi" \
+            --binary-images iso-hybrid \
+            --debian-installer false \
+            --memtest none \
+            --iso-application "navi" \
+            --iso-publisher "xvoidsx" \
+            --iso-volume "navi 1.2 mika" \
+            --image-name "$ISO_BASENAME"
+          lb build
+
+      - name: Collect the ISO
+        run: |
+          set -euo pipefail
+          iso_path="$(ls src/iso/build/${ISO_BASENAME}-*.hybrid.iso | head -n 1)"
+          cp "$iso_path" "/tmp/${ISO_BASENAME}.iso"
+          ls -lh "/tmp/${ISO_BASENAME}.iso"
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ISO_BASENAME }}.iso
+          path: /tmp/${{ env.ISO_BASENAME }}.iso
+          if-no-files-found: error
