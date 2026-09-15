@@ -5,7 +5,7 @@
 # Installs the navi "wired" desktop layer on Debian 13 (trixie):
 #   packages -> /usr/share/navi/wired (the iron structure) -> ~/.config/*
 #   commands -> /usr/bin + /usr/share/applications (rofi-visible)
-#   agent runtime: ollama, opencode, omp -> /usr/bin
+#   agent runtime: ollama, opencode, omp, pi, crush -> /usr/bin (/usr/local/bin)
 #   doas, flatpak/flathub, wallpapers, first-boot behavior
 #
 # Idempotent: safe to re-run. Existing configs are backed up, never clobbered.
@@ -227,8 +227,9 @@ build_mpvpaper() {
 
 # ---------------------------------------------------------------- agents
 
-# Agent-native from the first boot: ollama runtime, opencode, and omp.
-# Binaries land in /usr/bin so every user on the machine gets them.
+# Agent-native from the first boot: ollama runtime, opencode, omp, pi, crush.
+# Binaries land in /usr/bin (or /usr/local/bin via npm) so every user on
+# the machine gets them.
 #
 # Downloads go through fetch() (timeouts + retries) so a stalled host fails
 # fast instead of hanging the install forever — learned the hard way on the
@@ -247,7 +248,7 @@ host_up() { # host_up <url> -> 0 if the host answers a quick probe
 }
 
 setup_agents() {
-  step "agent runtime (ollama, opencode, omp)"
+  step "agent runtime (ollama, opencode, omp, pi, crush)"
 
   if command -v ollama >/dev/null 2>&1; then
     ok "ollama already installed"
@@ -297,6 +298,44 @@ setup_agents() {
       ok "omp -> /usr/bin/omp"
     else
       warn "omp install failed — skipping (re-run install.sh --yes later)"
+    fi
+  fi
+
+  # pi (earendil-works/pi): minimal, extensible terminal coding agent.
+  # the official installer is npm-based with preflight checks; nodejs and
+  # npm are already in the package list, so it runs non-interactively.
+  if command -v pi >/dev/null 2>&1; then
+    ok "pi already installed ($(command -v pi))"
+  elif ! host_up https://pi.dev/install.sh; then
+    warn "pi.dev unreachable — skipping pi (re-run install.sh --yes later)"
+  elif ! command -v npm >/dev/null 2>&1; then
+    warn "npm not on PATH — skipping pi (re-run install.sh --yes later)"
+  else
+    info "installing pi..."
+    if fetch https://pi.dev/install.sh | sh >/dev/null 2>&1 \
+        && command -v pi >/dev/null 2>&1; then
+      ok "pi -> $(command -v pi)"
+    else
+      warn "pi install failed — skipping (re-run install.sh --yes later)"
+    fi
+  fi
+
+  # crush (charmbracelet): glamorous agentic coding TUI in Go, LSP-aware.
+  # npm package; global install as root lands in /usr/local/bin, which is
+  # on every user's PATH.
+  if command -v crush >/dev/null 2>&1; then
+    ok "crush already installed ($(command -v crush))"
+  elif ! host_up https://registry.npmjs.org/@charmland%2fcrush; then
+    warn "npm registry unreachable — skipping crush (re-run install.sh --yes later)"
+  elif ! command -v npm >/dev/null 2>&1; then
+    warn "npm not on PATH — skipping crush (re-run install.sh --yes later)"
+  else
+    info "installing crush..."
+    if $DOAS npm install -g --ignore-scripts @charmland/crush >/dev/null 2>&1 \
+        && command -v crush >/dev/null 2>&1; then
+      ok "crush -> $(command -v crush)"
+    else
+      warn "crush install failed — skipping (re-run install.sh --yes later)"
     fi
   fi
 
