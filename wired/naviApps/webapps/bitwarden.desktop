@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Bitwarden
+Exec=chromium --force-dark-mode --app=https://vault.bitwarden.com
+Comment=FOSS password manager vault.
+Terminal=false
+Type=Application
+Icon=navi-bitwarden
+StartupNotify=true
+Categories=Utility;

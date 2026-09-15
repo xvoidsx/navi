@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Fizzy
+Exec=chromium --force-dark-mode --app=https://app.fizzy.do
+Comment=Boards and tasks for team projects.
+Terminal=false
+Type=Application
+Icon=navi-fizzy
+StartupNotify=true
+Categories=Office;

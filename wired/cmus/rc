@@ -1,0 +1,5 @@
+# = = = N A V I = = =
+# cmus startup: select the nightshadeNeon colorscheme.
+# ( this file should live at: $HOME/.config/cmus/rc )
+
+colorscheme nightshadeNeon

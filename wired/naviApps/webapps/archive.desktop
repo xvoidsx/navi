@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Internet Archive
+Exec=chromium --force-dark-mode --app=https://archive.org
+Comment=The web's memory: books, media, and the Wayback Machine.
+Terminal=false
+Type=Application
+Icon=navi-archive
+StartupNotify=true
+Categories=Network;

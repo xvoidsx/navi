@@ -1,0 +1,52 @@
+# = = = N A V I = = =
+# nightshadeNeon theme for cava.
+# ( this file should live at $HOME/.config/cava/config
+[general]
+framerate = 120
+bar_width = 1
+bar_spacing = 0
+noise_reduction = -20
+
+[input]
+method = pipewire
+source = auto
+
+[output]
+method = noncurses
+orientation = horizontal
+channels = stereo
+reverse = 1
+data_format = ascii
+ascii_max_range = 9
+bar_delimiter = 126
+
+# 'orb' tracking layer
+show_idle_bar_heads = 1
+
+[smoothing]
+monstercat = 0
+waves = 1
+integral = 1
+gravity = 90
+
+[eq]
+1 = 6.0
+2 = 0.0
+3 = 4.2
+4 = 0.0
+5 = 0.0
+6 = 3.5
+7 = 0.0
+8 = 6.0
+
+[color]
+gradient = 1
+gradient_count = 8
+gradient_color_1 = '#00ffff'
+gradient_color_2 = '#00ffff'
+gradient_color_3 = '#39ff14'
+gradient_color_4 = '#39ff14'
+gradient_color_5 = '#ff10f0'
+gradient_color_6 = '#ff10f0'
+gradient_color_7 = '#ff3131'
+gradient_color_8 = '#ff3131'

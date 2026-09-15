@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=navi (Wayland)
+Comment=the wired desktop (Wayland session)
+Exec=sway
+TryExec=sway

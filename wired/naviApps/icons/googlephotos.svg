@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="683px" height="683px" viewBox="0 0 683 683" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>logo</title>
+    <defs>
+        <radialGradient cx="2.6953795%" cy="10.782992%" fx="2.6953795%" fy="10.782992%" r="184.298937%" gradientTransform="translate(0.026954,0.107830),scale(1.000000,0.545465),rotate(-86.420000),translate(-0.026954,-0.107830)" id="radialGradient-1">
+            <stop stop-color="#FF96DA" offset="5%"></stop>
+            <stop stop-color="#FF69C3" offset="27%"></stop>
+            <stop stop-color="#FC413D" offset="75%"></stop>
+        </radialGradient>
+        <radialGradient cx="101.952117%" cy="99.5968859%" fx="101.952117%" fy="99.5968859%" r="183.956081%" gradientTransform="translate(1.019521,0.995969),scale(0.545452,1.000000),rotate(180.000000),translate(-1.019521,-0.995969)" id="radialGradient-2">
+            <stop stop-color="#3186FF" offset="50%"></stop>
+            <stop stop-color="#A9A8FF" offset="100%"></stop>
+        </radialGradient>
+        <radialGradient cx="-0.540319983%" cy="101.223006%" fx="-0.540319983%" fy="101.223006%" r="183.946204%" gradientTransform="translate(-0.005403,1.012230),scale(1.000000,0.545465),rotate(-90.000000),translate(0.005403,-1.012230)" id="radialGradient-3">
+            <stop stop-color="#00AF57" offset="50%"></stop>
+            <stop stop-color="#78C9FF" offset="100%"></stop>
+        </radialGradient>
+        <radialGradient cx="-1.00811199%" cy="0.610114893%" fx="-1.00811199%" fy="0.610114893%" r="183.946204%" gradientTransform="translate(-0.010081,0.006101),scale(0.545465,1.000000),translate(0.010081,-0.006101)" id="radialGradient-4">
+            <stop stop-color="#FEC700" offset="30%"></stop>
+            <stop stop-color="#FFE921" offset="100%"></stop>
+        </radialGradient>
+    </defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="_x28_type_product_name_here_x29_">
+            <rect id="bounding_box" x="77.83" y="88.92" width="512" height="512"></rect>
+            <g id="art_layer" fill-rule="nonzero">
+                <path d="M341.5,341.5 L341.5,26.23 C341.5,23.51 341.5,22.19 341.62,21.03 C342.71,9.97 351.44,1.24 362.5,0.15 C363.63,0.03 364.98,0.03 367.7,0.03 C456.09,0.03 527.76,76.47 527.76,170.76 C527.76,265.05 456.09,341.49 367.7,341.49 L341.51,341.49 L341.5,341.5 Z" id="Path" fill="url(#radialGradient-1)"></path>
+                <path d="M341.5,341.5 L658.12,341.5 C671.82,341.5 682.95,352.64 682.95,366.33 L682.95,367.69 C682.95,456.08 606.51,527.75 512.22,527.75 C417.93,527.75 341.49,456.08 341.49,367.69 L341.49,341.5 L341.5,341.5 Z" id="Path" fill="url(#radialGradient-2)"></path>
+                <path d="M341.5,341.5 L341.5,656.77 C341.5,659.49 341.5,660.81 341.38,661.97 C340.29,673.03 331.56,681.76 320.5,682.85 C319.37,682.97 318.02,682.97 315.3,682.97 C226.91,682.97 155.24,606.53 155.24,512.24 C155.24,417.95 226.91,341.51 315.3,341.51 L341.49,341.51 L341.49,341.51 L341.5,341.5 Z" id="Path" fill="url(#radialGradient-3)"></path>
+                <path d="M341.5,341.5 L26.23,341.5 C23.51,341.5 22.19,341.5 21.03,341.38 C9.97,340.29 1.24,331.56 0.15,320.5 C0.03,319.37 0.03,318.02 0.03,315.3 C0.03,226.91 76.47,155.24 170.76,155.24 C265.05,155.24 341.49,226.91 341.49,315.3 L341.49,341.49 L341.49,341.49 L341.5,341.5 Z" id="Path" fill="url(#radialGradient-4)"></path>
+            </g>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Google Drive
+Exec=chromium --force-dark-mode --app=https://drive.google.com
+Comment=Google Drive as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-googledrive
+StartupNotify=true
+Categories=Office;

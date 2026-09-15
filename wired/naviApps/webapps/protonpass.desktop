@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Proton Pass
+Exec=chromium --force-dark-mode --app=https://pass.proton.me
+Comment=Proton Pass as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-protonpass
+StartupNotify=true
+Categories=Office;

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>naviApps — the app store for navi</title>
+  <meta name="description" content="naviApps: the app store for navi — browse and install webapps." />
+  <link rel="stylesheet" href="style.css?v=glass2" />
+</head>
+<body>
+
+<header class="hero">
+  <h1>naviApps</h1>
+  <p class="tagline"><span>the app store for navi</span></p>
+  <div class="searchbar">
+    <input id="search" type="search" placeholder="search apps… (try 'browser', 'music', 'notes')" autocomplete="off" />
+    <select id="category" aria-label="category">
+      <option value="">all categories</option>
+    </select>
+  </div>
+</header>
+
+<hr class="breakHelper" />
+
+<nav class="filters" aria-label="filters">
+  <button data-source="" class="active">all</button>
+  <button data-source="navi">navi</button>
+</nav>
+
+<main>
+  <p class="status" id="status">loading curated apps…</p>
+  <section class="store-section" id="naviSection">
+    <h2 class="section-title"><span class="sec-xvoidsx">from xvoidsx</span></h2>
+    <div class="grid featured" id="naviGrid"></div>
+  </section>
+  <section class="store-section" id="appsSection">
+    <h2 class="section-title"><span class="sec-webapps">webapps</span></h2>
+    <div class="grid" id="grid"></div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h2 id="mName"></h2>
+    <div class="meta" id="mMeta"></div>
+    <p id="mSummary"></p>
+    <div class="cmdbox">
+      <pre><code id="mCmd"></code></pre>
+      <button class="btn" id="mCopy">copy</button>
+    </div>
+    <div id="mRemoveWrap" hidden>
+      <p class="meta">remove it again:</p>
+      <div class="cmdbox">
+        <pre><code id="mRemove"></code></pre>
+        <button class="btn" id="mCopyRemove">copy</button>
+      </div>
+    </div>
+    <div class="row">
+      <a class="btn primary" id="mHome" href="#" target="_blank" rel="noopener">homepage</a>
+      <a class="btn" id="mDownload" href="#" download hidden>download .desktop</a>
+      <button class="btn" id="mClose">close</button>
+    </div>
+    <details id="mDesktopWrap" hidden>
+      <summary>view .desktop entry (webapps)</summary>
+      <div class="cmdbox"><pre><code id="mDesktop"></code></pre></div>
+    </details>
+    <p class="meta">paste into a terminal on navi. <code>navi-webapp --all</code> grabs every webapp at once; from a naviApps checkout, <code>./install-webapp.sh …</code> does the same.</p>
+  </div>
+</div>
+
+<footer>
+  <p>~ ~ <a href="https://rav3ndust.xyz/wiki/nightshadeNeon.html">nightshadeNeon</a> themed · naviApps for navi · <a href="apps.json">apps.json</a> ~ ~</p>
+  <p>webapps = site-specific browsers, installed with <code>navi-webapp</code></p>
+</footer>
+
+<script src="catalog.js"></script>
+<script src="app.js?v=glass2"></script>
+</body>
+</html>

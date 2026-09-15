@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Marginalia
+Exec=chromium --force-dark-mode --app=https://search.marginalia.nu
+Comment=Smallweb search engine for the indie web.
+Terminal=false
+Type=Application
+Icon=navi-marginalia
+StartupNotify=true
+Categories=Network;

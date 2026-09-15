@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=GitHub
+Exec=chromium --force-dark-mode --app=https://github.com
+Comment=GitHub as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-github
+StartupNotify=true
+Categories=Network;

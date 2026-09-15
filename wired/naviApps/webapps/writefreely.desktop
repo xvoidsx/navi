@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=WriteFreely
+Exec=chromium --force-dark-mode --app=https://write.as
+Comment=Minimalist, private publishing.
+Terminal=false
+Type=Application
+Icon=navi-writefreely
+StartupNotify=true
+Categories=Office;

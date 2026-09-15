@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=nslock
+Comment=Lock the screen, navi style
+Exec=nslock
+Icon=system-lock-screen
+Categories=Utility;
+NoDisplay=false

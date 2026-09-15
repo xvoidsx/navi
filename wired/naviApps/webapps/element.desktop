@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Element
+Exec=chromium --force-dark-mode --app=https://app.element.io
+Comment=Decentralized chat over Matrix.
+Terminal=false
+Type=Application
+Icon=navi-element
+StartupNotify=true
+Categories=Network;

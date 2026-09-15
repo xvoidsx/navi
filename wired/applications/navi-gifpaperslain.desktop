@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=gifpaperslain
+Comment=Pick an animated wallpaper for the wired
+Exec=gifpaperslain
+Icon=preferences-desktop-wallpaper
+Categories=Utility;
+NoDisplay=false

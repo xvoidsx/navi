@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Grok
+Exec=chromium --force-dark-mode --app=https://grok.com
+Comment=Grok, xAI's assistant, as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-grok
+StartupNotify=true
+Categories=Network;

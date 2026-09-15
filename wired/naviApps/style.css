@@ -1,0 +1,358 @@
+/* nightshadeNeon — naviApps
+   pink #ff10f0 | green #39ff14 | cyan #00ffff
+   red #ff3131 | white #ffffff | black #000000 */
+
+:root {
+  --pink: #ff10f0;
+  --green: #39ff14;
+  --cyan: #00ffff;
+  --red: #ff3131;
+  --bg: #000000;
+  --panel: #0d0d0d;
+  --card: #111111;
+  --border: #2a2a2a;
+  --text: #ffffff;
+  --muted: #b8b8b8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: "Noto Sans", system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+a:link { color: var(--green); }
+a:visited { color: var(--green); }
+a:hover { color: var(--cyan); }
+
+h1, h2, h3 { color: var(--pink); margin: 0 0 0.5rem; }
+b, strong { color: var(--green); }
+code, pre { color: var(--green); font-size: 14px; }
+
+header.hero {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  text-align: center;
+  padding: 1.1rem 1.5rem 0.9rem;
+  /* glass: translucent panel + blur so scrolling cards smear underneath */
+  background: rgba(8, 8, 10, 0.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid rgba(255, 16, 240, 0.45);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  transition: padding 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+  /* collapsing the tagline changes header height — keep scroll anchoring
+     from fighting the sticky header near the top */
+  overflow-anchor: none;
+}
+
+/* neon glow on top of the glass without killing the transparency */
+header.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at top, rgba(255, 16, 240, 0.18) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+/* solid fallback where backdrop-filter is unsupported */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  header.hero { background: rgba(0, 0, 0, 0.92); }
+}
+
+.hero h1 {
+  font-size: 1.8rem;
+  text-shadow: 0 0 18px rgba(255, 16, 240, 0.55);
+  letter-spacing: 1px;
+  transition: font-size 0.25s ease;
+}
+
+.hero .tagline {
+  max-width: 640px;
+  margin: 0.15rem auto 0.8rem;
+  overflow: hidden;
+  max-height: 3em;
+  opacity: 1;
+  transform: translateY(0);
+  transition: max-height 0.3s ease, opacity 0.25s ease, margin 0.3s ease, transform 0.3s ease;
+}
+
+.hero .tagline span {
+  background: linear-gradient(90deg, var(--pink), var(--cyan) 55%, var(--green));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.35em;
+  text-transform: lowercase;
+  /* soft glow behind the gradient glyphs */
+  filter: drop-shadow(0 0 8px rgba(255, 16, 240, 0.35));
+}
+
+/* compact mode once the user scrolls: logo + search stay, tagline folds away */
+header.hero.scrolled {
+  padding: 0.6rem 1.5rem 0.7rem;
+  background: rgba(8, 8, 10, 0.78);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 18px rgba(255, 16, 240, 0.15);
+}
+
+header.hero.scrolled h1 { font-size: 1.4rem; }
+
+header.hero.scrolled p,
+header.hero.scrolled .tagline {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-8px);
+  margin: 0 auto;
+}
+
+.searchbar {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.searchbar input[type="search"], .searchbar select {
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid var(--green);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  font-size: 1rem;
+}
+
+.searchbar input[type="search"] { flex: 2; min-width: 220px; }
+.searchbar select { flex: 0; }
+.searchbar input:focus, .searchbar select:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
+}
+
+.filters {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 1.2rem 1rem 0;
+}
+
+.filters button {
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.filters button.active, .filters button:hover {
+  border-color: var(--pink);
+  color: var(--pink);
+  box-shadow: 0 0 12px rgba(255, 16, 240, 0.35);
+}
+
+main { max-width: 1100px; margin: 0 auto; padding: 1rem 1rem 3rem; }
+
+.status { text-align: center; color: var(--muted); min-height: 1.6em; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.2rem;
+  margin-top: 1rem;
+}
+
+/* --- store sections --- */
+.store-section { margin-top: 0.5rem; }
+.store-section[hidden] { display: none; }
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.35em;
+  text-transform: lowercase;
+  margin: 2rem 0 0.2rem;
+}
+.section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, currentColor, transparent);
+  opacity: 0.35;
+}
+.sec-xvoidsx { color: var(--pink); text-shadow: 0 0 14px rgba(255, 16, 240, 0.55); }
+.sec-webapps { color: var(--cyan); text-shadow: 0 0 14px rgba(0, 255, 255, 0.4); }
+
+/* first-party cards get the gradient-border treatment */
+.grid.featured .card {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    linear-gradient(135deg, var(--pink), var(--cyan)) border-box;
+  box-shadow: 0 0 22px rgba(255, 16, 240, 0.12);
+}
+.grid.featured .card:hover {
+  box-shadow: 0 10px 28px rgba(255, 16, 240, 0.35), 0 0 18px rgba(0, 255, 255, 0.2);
+}
+
+.card {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 1rem;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.25s ease;
+  animation: rise 0.45s ease both;
+  animation-delay: var(--d, 0ms);
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--pink);
+  box-shadow: 0 10px 26px rgba(255, 16, 240, 0.28);
+}
+
+.card .top { display: flex; align-items: center; gap: 0.7rem; }
+.card .icon { font-size: 2rem; }
+/* brand glyphs ship white (nightshadeNeon text color) so they read on
+   both the black store theme and dark launchers like rofi */
+.card .logo, .modal .logo { width: 2rem; height: 2rem; flex: none; }
+.modal .logo { vertical-align: -0.35em; }
+.card h2 { font-size: 1.15rem; color: #fff; }
+
+.badges { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.badge {
+  font-size: 0.72rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+}
+.badge.webapp { color: var(--pink); border-color: var(--pink); }
+
+.card p { color: var(--muted); font-size: 0.92rem; flex: 1; }
+
+.card .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.btn {
+  border: 2px solid var(--green);
+  background: transparent;
+  color: var(--green);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.btn:hover { background: var(--green); color: #000; }
+.btn.primary { background: var(--pink); border-color: var(--pink); color: #000; }
+.btn.primary:hover { background: #ff5cf6; }
+
+.btn:focus-visible, .filters button:focus-visible,
+.searchbar input:focus-visible, .searchbar select:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* slim neon scrollbar */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb { background: #2b2b2b; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--pink); }
+
+/* modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+.modal-backdrop.open { display: flex; }
+.modal-backdrop.open .modal { animation: pop 0.22s ease both; }
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.modal {
+  background: var(--panel);
+  border: 2px solid var(--pink);
+  border-radius: 1rem;
+  max-width: 620px;
+  width: 100%;
+  padding: 1.5rem;
+  box-shadow: 0 0 30px rgba(255, 16, 240, 0.3);
+}
+.modal h2 { margin-top: 0; }
+.modal .meta { color: var(--muted); font-size: 0.9rem; }
+
+.cmdbox {
+  position: relative;
+  background: #000;
+  border: 1px solid var(--green);
+  border-radius: 0.6rem;
+  padding: 0.8rem;
+  margin: 1rem 0;
+}
+.cmdbox pre { margin: 0; white-space: pre-wrap; word-break: break-all; }
+.cmdbox button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+
+.modal details { margin-top: 0.8rem; }
+.modal summary { cursor: pointer; color: var(--cyan); }
+
+footer {
+  border-top: 2px solid var(--green);
+  text-align: center;
+  padding: 1.5rem 1rem 2.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.breakHelper {
+  height: 2px;
+  background-color: var(--pink);
+  border: none;
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .hero h1 { font-size: 1.5rem; }
+  header.hero.scrolled h1 { font-size: 1.2rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  header.hero, .hero h1, .hero p, .hero .tagline { transition: none; }
+  .card, .modal-backdrop.open .modal { animation: none; }
+}

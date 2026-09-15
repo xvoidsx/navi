@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-Qx
+Comment=Query the navi agent (extended)
+Exec=navi-Qx
+Terminal=true
+Icon=utilities-terminal
+Categories=Utility;
+NoDisplay=false

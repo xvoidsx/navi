@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Gemini
+Exec=chromium --force-dark-mode --app=https://gemini.google.com
+Comment=Google Gemini as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-gemini
+StartupNotify=true
+Categories=Network;

@@ -1,0 +1,18 @@
+#!/bin/sh
+# navi chromium launcher wrapper.
+#
+# Forces Chromium into dark mode on every launch. Chromium's system-theme
+# auto-detection is unreliable on sway — it needs xdg-desktop-portal's
+# Settings portal to see the prefer-dark dconf key, and falls back to
+# light when the portal isn't answering. Passing --force-dark-mode
+# explicitly is deterministic: browser UI *and* prefers-color-scheme
+# for web content both go dark.
+#
+# Installed to /usr/local/bin/chromium, which precedes /usr/bin/chromium
+# in PATH, so this intercepts the stock chromium.desktop launcher, the
+# navi webapp launchers, xdg-open handlers, and terminal invocations —
+# without touching Debian's packaged files.
+#
+# An explicit user flag still wins: our flag comes first, so
+# `chromium --force-light-mode` overrides it.
+exec /usr/bin/chromium --force-dark-mode "$@"

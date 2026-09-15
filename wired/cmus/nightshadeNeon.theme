@@ -1,0 +1,32 @@
+# = = = N A V I = = =
+# nightshadeNeon theme for cmus.
+# ( should live at: $HOME/.config/cmus/nightshadeNeon.theme )
+
+# - - - window/ui
+set color_win_bg=default
+set color_win_fg=51
+set color_win_dir=201
+set color_win_cur=82
+set color_win_cur_sel_bg=201
+set color_win_cur_sel_fg=16
+set color_win_sel_bg=51
+set color_win_sel_fg=16
+set color_win_inactive_sel_bg=234
+set color_win_inactive_sel_fg=51
+
+# --- stat/ui bars
+set color_titleline_bg=82
+set color_titleline_fg=16
+
+# progress bar base
+set color_statusline_bg=201
+set color_statusline_fg=16
+set color_cmdline_bg=default
+
+# input prompt
+set color_cmdline_fg=51
+set color_separator=196
+
+# --- alerts
+set color_error=196
+set color_info=51

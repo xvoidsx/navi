@@ -1,0 +1,10 @@
+PRETTY_NAME="navi 1.2 (mika)"
+NAME="navi"
+VERSION_ID="1.2"
+VERSION="1.2 (mika)"
+VERSION_CODENAME=mika
+ID=navi
+ID_LIKE=debian
+HOME_URL="https://github.com/xvoidsx/navi"
+SUPPORT_URL="https://github.com/xvoidsx/navi"
+BUG_REPORT_URL="https://github.com/xvoidsx/navi/issues"

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=HEY
+Exec=chromium --force-dark-mode --app=https://hey.com
+Comment=Email, reimagined by 37signals.
+Terminal=false
+Type=Application
+Icon=navi-hey
+StartupNotify=true
+Categories=Network;

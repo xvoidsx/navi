@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=neighborli
+Exec=chromium --force-dark-mode --app=https://neighborli.xyz
+Comment=friendly neighborhood on the fediverse
+Terminal=false
+Type=Application
+Icon=navi-neighborli
+StartupNotify=true
+Categories=Network;

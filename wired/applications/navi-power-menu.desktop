@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=power_menu
+Comment=Power options for the wired desktop
+Exec=power_menu
+Icon=system-shutdown
+Categories=Utility;System;
+NoDisplay=false

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Odysee
+Exec=chromium --force-dark-mode --app=https://odysee.com
+Comment=Odysee as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-odysee
+StartupNotify=true
+Categories=AudioVideo;

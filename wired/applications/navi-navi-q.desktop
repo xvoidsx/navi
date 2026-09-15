@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-Q
+Comment=Query the navi agent
+Exec=navi-Q
+Terminal=true
+Icon=utilities-terminal
+Categories=Utility;
+NoDisplay=false

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Bandcamp
+Exec=chromium --force-dark-mode --app=https://bandcamp.com
+Comment=Music directly from the artists. The fair-trade music store.
+Terminal=false
+Type=Application
+Icon=navi-bandcamp
+StartupNotify=true
+Categories=AudioVideo;Audio;

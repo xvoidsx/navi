@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Google Photos
+Exec=chromium --force-dark-mode --app=https://photos.google.com
+Comment=Google Photos as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-googlephotos
+StartupNotify=true
+Categories=Graphics;
