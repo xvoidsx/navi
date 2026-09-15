@@ -268,8 +268,17 @@ setup_agents() {
     tmp="$(mktemp)"
     if fetch https://ollama.com/install.sh -o "$tmp" \
         && $DOAS setsid timeout -k 30 300 sh "$tmp" </dev/null; then
-      if $DOAS systemctl enable --now ollama 2>/dev/null; then
-        ok "ollama installed and enabled"
+      # enable is pure symlink work (client-side), so it lands in the target
+      # correctly even when provisioning inside the installer chroot; the
+      # start is best-effort — in the chroot the system bus belongs to the
+      # live ISO, so a failed start just means "starts on next boot".
+      if $DOAS systemctl enable ollama 2>/dev/null; then
+        ok "ollama installed and enabled on boot"
+        if $DOAS systemctl start ollama 2>/dev/null; then
+          ok "ollama service started"
+        else
+          info "ollama will start on next boot"
+        fi
       else
         warn "ollama installed but the service did not enable — run: doas systemctl enable --now ollama"
       fi
