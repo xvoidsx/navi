@@ -1004,5 +1004,20 @@
     "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=HEY\\nExec=chromium --app=https://hey.com\\nComment=Email, reimagined by 37signals.\\nTerminal=false\\nType=Application\\nIcon=navi-hey\\nStartupNotify=true\\nCategories=Network;\\n",
     "homepage": "https://hey.com",
     "icon": "💌"
+  },
+  {
+    "id": "web-perplexity",
+    "name": "Perplexity",
+    "summary": "AI answer engine. Ask anything, get cited sources.",
+    "category": "AI",
+    "source": "webapp",
+    "package": "perplexity",
+    "url": "https://www.perplexity.ai",
+    "install": "navi-webapp perplexity",
+    "downloadUrl": "webapps/perplexity.desktop",
+    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Perplexity\nExec=chromium --app=https://www.perplexity.ai\nComment=Perplexity as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-perplexity\nStartupNotify=true\nCategories=Network;",
+    "homepage": "https://www.perplexity.ai",
+    "logo": "icons/perplexity.png",
+    "icon": "🔎"
   }
 ]

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Perplexity
+Exec=chromium --force-dark-mode --app=https://www.perplexity.ai
+Comment=Perplexity as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-perplexity
+StartupNotify=true
+Categories=Network;
