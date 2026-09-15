@@ -240,9 +240,12 @@ build_mpvpaper() {
 # ./install.sh --yes once the network cooperates.
 #
 # The installer scripts themselves get the same treatment: every one runs
-# under `timeout -k 30 300` with stdin from /dev/null, so a hung or
-# interactive installer degrades to a warning instead of wedging the whole
-# provision (seen on the Cloudbook with the omp and pi installers).
+# under `timeout -k 30 300` with stdin from /dev/null, so a hung installer
+# degrades to a warning instead of wedging the whole provision (seen on the
+# Cloudbook with the omp and pi installers). Third-party install scripts
+# additionally run under `setsid` (no controlling terminal): pi's official
+# installer waits for a keypress on /dev/tty when a terminal is present,
+# and detaching takes its designed non-interactive path instead.
 fetch() { # fetch <url> [curl args...] — curl with sane timeouts and retries
   curl -fsSL --connect-timeout 20 --max-time 600 \
        --retry 3 --retry-all-errors "$@"
@@ -264,7 +267,7 @@ setup_agents() {
     local tmp
     tmp="$(mktemp)"
     if fetch https://ollama.com/install.sh -o "$tmp" \
-        && $DOAS timeout -k 30 300 sh "$tmp" </dev/null; then
+        && $DOAS setsid timeout -k 30 300 sh "$tmp" </dev/null; then
       if $DOAS systemctl enable --now ollama 2>/dev/null; then
         ok "ollama installed and enabled"
       else
@@ -287,7 +290,7 @@ setup_agents() {
     local octmp
     octmp="$(mktemp)"
     if fetch https://opencode.ai/install -o "$octmp" \
-        && timeout -k 30 300 bash "$octmp" </dev/null \
+        && setsid timeout -k 30 300 bash "$octmp" </dev/null \
         && [ -x "$HOME/.opencode/bin/opencode" ] \
         && $DOAS install -m 0755 "$HOME/.opencode/bin/opencode" /usr/bin/opencode; then
       ok "opencode -> /usr/bin/opencode"
@@ -307,7 +310,7 @@ setup_agents() {
     local omptmp
     omptmp="$(mktemp)"
     if fetch https://omp.sh/install -o "$omptmp" \
-        && $DOAS timeout -k 30 300 env PI_INSTALL_DIR=/usr/bin sh "$omptmp" </dev/null; then
+        && $DOAS setsid timeout -k 30 300 env PI_INSTALL_DIR=/usr/bin sh "$omptmp" </dev/null; then
       ok "omp -> /usr/bin/omp"
     else
       warn "omp install failed — skipping (re-run install.sh --yes later)"
@@ -315,9 +318,13 @@ setup_agents() {
     rm -f "$omptmp"
   fi
 
-  # pi (earendil-works/pi): minimal, extensible terminal coding agent.
-  # the official installer is npm-based with preflight checks; nodejs and
-  # npm are already in the package list, so it runs non-interactively.
+  # pi (earendil-works/pi): the official installer is INTERACTIVE — when a
+  # terminal is present it draws a menu and waits for a keypress on /dev/tty,
+  # which wedged the Cloudbook provision (and any unattended run). setsid
+  # detaches it from any controlling terminal so it takes its own designed
+  # non-interactive path ("No terminal detected; continuing without
+  # confirmation"). Installed system-wide through doas so pi lands in
+  # /usr/local/bin for every user, like crush.
   if command -v pi >/dev/null 2>&1; then
     ok "pi already installed ($(command -v pi))"
   elif ! host_up https://pi.dev/install.sh; then
@@ -329,7 +336,7 @@ setup_agents() {
     local pitmp
     pitmp="$(mktemp)"
     if fetch https://pi.dev/install.sh -o "$pitmp" \
-        && timeout -k 30 300 sh "$pitmp" </dev/null >/dev/null 2>&1 \
+        && $DOAS setsid timeout -k 30 300 sh "$pitmp" </dev/null >/dev/null 2>&1 \
         && command -v pi >/dev/null 2>&1; then
       ok "pi -> $(command -v pi)"
     else
