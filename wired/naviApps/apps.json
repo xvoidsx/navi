@@ -285,6 +285,21 @@
     "icon": "🔒"
   },
   {
+    "id": "web-protonpass",
+    "name": "Proton Pass",
+    "summary": "Encrypted password manager.",
+    "category": "Webapps",
+    "source": "webapp",
+    "package": "protonpass",
+    "url": "https://pass.proton.me",
+    "install": "navi-webapp protonpass",
+    "downloadUrl": "webapps/protonpass.desktop",
+    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Proton Pass\nExec=chromium --app=https://pass.proton.me\nComment=Proton Pass as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-protonpass\nStartupNotify=true\nCategories=Office;",
+    "homepage": "https://pass.proton.me",
+    "logo": "icons/protonpass.png",
+    "icon": "🔒"
+  },
+  {
     "id": "web-protondrive",
     "name": "Proton Drive",
     "summary": "Encrypted cloud storage.",
