@@ -3,11 +3,9 @@
 
 ###### the minimal **navi** desktop
 
-> **navi 1.2 "mika" RC16** is live now.
+> **navi 1.2 "mika" is stable and available now.**
 >
-> Not intended for stable use yet, but if you want to test out navi on a spare machine or in a VM, feel free!
->
-> **navi** release candidate images are in the [Releases](https://github.com/xvoidsx/navi/releases/tag/v1.2-mika-RC16) section.
+> Download it from the [Releases](https://github.com/xvoidsx/navi/releases/tag/v1.2-mika) page: `navi-1.2-mika.iso` plus `SHA256SUMS.txt` so you can verify your download. Boots on legacy BIOS and UEFI, x86_64.
 
 **navi** is a new GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx).
 
@@ -35,26 +33,32 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 ###### floating windows
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/49e39b89-d1a1-42ef-bbfb-6a2b25adf26f" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/88ed837a-8e01-40dc-bfc1-496e46f293c1" />
 
 ###### browsing the web
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/88ed837a-8e01-40dc-bfc1-496e46f293c1" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/4c0589cb-6dee-45f7-85ab-1001626111c8" />
 
 ###### neighborli, one of **navi**'s built-in webapps
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/4c0589cb-6dee-45f7-85ab-1001626111c8" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/2b554f70-da35-46dd-b004-2735af44e61b" />
 
 ###### **navi**'s `rofi` launcher - in this case, sorting a list of installed games
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/2b554f70-da35-46dd-b004-2735af44e61b" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/585c6a23-bf1d-490c-a244-9fe071a2875b" />
 
 ###### navi-Q in Agent mode showing the latest from Hacker News
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/585c6a23-bf1d-490c-a244-9fe071a2875b" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/ae36f014-77d4-4558-9a04-be57dbfd27b3" />
 
 ###### listen to music in cliamp with our custom Void visualizer and nightshadeNeon theme
 
 ### notes
 
-This repo is a work in progress, and things are being moved over and tweaked before we begin making public releases of **navi**. A website for the distro is in the works right now, and `.iso` images are planned in the future once we've got some things wrapped up - we will announce it as soon as these things are finished up and ready to go!
+**navi 1.2 "mika"** is our first stable release. If you're new, grab the ISO from the [Releases](https://github.com/xvoidsx/navi/releases/tag/v1.2-mika) page and give it a spin in a VM or on a spare machine — it was validated on hardware as old as a 2015 Acer Cloudbook, so it'll run just about anywhere.
+
+Documentation lives in the built-in manual: press `Super+Shift+H` anywhere in **navi** to open it, or browse the `wired/manual` folder in this repo.
+
+Found a bug or have an idea? Open an issue in this repo's [issue tracker](https://github.com/xvoidsx/navi/issues) — that's where we track everything.
+
+What's next: small maintenance releases on the 1.2 line, then **navi 2 "eiri"** — the coherence release.
