@@ -1,5 +1,5 @@
 # navi
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/7eddaefa-0f3b-4cfe-8372-0e722fc8b173" />
+<img width="1366" height="768" alt="the navi desktop with neighborli and glyyph open side by side" src="screenshots/desktop-neighborli-glyyph.png" />
 
 ###### the minimal **navi** desktop
 
@@ -25,33 +25,33 @@ It follows the [Serial Experiments Lain](#) aesthetic, and also uses our [nights
 
 A cozy computing environment is one that you look forward to using when you sit down at the computer. Not only does it feel good and functional to use, but it also looks beautiful as well! If you're going to be using your computer for hours every day doing work and play, don't you want to use a system that invites you to *have fun* while you do so?
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/5d91abac-9b6f-4715-b0db-94e84115a989" />
+<img width="1366" height="768" alt="herdr running agent sessions with omp and hermes in tiled terminals" src="screenshots/herdr-agents.png" />
 
-###### tiled windows
+###### tiled windows, agents at work
 
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/ae36f014-77d4-4558-9a04-be57dbfd27b3" />
 
 ###### floating windows
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/88ed837a-8e01-40dc-bfc1-496e46f293c1" />
+<img width="1366" height="768" alt="elinks and amfora open on the smallweb" src="screenshots/smallweb-elinks-amfora.png" />
 
-###### browsing the web
+###### browsing the web, and the smallweb
 
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/4c0589cb-6dee-45f7-85ab-1001626111c8" />
 
 ###### neighborli, one of **navi**'s built-in webapps
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/2b554f70-da35-46dd-b004-2735af44e61b" />
+<img width="1280" height="719" alt="the naviApps store showing the local webapp catalog" src="screenshots/naviapps-store.png" />
 
-###### **navi**'s `rofi` launcher - in this case, sorting a list of installed games
+###### naviApps, the app store for **navi**
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/585c6a23-bf1d-490c-a244-9fe071a2875b" />
+<img width="1366" height="768" alt="navi radio playing a station in its nightshadeNeon interface" src="screenshots/navi-radio.png" />
 
-###### navi-Q in Agent mode showing the latest from Hacker News
+###### navi radio, tuned to the desktop
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/ae36f014-77d4-4558-9a04-be57dbfd27b3" />
+<img width="1280" height="719" alt="fastfetch showing navi 1.2 mika on a 2015 Acer Aspire Cloudbook" src="screenshots/fastfetch-cloudbook.png" />
 
-###### listen to music in cliamp with our custom Void visualizer and nightshadeNeon theme
+###### proven on old iron — **navi** 1.2 on a 2015 Acer Cloudbook
 
 ### notes
 
