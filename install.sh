@@ -76,7 +76,7 @@ PKGS=(
 # add/remove more from the naviApps store.
 DEFAULT_WEBAPPS=(
   navi-radio neighborli glyyph telegram element pandora
-  github youtube yomi twitch discord
+  github youtube yomi twitch discord perplexity
 )
 
 # ---------------------------------------------------------------- ui
