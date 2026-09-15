@@ -702,15 +702,26 @@ setup_sddm() {
 # the Chrome Web Store) installs itself via managed enterprise policy on
 # first launch — no clicks, no profile surgery. Force-install means the
 # theme stays put while the policy is in place; that's the price of a
-# curated default. Dark page rendering needs no policy at all: Chromium
-# follows the system GTK theme, and navi already ships Yaru-magenta-dark
-# with prefer-dark-theme, so pages render dark out of the box.
+# curated default. Dark mode is forced explicitly too: Chromium's
+# system-theme auto-detection is unreliable on sway (it needs
+# xdg-desktop-portal's Settings portal to see the prefer-dark dconf key,
+# and silently falls back to light without it), so a tiny wrapper in
+# /usr/local/bin injects --force-dark-mode on every launch. That covers
+# the stock launcher, the webapp launchers, xdg-open, and the terminal —
+# and an explicit `chromium --force-light-mode` still wins.
 setup_chromium() {
   step "chromium (nightshadeNeon theme via managed policy)"
   $DOAS install -d -m 755 /etc/chromium/policies/managed
   $DOAS install -m 644 "$WIRED_DIR/chromium/policies/managed/navi.json" \
     /etc/chromium/policies/managed/navi.json
   ok "nightshadeNeon theme installs on first Chromium launch"
+  if [[ -x /usr/bin/chromium ]]; then
+    $DOAS install -m 755 "$WIRED_DIR/chromium/usr-local-bin/chromium" \
+      /usr/local/bin/chromium
+    ok "chromium wrapper forces dark mode on every launch"
+  else
+    warn "chromium not found at /usr/bin/chromium; skipping dark-mode wrapper"
+  fi
 }
 
 # ---------------------------------------------------------------- fonts
