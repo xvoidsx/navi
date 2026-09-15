@@ -1,4 +1,4 @@
-# navi ISO builder (Mika RC20.3).
+# navi ISO builder (Mika RC21).
 #
 # Builds the installer ISO inside a privileged debian:trixie container and
 # uploads it as a workflow artifact. These builds are heavy (debootstrap +
@@ -14,7 +14,7 @@
 # build on real Debian tooling: live-build, debootstrap, and friends from
 # trixie itself.
 
-name: navi ISO (Mika RC20.3)
+name: navi ISO (Mika RC21)
 
 # === RELEASE CHECKLIST ===
 # Bump BOTH values below for every new RC. Everything downstream derives
@@ -23,8 +23,8 @@ name: navi ISO (Mika RC20.3)
 # (this bit us on RC19: the build produced navi-1.2-mika-RC18.iso while
 # publish-rc19.yml looked for the RC19 name — fixed going forward).
 env:
-  RC_LABEL: RC20.3
-  ISO_BASENAME: navi-1.2-mika-RC20.3
+  RC_LABEL: RC21
+  ISO_BASENAME: navi-1.2-mika-RC21
 
 on:
   workflow_dispatch:

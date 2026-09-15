@@ -5,7 +5,7 @@
 # Installs the navi "wired" desktop layer on Debian 13 (trixie):
 #   packages -> /usr/share/navi/wired (the iron structure) -> ~/.config/*
 #   commands -> /usr/bin + /usr/share/applications (rofi-visible)
-#   agent runtime: ollama, opencode, omp, pi, crush -> /usr/bin (/usr/local/bin)
+#   agent runtime: ollama, opencode, omp, goose -> /usr/bin
 #   doas, flatpak/flathub, wallpapers, first-boot behavior
 #
 # Idempotent: safe to re-run. Existing configs are backed up, never clobbered.
@@ -64,7 +64,7 @@ PKGS=(
   firmware-realtek firmware-iwlwifi firmware-atheros firmware-brcm80211 firmware-mediatek
   # small system utilities we love (2026-09-13): archives, rainbow cat,
   # python3 dev conveniences, pandora radio, firewall, node runtime.
-  zip unzip lolcat python-dev-is-python3 pianobar ufw nodejs npm
+  zip unzip bzip2 lolcat python-dev-is-python3 pianobar ufw nodejs npm
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -227,7 +227,7 @@ build_mpvpaper() {
 
 # ---------------------------------------------------------------- agents
 
-# Agent-native from the first boot: ollama runtime, opencode, omp, pi, crush.
+# Agent-native from the first boot: ollama runtime, opencode, omp, goose.
 # Binaries land in /usr/bin (or /usr/local/bin via npm) so every user on
 # the machine gets them.
 #
@@ -256,7 +256,7 @@ host_up() { # host_up <url> -> 0 if the host answers a quick probe
 }
 
 setup_agents() {
-  step "agent runtime (ollama, opencode, omp, pi, crush)"
+  step "agent runtime (ollama, opencode, omp, goose)"
 
   if command -v ollama >/dev/null 2>&1; then
     ok "ollama already installed"
@@ -327,50 +327,32 @@ setup_agents() {
     rm -f "$omptmp"
   fi
 
-  # pi (earendil-works/pi): the official installer is INTERACTIVE — when a
-  # terminal is present it draws a menu and waits for a keypress on /dev/tty,
-  # which wedged the Cloudbook provision (and any unattended run). setsid
-  # detaches it from any controlling terminal so it takes its own designed
-  # non-interactive path ("No terminal detected; continuing without
-  # confirmation"). Installed system-wide through doas so pi lands in
-  # /usr/local/bin for every user, like crush.
-  if command -v pi >/dev/null 2>&1; then
-    ok "pi already installed ($(command -v pi))"
-  elif ! host_up https://pi.dev/install.sh; then
-    warn "pi.dev unreachable — skipping pi (re-run install.sh --yes later)"
-  elif ! command -v npm >/dev/null 2>&1; then
-    warn "npm not on PATH — skipping pi (re-run install.sh --yes later)"
+  # goose (aaif-goose/goose — ex-Block, now the Linux Foundation's Agentic
+  # AI Foundation): open-source AI agent, CLI + desktop app. Its install
+  # script is designed for non-interactive use (automation/docker): both
+  # interactive points are tty-guarded and degrade gracefully — the anti-pi.
+  # GOOSE_BIN_DIR pins the install location like omp's PI_INSTALL_DIR;
+  # GOOSE_VERSION pins the release (never float on the moving `stable` tag
+  # in a shipped ISO); the musl variant is fully static (sidesteps libssl).
+  # CONFIGURE=false is explicit: first-run `goose configure` happens at
+  # user-invocation time, never during provisioning. The script unpacks a
+  # .tar.bz2, so bzip2 must be in PKGS.
+  if [ -x /usr/bin/goose ]; then
+    ok "goose already in /usr/bin"
+  elif ! host_up https://github.com/aaif-goose/goose/releases/download/v1.50.1/download_cli.sh; then
+    warn "goose release unreachable — skipping goose (re-run install.sh --yes later)"
   else
-    info "installing pi..."
-    local pitmp
-    pitmp="$(mktemp)"
-    if fetch https://pi.dev/install.sh -o "$pitmp" \
-        && $DOAS setsid timeout -k 30 300 sh "$pitmp" </dev/null >/dev/null 2>&1 \
-        && command -v pi >/dev/null 2>&1; then
-      ok "pi -> $(command -v pi)"
+    info "installing goose v1.50.1..."
+    local goosetmp
+    goosetmp="$(mktemp)"
+    if fetch https://github.com/aaif-goose/goose/releases/download/v1.50.1/download_cli.sh -o "$goosetmp" \
+        && $DOAS setsid timeout -k 30 300 env GOOSE_BIN_DIR=/usr/bin GOOSE_VERSION=v1.50.1 GOOSE_LINUX_VARIANT=musl CONFIGURE=false bash "$goosetmp" </dev/null \
+        && [ -x /usr/bin/goose ]; then
+      ok "goose v1.50.1 -> /usr/bin/goose"
     else
-      warn "pi install failed — skipping (re-run install.sh --yes later)"
+      warn "goose install failed — skipping (re-run install.sh --yes later)"
     fi
-    rm -f "$pitmp"
-  fi
-
-  # crush (charmbracelet): glamorous agentic coding TUI in Go, LSP-aware.
-  # npm package; global install as root lands in /usr/local/bin, which is
-  # on every user's PATH.
-  if command -v crush >/dev/null 2>&1; then
-    ok "crush already installed ($(command -v crush))"
-  elif ! host_up https://registry.npmjs.org/@charmland%2fcrush; then
-    warn "npm registry unreachable — skipping crush (re-run install.sh --yes later)"
-  elif ! command -v npm >/dev/null 2>&1; then
-    warn "npm not on PATH — skipping crush (re-run install.sh --yes later)"
-  else
-    info "installing crush..."
-    if $DOAS timeout -k 30 300 npm install -g --ignore-scripts @charmland/crush </dev/null >/dev/null 2>&1 \
-        && command -v crush >/dev/null 2>&1; then
-      ok "crush -> $(command -v crush)"
-    else
-      warn "crush install failed — skipping (re-run install.sh --yes later)"
-    fi
+    rm -f "$goosetmp"
   fi
 
   # herdr (agent multiplexer): pinned release, one static binary, no
@@ -708,6 +690,13 @@ gtk-theme='Yaru-magenta-dark'
 icon-theme='Papirus-Dark'
 color-scheme='prefer-dark'
 EOF
+  # The profile is the piece RC20.x was missing: without
+  # /etc/dconf/profile/user, dconf falls back to its internal user-db-only
+  # profile and never reads the compiled local db — fresh installs fell
+  # back to Adwaita despite the keyfile above. Standard Debian profile.
+  $DOAS install -d -m 755 /etc/dconf/profile
+  printf '%s\n' 'user-db:user' 'system-db:local' 'system-db:site' 'system-db:distro' \
+    | $DOAS tee /etc/dconf/profile/user >/dev/null
   $DOAS dconf update
   ok "yaru-magenta-dark seeded as the gtk default (user-overridable)"
 }
@@ -760,6 +749,22 @@ setup_chromium() {
     $DOAS install -m 755 "$WIRED_DIR/chromium/usr-local-bin/chromium" \
       /usr/local/bin/chromium
     ok "chromium wrapper forces dark mode on every launch"
+    # Debian's chromium.desktop hardcodes Exec=/usr/bin/chromium, which
+    # bypasses the wrapper (and its --force-dark-mode) for Rofi and
+    # launcher invocations. Shadow it under /usr/local/share/applications
+    # — which outranks /usr/share/applications — with the Exec line
+    # rewritten to the wrapper. Generated from Debian's own file so the
+    # override tracks upstream launcher changes; the packaged file is
+    # never modified.
+    if [ -f /usr/share/applications/chromium.desktop ]; then
+      $DOAS install -d -m 755 /usr/local/share/applications
+      sed 's|^Exec=/usr/bin/chromium|Exec=/usr/local/bin/chromium|' \
+        /usr/share/applications/chromium.desktop \
+        | $DOAS tee /usr/local/share/applications/chromium.desktop >/dev/null
+      ok "chromium.desktop override routes Rofi through the dark-mode wrapper"
+    else
+      warn "Debian chromium.desktop not found — skipping launcher override"
+    fi
   else
     warn "chromium not found at /usr/bin/chromium; skipping dark-mode wrapper"
   fi
