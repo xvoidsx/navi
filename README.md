@@ -31,7 +31,7 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 <img width="1366" height="768" alt="herdr running agent sessions with omp and hermes in tiled terminals" src="screenshots/herdr-agents.png" />
 
-###### tiled windows, agents at work
+###### herdr activated, agents at work
 
 <img width="1366" height="768" alt="elinks and amfora open on the smallweb" src="screenshots/smallweb-elinks-amfora.png" />
 
