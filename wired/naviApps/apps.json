@@ -390,6 +390,21 @@
     "icon": "💾"
   },
   {
+    "id": "web-dropbox",
+    "name": "Dropbox",
+    "summary": "Cloud files and storage.",
+    "category": "Webapps",
+    "source": "webapp",
+    "package": "dropbox",
+    "url": "https://www.dropbox.com",
+    "install": "navi-webapp dropbox",
+    "downloadUrl": "webapps/dropbox.desktop",
+    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Dropbox\nExec=chromium --app=https://www.dropbox.com\nComment=Dropbox as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-dropbox\nStartupNotify=true\nCategories=Office;",
+    "homepage": "https://www.dropbox.com",
+    "logo": "icons/dropbox.svg",
+    "icon": "📦"
+  },
+  {
     "id": "web-googledocs",
     "name": "Google Docs",
     "summary": "Docs, sheets, and slides in the browser.",
