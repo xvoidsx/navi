@@ -1,4 +1,4 @@
-# navi ISO builder (1.4.4 "mika" stable).
+# navi ISO builder (1.4.5 "mika" stable).
 #
 # Builds the installer ISO inside a privileged debian:trixie container and
 # uploads it as a workflow artifact. These builds are heavy (debootstrap +
@@ -14,7 +14,7 @@
 # build on real Debian tooling: live-build, debootstrap, and friends from
 # trixie itself.
 
-name: navi ISO (1.4.4 "mika")
+name: navi ISO (1.4.5 "mika")
 
 # === RELEASE CHECKLIST ===
 # Bump BOTH values below for every new release. Everything downstream derives
@@ -33,7 +33,7 @@ name: navi ISO (1.4.4 "mika")
 #   - iso/installer/navi-install        (banner line + "is installed" box — keep the
 #                                        box-drawing padding aligned after the bump)
 #   - iso/stage.sh payload              (install.sh, wired/, scripts/, iso/installer —
-#                                        scripts/ holds navi-update + navi-wired-restore;
+#                                        scripts/ holds navi-update + navi-wired-restore + navi-wired-adopt;
 #                                        leaving it out silently drops them from fresh
 #                                        installs, caught on the Cloudbook in 1.4)
 #   - iso/README.md                     (pipeline doc header)
@@ -58,8 +58,8 @@ name: navi ISO (1.4.4 "mika")
 #   - navi repo README.md: bump any human-facing version strings (check
 #     with grep, same as the installer banner).
 env:
-  RELEASE: 1.4.4
-  ISO_BASENAME: navi-1.4.4-mika
+  RELEASE: 1.4.5
+  ISO_BASENAME: navi-1.4.5-mika
 
 on:
   workflow_dispatch:
@@ -125,7 +125,7 @@ jobs:
             --memtest none \
             --iso-application "navi" \
             --iso-publisher "xvoidsx" \
-            --iso-volume "navi 1.4.4 mika" \
+            --iso-volume "navi 1.4.5 mika" \
             --image-name "$ISO_BASENAME"
           lb build
 

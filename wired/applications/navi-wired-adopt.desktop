@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-wired-adopt
+Comment=Adopt the new stock wired configs wholesale (backs up yours first)
+Exec=navi-wired-adopt
+Terminal=true
+Icon=system-software-update
+Categories=Utility;Settings;
+NoDisplay=false

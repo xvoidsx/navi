@@ -175,7 +175,7 @@
         "escape": true,
         "interval": 300,
         "exec": "/usr/share/navi/wired/waybar/update-check.sh",
-        "on-click": "alacritty -e navi-update",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-update\" navi-update",
         "tooltip": true
     },
     "custom/bell": {
@@ -184,7 +184,7 @@
         "escape": true,
         "interval": 10,
         "exec": "/usr/share/navi/wired/waybar/notif-bell.sh",
-        "on-click": "/usr/share/navi/wired/waybar/notif-open.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-notifs\" navi-notifs",
         "tooltip": true
     },
     "custom/power": {

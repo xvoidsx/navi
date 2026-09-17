@@ -638,7 +638,7 @@ install_commands() {
 
   # distro-level tools live in scripts/ (repo root), outside the /wired
   # desktop layer — same /usr/bin destination, same rofi visibility.
-  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore"; do
+  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore" "navi-wired-adopt.sh:navi-wired-adopt"; do
     local src="$REPO_DIR/scripts/${pair%%:*}" name="${pair##*:}"
     if [ -e "$src" ]; then
       $DOAS install -m 0755 "$src" "/usr/bin/$name"
