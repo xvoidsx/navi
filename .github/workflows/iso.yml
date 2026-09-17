@@ -58,8 +58,8 @@ name: navi ISO (1.4.5 "mika")
 #   - navi repo README.md: bump any human-facing version strings (check
 #     with grep, same as the installer banner).
 env:
-  RELEASE: 1.4.5
-  ISO_BASENAME: navi-1.4.5-mika
+  RELEASE: 1.4.6
+  ISO_BASENAME: navi-1.4.6-mika
 
 on:
   workflow_dispatch:
@@ -125,7 +125,7 @@ jobs:
             --memtest none \
             --iso-application "navi" \
             --iso-publisher "xvoidsx" \
-            --iso-volume "navi 1.4.5 mika" \
+            --iso-volume "navi 1.4.6 mika" \
             --image-name "$ISO_BASENAME"
           lb build
 

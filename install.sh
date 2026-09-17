@@ -596,6 +596,19 @@ deploy_configs() {
   fi
 
   verify_wallpaper_wiring
+
+  # waybar hot-reloads style.css on its own, but a new config.jsonc (new
+  # on-clicks, new modules) needs an explicit nudge — otherwise the
+  # running bar keeps yesterday's config and new launchers never take
+  # effect on a live system. SIGUSR2 is waybar's documented config-reload
+  # signal. fresh installs have no bar running yet; the pgrep guard skips.
+  if pgrep -x waybar >/dev/null 2>&1; then
+    if pkill -USR2 -x waybar 2>/dev/null; then
+      ok "waybar reloaded (new config active)"
+    else
+      warn "waybar is running but the reload signal failed — restart it or re-login"
+    fi
+  fi
 }
 
 verify_wallpaper_wiring() {
