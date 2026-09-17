@@ -18,3 +18,5 @@ alias la='ls -A --color=auto'
 alias grep='grep --color=auto'
 # QoL aliases
 alias cls="clear"
+# /usr/sbin holds ufw and friends; Debian keeps it off a normal user's PATH
+case ":$PATH:" in *":/usr/sbin:"*) ;; *) export PATH="$PATH:/usr/sbin" ;; esac

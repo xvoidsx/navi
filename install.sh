@@ -82,7 +82,7 @@ PKGS=(
   # small system utilities we love (2026-09-13): archives, rainbow cat,
   # python3 dev conveniences, pandora radio, firewall (+ graphical frontend),
   # node runtime, graphical sftp/ssh file transfer.
-  zip unzip bzip2 lolcat python-dev-is-python3 pianobar ufw gufw nodejs npm filezilla
+  zip unzip bzip2 lolcat python-dev-is-python3 pianobar ufw gufw nodejs npm filezilla imv
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -733,6 +733,34 @@ EOF
   fi
 }
 
+# Let the local user manage system flatpaks without a password prompt.
+# Rationale: on navi the user already holds doas root (permit persist),
+# so the polkit prompt on every flatpak install/update was pure friction,
+# not a real authorization boundary — it also broke non-interactive
+# `flatpak update` inside navi-update. Remote users are unaffected; this
+# only applies to local, active sessions.
+setup_flatpak_polkit() {
+  step "flatpak authorization"
+  local rule_file="/etc/polkit-1/rules.d/49-navi-flatpak.rules"
+  if [ -f "$rule_file" ]; then
+    info "flatpak polkit rule already present"
+    return 0
+  fi
+  $DOAS mkdir -p /etc/polkit-1/rules.d
+  $DOAS tee "$rule_file" >/dev/null <<'EOF'
+// navi: the local, active user manages system flatpaks without auth.
+// They already have doas root; the prompt was friction, not security.
+polkit.addRule(function(action, subject) {
+  if (action.id.indexOf("org.freedesktop.Flatpak.") === 0 &&
+      subject.local && subject.active) {
+    return polkit.Result.YES;
+  }
+});
+EOF
+  $DOAS chmod 644 "$rule_file"
+  ok "flatpak polkit rule installed"
+}
+
 # ---------------------------------------------------------------- user dirs + app installers
 
 setup_dirs() {
@@ -980,6 +1008,7 @@ main() {
     setup_agents
     setup_environment
     setup_flatpak
+    setup_flatpak_polkit
     setup_gtk_theme
     setup_dirs
     setup_sddm
@@ -1010,6 +1039,7 @@ main() {
   setup_agents
   setup_environment
   setup_flatpak
+  setup_flatpak_polkit
   setup_gtk_theme
   setup_dirs
   setup_sddm
