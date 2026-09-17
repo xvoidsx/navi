@@ -33,7 +33,7 @@ KEY_FILE="/usr/share/navi/wired/keys/release.asc"
 # fingerprint of the xvoidsx release signing key. empty until Raven runs
 # the signing ceremony (see wired/keys/README.md) — with it empty the
 # navi layer refuses to update (fail closed).
-RELEASE_FINGERPRINT=""
+RELEASE_FINGERPRINT="977129E517EBD91B62E1530A9F8482C4352A5E32"
 
 ASSUME_YES=0
 CHECK_ONLY=0
