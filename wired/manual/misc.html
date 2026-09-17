@@ -42,8 +42,13 @@
 	<h1 style="color:#ff10f0;text-align:center">misc. ~</h1>
 	<p><a href="manual.html">go back</a></p>
 	<p>Assorted things worth knowing about your navi machine.</p>
-	<h3 style="color:#ff10f0">doas, not sudo</h3>
-	<p>navi uses <code>doas</code> instead of <code>sudo</code> for running commands as root. It works the same way you're used to: <code>doas apt update</code>. It's smaller, simpler, and configured at <code>/etc/doas.conf</code>.</p>
+	<h3 style="color:#ff10f0">doas and sudo</h3>
+	<p>navi is <code>doas</code>-native: <code>doas apt update</code> works the way you're used to, configured at <code>/etc/doas.conf</code>. It's smaller and simpler than sudo, so it's the default.</p>
+	<p>But real <code>sudo</code> is installed too, as a compatibility layer — plenty of third-party install scripts (our own <code>scripts/installers</code> included) expect it. Your user has a dedicated rule in <code>/etc/sudoers.d/10-navi-user</code>, so <code>sudo</code> asks for your login password just like doas does, and it works immediately — no logout required.</p>
+	<h3 style="color:#ff10f0">notifications</h3>
+	<p>The bell icon in the panel shows how many notifications are waiting. Click it (or run <code>navi-notifs</code>) to open the viewer in a floating window: browse the list, type a <b>number</b> to trigger that notification's action, <b>d+number</b> to dismiss one, <b>c</b> to clear them all, <b>q</b> to quit.</p>
+	<h3 style="color:#ff10f0">staying updated</h3>
+	<p><code>navi-update</code> pulls the latest navi release and redeploys around your customizations; <code>navi-update --check</code> just reports what's available. The download-arrow icon in the panel checks automatically every 15 minutes and lights up when updates are waiting — click it to update. <code>navi-wired-restore</code> shows how your setup drifted from stock and restores what you choose.</p>
 	<h3 style="color:#ff10f0">installing software</h3>
 	<p>navi is based on Debian, so <code>apt</code> installs anything in the Debian repositories: <code>doas apt install &lt;package&gt;</code>. We also ship <b>flatpak</b> with Flathub enabled, so desktop apps are one install away. And don't forget <b>naviApps</b> — our curated webapp store, right in your launcher.</p>
 	<h3 style="color:#ff10f0">screenshots</h3>

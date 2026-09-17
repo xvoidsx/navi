@@ -21,13 +21,13 @@
     ],
     "modules-right": [
         //"custom/media",
+	"custom/update",
 	"pulseaudio",
         "network",
         "battery",
         "backlight",
         "idle_inhibitor",
         "power-profiles-daemon",	
-	"custom/update",
 	"custom/bell",
 	"tray", 	
 	"custom/power"
@@ -184,7 +184,7 @@
         "escape": true,
         "interval": 10,
         "exec": "/usr/share/navi/wired/waybar/notif-bell.sh",
-        "on-click": "alacritty --title \"navi-notifs\" -e navi-notifs",
+        "on-click": "/usr/share/navi/wired/waybar/notif-open.sh",
         "tooltip": true
     },
     "custom/power": {

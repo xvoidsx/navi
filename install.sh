@@ -711,11 +711,26 @@ setup_sudo() {
       && ok "$USER added to the sudo group (next login)" \
       || warn "could not add $USER to the sudo group"
   fi
+  # immediate steady state: an explicit sudoers.d rule for the user takes
+  # effect on the very next sudo invocation — no re-login needed (unlike
+  # group membership, which is still added above as the debian-native
+  # belt and suspenders). password-required, same feel as doas
+  # 'permit persist'. this is what makes scripts/installers/* work right
+  # after navi-update, in the same session.
+  printf '%s ALL=(ALL:ALL) ALL\n' "$USER" | $DOAS tee /etc/sudoers.d/10-navi-user >/dev/null
+  $DOAS chmod 440 /etc/sudoers.d/10-navi-user
+  if $DOAS visudo -c -q 2>/dev/null; then
+    ok "sudoers rule in place for $USER (effective immediately)"
+  else
+    warn "/etc/sudoers.d/10-navi-user failed visudo check — removing it"
+    $DOAS rm -f /etc/sudoers.d/10-navi-user
+  fi
   if [ "$NAVI_UPDATE_MODE" -ne 1 ]; then
     # fresh-install provisioning is non-interactive (no tty for a password
     # prompt), so sudo stays passwordless until tighten_sudo() runs at the
     # end of the install. mirrors the installer's temporary doas
-    # 'permit nopass' that gets locked down after provisioning.
+    # 'permit nopass' that gets locked down after provisioning. (this file
+    # sorts after 10-navi-user, so its NOPASSWD wins while it exists.)
     printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$USER" | $DOAS tee /etc/sudoers.d/navi-provision >/dev/null
     $DOAS chmod 440 /etc/sudoers.d/navi-provision
     $DOAS visudo -c -q 2>/dev/null \
@@ -727,7 +742,9 @@ setup_sudo() {
 tighten_sudo() {
   # end of a fresh install: drop the provisioning NOPASSWD so sudo goes
   # back to asking for the login password. never silently leave the
-  # passwordless rule in place.
+  # passwordless rule in place. the permanent /etc/sudoers.d/10-navi-user
+  # rule (password-required, written by setup_sudo) stays — that is the
+  # steady state.
   step "sudo lockdown"
   $DOAS rm -f /etc/sudoers.d/navi-provision
   ok "provisioning NOPASSWD removed; sudo now asks for the login password"

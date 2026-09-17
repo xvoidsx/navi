@@ -14,6 +14,8 @@ set -uo pipefail
 # neon palette — nightshadeNeon, terminal edition
 N_PINK=$'\033[38;5;201m'
 N_GREEN=$'\033[92m'
+N_DIM=$'\033[2m'
+N_BOLD=$'\033[1m'
 N_OFF=$'\033[0m'
 
 HIST_JSON=""
@@ -25,6 +27,11 @@ fetch_history() {
 list_notifs() {
   python3 -c '
 import json, sys, textwrap
+PINK = "\033[38;5;201m"
+GREEN = "\033[92m"
+DIM = "\033[2m"
+BOLD = "\033[1m"
+OFF = "\033[0m"
 def raw(d, k, default=None):
     # dunstctl prints busctl JSON: every D-Bus variant arrives wrapped as
     # {"type": "<sig>", "data": <value>}. unwrap that; leave anything else
@@ -46,23 +53,38 @@ hist = data[0] if data else []
 if not hist:
     print("  all quiet — no notifications in history.")
     sys.exit()
+print("  " + DIM + str(len(hist)) + " in history" + OFF)
+print("")
+shown = 0
 for n, h in enumerate(hist):
     if not isinstance(h, dict):
         continue
+    if shown:
+        print("  " + DIM + ("-" * 46) + OFF)
+        print("")
+    shown += 1
     app = s(h, "appname") or "?"
-    summary = s(h, "summary").strip().replace("\n", " ")
-    body = s(h, "body").strip().replace("\n", " ")
+    summary = " ".join(s(h, "summary").split())
+    body = " ".join(s(h, "body").split())
     actions = raw(h, "actions", {}) or {}
     if not isinstance(actions, dict):
         actions = {}
-    acts = (", actions: " + ", ".join(str(v) for v in actions.values())) if actions else ""
     # NOTE: no backslashes inside f-string expressions — python < 3.12
     # chokes on them (SyntaxError: unexpected character after line
-    # continuation character). build the line with concatenation instead.
-    line = "  [" + str(n) + "] " + app + ": " + summary
+    # continuation character). concatenation only, below.
+    print("  " + PINK + "[" + str(n) + "]" + OFF + "  " + DIM + app + OFF)
+    print("")
+    if summary:
+        print("  " + BOLD + summary + OFF)
+        print("")
     if body:
-        line = line + " — " + textwrap.shorten(body, width=72, placeholder="…")
-    print(line + acts)
+        for wline in textwrap.wrap(body, width=56):
+            print("  " + DIM + wline + OFF)
+        print("")
+    if actions:
+        labels = ", ".join(str(v) for v in actions.values())
+        print("  " + GREEN + "> " + labels + OFF)
+        print("")
 ' "$HIST_JSON"
 }
 
@@ -138,10 +160,9 @@ main() {
   while true; do
     fetch_history
     echo
-    printf '  ── %snotifications%s ─────────────────────────────\n' "$N_PINK" "$N_OFF"
+    printf '  %s∅ notifications%s\n' "$N_PINK" "$N_OFF"
     list_notifs
-    echo "  ─────────────────────────────────────────────"
-    printf '  %s<number> open action · d<number> dismiss · c clear all · q quit%s\n' "$N_GREEN" "$N_OFF"
+    printf '  %s<number> action · d<number> dismiss · c clear all · q quit%s\n' "$N_DIM" "$N_OFF"
     read -r -p "  > " cmd
     case "$cmd" in
       q|Q) break ;;
