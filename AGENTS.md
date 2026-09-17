@@ -241,6 +241,14 @@ file limit so they can ship in the repo.)
 - This repo's `AGENTS.md` is mirrored to the website as `agents.html`. After
   changing this file, re-run `build-agents-page.sh` in the site repo and push
   — the repo copy stays the source of truth.
+- NaviVim (xvoidsx/navivim, navi's default editor from 1.5) has its own site
+  section: `navivim.html` (hand-written product page), `navivim-handbook.html`
+  (mirror of its HANDBOOK.md), `navivim-agents.html` (mirror of its AGENTS.md)
+  — all built by `build-navivim-pages.sh` in the site repo. The NaviVim repo
+  copies stay the source of truth.
+- Doc-mirror build scripts need the Python `markdown` package. Make sure it's
+  installed somewhere that survives your environment rebuilds — a plain system
+  pip install may not be.
 - Footer creed: "open models, open web" — quiet, not shouty.
 
 ## House conventions
