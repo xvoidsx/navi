@@ -54,7 +54,10 @@ MANIFEST_TMP=""
 # virtual). i3status + i3blocks were dropped: navi uses polybar, not i3bar,
 # on the X11 session.
 PKGS=(
-  i3 i3lock-fancy nitrogen pamixer wget curl git htop opendoas lsd
+  # sudo rides along for compatibility: third-party install scripts
+  # (scripts/installers/*) and random upstream tooling expect it.
+  # doas stays the navi-native way up; see setup_sudo.
+  i3 i3lock-fancy nitrogen pamixer wget curl git htop opendoas sudo lsd
   nsxiv pulseaudio-utils xcompmgr picom waybar alacritty fonts-inter xterm
   arandr nemo rofi xss-lock feh pandoc volumeicon-alsa polybar blueman dunst
   flameshot meteo-qt pasystray ffmpeg mpv kitty stterm surf conky-all suckless-tools zathura zathura-pdf-poppler
@@ -681,6 +684,55 @@ setup_doas() {
   fi
 }
 
+setup_sudo() {
+  step "sudo (compatibility)"
+  # sudo ships so third-party install scripts (scripts/installers/*) and
+  # upstream tooling that expects it keep working. doas stays the
+  # navi-native privilege tool. deliberately NOT an alias: a sudo->doas
+  # alias would shadow the real sudo and break sudo -u/-i/-E, and aliases
+  # don't expand in non-interactive scripts anyway — which is exactly
+  # where the installers need sudo.
+  if ! command -v sudo >/dev/null 2>&1; then
+    # install_packages (which runs in both install and update mode) owns
+    # the sudo package; this is just a safety net for odd states.
+    info "sudo not present — installing"
+    $DOAS apt-get install -y -qq sudo \
+      || { warn "could not install sudo; installers expecting sudo will fail"; return 0; }
+    ok "sudo installed"
+  fi
+  # debian-native steady state: the user sits in the sudo group, so sudo
+  # asks for the login password — same feel as doas 'permit persist'.
+  # (group membership takes effect on next login, like the input group
+  # for ydotool.)
+  if id -nG "$USER" | tr ' ' '\n' | grep -qx sudo; then
+    ok "$USER already in the sudo group"
+  else
+    $DOAS usermod -aG sudo "$USER" \
+      && ok "$USER added to the sudo group (next login)" \
+      || warn "could not add $USER to the sudo group"
+  fi
+  if [ "$NAVI_UPDATE_MODE" -ne 1 ]; then
+    # fresh-install provisioning is non-interactive (no tty for a password
+    # prompt), so sudo stays passwordless until tighten_sudo() runs at the
+    # end of the install. mirrors the installer's temporary doas
+    # 'permit nopass' that gets locked down after provisioning.
+    printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$USER" | $DOAS tee /etc/sudoers.d/navi-provision >/dev/null
+    $DOAS chmod 440 /etc/sudoers.d/navi-provision
+    $DOAS visudo -c -q 2>/dev/null \
+      || warn "/etc/sudoers.d/navi-provision failed visudo check"
+    ok "sudo passwordless during provisioning (tightened at end of install)"
+  fi
+}
+
+tighten_sudo() {
+  # end of a fresh install: drop the provisioning NOPASSWD so sudo goes
+  # back to asking for the login password. never silently leave the
+  # passwordless rule in place.
+  step "sudo lockdown"
+  $DOAS rm -f /etc/sudoers.d/navi-provision
+  ok "provisioning NOPASSWD removed; sudo now asks for the login password"
+}
+
 setup_environment() {
   step "environment"
   if [ -f "$WIRED_SHARE/../system/environment" ]; then
@@ -1024,6 +1076,7 @@ main() {
     manifest_write
     install_commands
     setup_doas
+    setup_sudo
     setup_agents
     setup_environment
     setup_flatpak
@@ -1055,6 +1108,7 @@ main() {
   manifest_write
   install_commands
   setup_doas
+  setup_sudo
   setup_agents
   setup_environment
   setup_flatpak
@@ -1066,6 +1120,7 @@ main() {
   setup_fonts
   run_app_installers
   setup_webapps
+  tighten_sudo
   done_banner
 }
 

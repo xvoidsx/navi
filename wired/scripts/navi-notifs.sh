@@ -25,22 +25,37 @@ fetch_history() {
 list_notifs() {
   python3 -c '
 import json, sys, textwrap
+def raw(d, k, default=None):
+    # dunstctl prints busctl JSON: every D-Bus variant arrives wrapped as
+    # {"type": "<sig>", "data": <value>}. unwrap that; leave anything else
+    # (including a plain value, if dunst ever changes shape) alone.
+    x = d.get(k, default)
+    if isinstance(x, dict) and "data" in x and set(x.keys()) <= {"type", "data"}:
+        return x["data"]
+    return x
+def s(d, k):
+    x = raw(d, k, "")
+    return x if isinstance(x, str) else ("" if x is None else str(x))
 try:
     d = json.loads(sys.argv[1])
 except Exception:
     print("  (could not read dunst history)")
     sys.exit()
-data = d.get("data", [])
+data = raw(d, "data", []) or []
 hist = data[0] if data else []
 if not hist:
     print("  all quiet — no notifications in history.")
     sys.exit()
 for n, h in enumerate(hist):
-    app = h.get("appname", "?") or "?"
-    summary = (h.get("summary", "") or "").strip().replace("\n", " ")
-    body = (h.get("body", "") or "").strip().replace("\n", " ")
-    actions = h.get("actions", {}) or {}
-    acts = (", actions: " + ", ".join(actions.values())) if actions else ""
+    if not isinstance(h, dict):
+        continue
+    app = s(h, "appname") or "?"
+    summary = s(h, "summary").strip().replace("\n", " ")
+    body = s(h, "body").strip().replace("\n", " ")
+    actions = raw(h, "actions", {}) or {}
+    if not isinstance(actions, dict):
+        actions = {}
+    acts = (", actions: " + ", ".join(str(v) for v in actions.values())) if actions else ""
     # NOTE: no backslashes inside f-string expressions — python < 3.12
     # chokes on them (SyntaxError: unexpected character after line
     # continuation character). build the line with concatenation instead.
@@ -54,10 +69,16 @@ for n, h in enumerate(hist):
 entry_id() { # <index> -> dunst id (or empty)
   python3 -c '
 import json, sys
+def raw(d, k, default=None):
+    x = d.get(k, default)
+    if isinstance(x, dict) and "data" in x and set(x.keys()) <= {"type", "data"}:
+        return x["data"]
+    return x
 try:
     d = json.loads(sys.argv[1])
-    hist = (d.get("data", []) or [[]])[0]
-    print(hist[int(sys.argv[2])].get("id", ""))
+    data = raw(d, "data", []) or []
+    hist = data[0] if data else []
+    print(raw(hist[int(sys.argv[2])], "id", ""))
 except Exception:
     print("")
 ' "$HIST_JSON" "$1"
@@ -66,11 +87,21 @@ except Exception:
 entry_actions() { # <index> -> "key:label ..." or empty
   python3 -c '
 import json, sys
+def raw(d, k, default=None):
+    x = d.get(k, default)
+    if isinstance(x, dict) and "data" in x and set(x.keys()) <= {"type", "data"}:
+        return x["data"]
+    return x
 try:
     d = json.loads(sys.argv[1])
-    hist = (d.get("data", []) or [[]])[0]
-    acts = hist[int(sys.argv[2])].get("actions", {}) or {}
-    print(" ".join(f"{k}:{v}" for k, v in acts.items()))
+    data = raw(d, "data", []) or []
+    hist = data[0] if data else []
+    acts = raw(hist[int(sys.argv[2])], "actions", {}) or {}
+    if not isinstance(acts, dict):
+        acts = {}
+    # NOTE: no backslashes inside f-string expressions — build with
+    # concatenation instead (python < 3.12 SyntaxError otherwise).
+    print(" ".join(str(k) + ":" + str(v) for k, v in acts.items()))
 except Exception:
     print("")
 ' "$HIST_JSON" "$1"
