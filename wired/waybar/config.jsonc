@@ -27,6 +27,8 @@
         "backlight",
         "idle_inhibitor",
         "power-profiles-daemon",	
+	"custom/update",
+	"custom/bell",
 	"tray", 	
 	"custom/power"
     ],
@@ -166,6 +168,24 @@
             "balanced": "",
             "power-saver": ""
         }
+    },
+    "custom/update": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 300,
+        "exec": "/usr/share/navi/wired/waybar/update-check.sh",
+        "on-click": "alacritty -e navi-update",
+        "tooltip": true
+    },
+    "custom/bell": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 10,
+        "exec": "/usr/share/navi/wired/waybar/notif-bell.sh",
+        "on-click": "alacritty -e navi-notifs",
+        "tooltip": true
     },
     "custom/power": {
         "format" : "⏻ ",

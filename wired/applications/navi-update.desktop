@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-update
+Comment=Update navi: navi's files, Debian packages, and Flatpaks in one pass
+Exec=navi-update
+Icon=system-software-update
+Terminal=true
+Categories=System;Settings;
+NoDisplay=false

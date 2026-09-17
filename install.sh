@@ -11,9 +11,12 @@
 # Idempotent: safe to re-run. Existing configs are backed up, never clobbered.
 # Run as your normal user (not root). Privileged steps use doas/sudo.
 #
-#   ./install.sh [--yes] [--help]
+#   ./install.sh [--yes] [--deploy-only] [--help]
 #
 # --yes   non-interactive: accept defaults, run every app installer
+# --deploy-only   refresh an installed machine to this repo's state:
+#                 no provisioning, no prompts. navi-update shells out
+#                 to this mode; in it, user-modified configs are kept.
 
 set -euo pipefail
 
@@ -30,6 +33,20 @@ BACKUP_ROOT="$HOME/.config-backup-navi"
 BACKUP_DIR="$BACKUP_ROOT/$(date +%Y%m%d-%H%M%S)"
 ASSUME_YES=0
 DOAS=""
+DEPLOY_ONLY=0
+# wired/VERSION is the single source of truth for the navi version
+# (e.g. 1.3 "mika"). the banner, the deploy manifest, and
+# /etc/navi/version all derive from it — never hardcode it elsewhere.
+NAVI_VERSION="$(cat "$WIRED_DIR/VERSION" 2>/dev/null || echo "unknown")"
+# update mode (set by --deploy-only): deploy_config will not overwrite a
+# config the user has modified — manifest checksums are the baseline.
+NAVI_UPDATE_MODE=0
+# the deploy manifest: sha256, navi version, repo relpath, dest, mode —
+# one line per deployed file. it lets navi-update tell "untouched" from
+# "the user customized this", and it powers navi-wired-restore.
+MANIFEST_DIR="/var/lib/navi"
+MANIFEST_FILE="$MANIFEST_DIR/deploy-manifest.tsv"
+MANIFEST_TMP=""
 
 # Every apt package, audited against Debian 13 "trixie" (2026-09-10).
 # Corrections baked in: opendoas (doas is a transitional dummy), no slock
@@ -77,7 +94,7 @@ PKGS=(
 # add/remove more from the naviApps store.
 DEFAULT_WEBAPPS=(
   navi-radio neighborli glyyph telegram element pandora
-  github youtube yomi twitch discord perplexity
+  github youtube yomi twitch discord perplexity dropbox
 )
 
 # ---------------------------------------------------------------- ui
@@ -94,8 +111,11 @@ banner() {
             ██████
 
    ✦  W E L C O M E   T O   T H E   W I R E D  ✦
-
-       n a v i   1 . 3  " m i k a "
+EOF
+  # the version line is spaced out for the aesthetic; wired/VERSION is the
+  # single source of truth, so this never goes stale.
+  printf '\n       n a v i   %s\n' "$(printf '%s' "$NAVI_VERSION" | sed 's/./& /g; s/ $//')"
+  cat <<'EOF'
 
        ナビ — everybody has already entered the wired
 
@@ -423,6 +443,50 @@ backup_file() {
   [ -e "$f.navi-orig" ] || $DOAS cp -a "$f" "$f.navi-orig"
 }
 
+# ---------------------------------------------------------------- deploy manifest
+# /var/lib/navi/deploy-manifest.tsv — one tab-separated line per deployed file:
+#   <sha256> <tab> <navi-version> <tab> <repo-relpath> <tab> <dest> <tab> <mode>
+# accumulated in a temp file during the deploy phase, then written once
+# (root-owned) by manifest_write.
+
+manifest_begin() {
+  MANIFEST_TMP="$(mktemp /tmp/navi-manifest.XXXXXX)"
+  if [ "$NAVI_UPDATE_MODE" -eq 1 ] && [ -s "$MANIFEST_FILE" ]; then
+    # update mode: seed from the previous deploy so files we don't touch
+    # keep their entries (their baseline stays valid).
+    cp -a "$MANIFEST_FILE" "$MANIFEST_TMP"
+    info "manifest seeded from previous deploy ($(wc -l < "$MANIFEST_TMP") entries)"
+  fi
+}
+
+manifest_lookup() {
+  # manifest_lookup <dest> — prints the recorded sha256 for dest, or nothing
+  [ -s "$MANIFEST_TMP" ] 2>/dev/null || return 0
+  awk -F'\t' -v d="$1" '$4 == d {print $1}' "$MANIFEST_TMP" | tail -n 1
+}
+
+manifest_record() {
+  # manifest_record <src> <relpath> <dest> <mode>
+  local src="$1" rel="$2" dest="$3" mode="$4"
+  local sha
+  sha="$(sha256sum "$src" | cut -d' ' -f1)"
+  # one line per dest: drop any stale entry first, then append
+  if [ -s "$MANIFEST_TMP" ]; then
+    awk -F'\t' -v d="$dest" '$4 != d' "$MANIFEST_TMP" > "$MANIFEST_TMP.new"
+    mv "$MANIFEST_TMP.new" "$MANIFEST_TMP"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\n' "$sha" "$NAVI_VERSION" "$rel" "$dest" "$mode" >> "$MANIFEST_TMP"
+}
+
+manifest_write() {
+  step "writing deploy manifest"
+  $DOAS mkdir -p "$MANIFEST_DIR"
+  $DOAS install -m 644 "$MANIFEST_TMP" "$MANIFEST_FILE"
+  ok "manifest -> $MANIFEST_FILE ($(wc -l < "$MANIFEST_TMP") files)"
+  rm -f "$MANIFEST_TMP"
+  MANIFEST_TMP=""
+}
+
 deploy_config() {
   # deploy_config <repo-relpath> <dest> [mode]
   # destinations outside $HOME (e.g. /etc/lynx.cfg) are deployed with $DOAS,
@@ -438,9 +502,32 @@ deploy_config() {
     "$HOME"/*) ;;
     *) elevate="$DOAS" ;;
   esac
+  if [ "$NAVI_UPDATE_MODE" -eq 1 ] && [ -e "$dest" ]; then
+    # update mode: never overwrite a config the user has touched. the
+    # manifest holds the checksum of the navi default we last deployed —
+    # if the live file still matches it, the file is untouched and takes
+    # the new default. if it differs, the user customized it: leave it
+    # alone and say so.
+    local baseline live_sha
+    baseline="$(manifest_lookup "$dest")"
+    if [ -n "$baseline" ]; then
+      # a failed read compares unequal -> treated as modified -> kept.
+      # failing toward keeping the user's file is the safe direction.
+      live_sha="$($elevate sha256sum "$dest" 2>/dev/null | cut -d' ' -f1 || true)"
+      if [ "$live_sha" != "$baseline" ]; then
+        info "kept your modified ${dest#$HOME/} (new defaults: navi-wired-restore --diff)"
+        return 0
+      fi
+    else
+      # pre-manifest install: no baseline to compare against. the backup
+      # below is the safety net — differing files are stashed, never lost.
+      info "no manifest baseline for ${dest#$HOME/} — deploying (backup first)"
+    fi
+  fi
   $elevate mkdir -p "$(dirname "$dest")"
   backup_if_changed "$src" "$dest"
   $elevate install -m "$mode" "$src" "$dest"
+  manifest_record "$src" "$rel" "$dest" "$mode"
   ok "${dest#$HOME/} deployed"
 }
 
@@ -544,6 +631,19 @@ install_commands() {
   install_bin "navi-Q.sh"           "navi-Q"
   install_bin "navi-Qx.sh"          "navi-Qx"
   install_bin "navi-webapp.sh"      "navi-webapp"
+  install_bin "navi-notifs.sh"       "navi-notifs"
+
+  # distro-level tools live in scripts/ (repo root), outside the /wired
+  # desktop layer — same /usr/bin destination, same rofi visibility.
+  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore"; do
+    local src="$REPO_DIR/scripts/${pair%%:*}" name="${pair##*:}"
+    if [ -e "$src" ]; then
+      $DOAS install -m 0755 "$src" "/usr/bin/$name"
+      ok "$name"
+    else
+      warn "missing script: scripts/${pair%%:*} — skipping"
+    fi
+  done
 
   # remoji reads emojis.txt via $emojidir; point it at the share dir instead
   if grep -q '$HOME/wiredWM/scripts-config/remoji' /usr/bin/remoji 2>/dev/null; then
@@ -813,6 +913,16 @@ install_identity() {
   $DOAS install -m 644 "$WIRED_DIR/identity/issue.net"   /etc/issue.net
   $DOAS install -m 644 "$WIRED_DIR/VERSION" /usr/share/navi/VERSION
   ok "/etc/os-release now reports navi"
+  # release channel + version: navi-update reads these to decide what
+  # "newer" means. never clobber an existing channel — the user may have
+  # opted into a different one (e.g. eiri).
+  $DOAS mkdir -p /etc/navi
+  if [ ! -f /etc/navi/channel ]; then
+    echo "stable" | $DOAS tee /etc/navi/channel >/dev/null
+    ok "release channel: stable"
+  fi
+  $DOAS install -m 644 "$WIRED_DIR/VERSION" /etc/navi/version
+  ok "/etc/navi/version stamped ($NAVI_VERSION)"
   deploy_config "fastfetch/config.jsonc" "$HOME/.config/fastfetch/config.jsonc"
   ok "fastfetch carries the navi logo"
 }
@@ -844,11 +954,42 @@ EOF
 main() {
   for a in "$@"; do
     case "$a" in
-      --yes)  ASSUME_YES=1 ;;
+      --yes)         ASSUME_YES=1 ;;
+      --deploy-only) DEPLOY_ONLY=1 ;;
       --help) usage ;;
       *) echo "unknown option: $a (try --help)"; exit 1 ;;
     esac
   done
+
+  # --deploy-only: refresh an installed machine to this repo's state.
+  # structurally incapable of provisioning: no confirm prompt, no user
+  # creation, no LUKS handling. navi-update shells out to this mode, and
+  # every setup step below is idempotent (guard-before-write) by design.
+  if [ "$DEPLOY_ONLY" -eq 1 ]; then
+    NAVI_UPDATE_MODE=1
+    preflight
+    install_packages
+    build_mpvpaper
+    deploy_share
+    manifest_begin
+    deploy_configs
+    install_identity
+    manifest_write
+    install_commands
+    setup_doas
+    setup_agents
+    setup_environment
+    setup_flatpak
+    setup_gtk_theme
+    setup_dirs
+    setup_sddm
+    setup_chromium
+    setup_fonts
+    run_app_installers
+    setup_webapps
+    ok "deploy-only refresh complete (navi $NAVI_VERSION)"
+    exit 0
+  fi
 
   banner
   if ! confirm "install the navi wired desktop on this machine?"; then
@@ -860,8 +1001,10 @@ main() {
   install_packages
   build_mpvpaper
   deploy_share
+  manifest_begin
   deploy_configs
   install_identity
+  manifest_write
   install_commands
   setup_doas
   setup_agents

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-wired-restore
+Comment=Restore the wired desktop to navi's defaults (backs up first)
+Exec=navi-wired-restore
+Icon=system-restore
+Terminal=true
+Categories=System;Settings;
+NoDisplay=false
