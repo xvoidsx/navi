@@ -6,6 +6,7 @@
 #   packages -> /usr/share/navi/wired (the iron structure) -> ~/.config/*
 #   commands -> /usr/bin + /usr/share/applications (rofi-visible)
 #   agent runtime: ollama, opencode, omp, goose -> /usr/bin
+#   editor: NaviVim (default terminal IDE) -> /usr/local + /etc/skel
 #   doas, flatpak/flathub, wallpapers, first-boot behavior
 #
 # Idempotent: safe to re-run. Existing configs are backed up, never clobbered.
@@ -86,6 +87,10 @@ PKGS=(
   # python3 dev conveniences, pandora radio, firewall (+ graphical frontend),
   # node runtime, graphical sftp/ssh file transfer.
   zip unzip bzip2 lolcat python-dev-is-python3 pianobar ufw gufw nodejs npm filezilla imv
+  # NaviVim (default terminal IDE): telescope needs ripgrep + fd
+  # (Debian calls it fd-find), treesitter parsers and fzf-native compile
+  # at first launch (build-essential), shellcheck for config linting.
+  ripgrep fd-find shellcheck build-essential
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -402,6 +407,122 @@ setup_agents() {
       warn "herdr install failed — skipping (re-run install.sh --yes later)"
     fi
     rm -f "$herdr_tmp"
+  fi
+}
+
+# ---------------------------------------------------------------- NaviVim
+
+# NaviVim is navi's default terminal IDE (xvoidsx/navivim): Neovim 0.11+
+# from the upstream tarball (Debian stable's 0.10 is too old) plus Raven's
+# hand-rolled config. Installed through NaviVim's own install.sh --system,
+# which lands the binary in /usr/local, seeds /etc/skel for future users,
+# and registers editor/vi alternatives + EDITOR/VISUAL in /etc/profile.d.
+#
+# Source resolution, in order:
+#   1. $REPO_DIR/navivim — staged on the ISO by iso/stage.sh at a pinned
+#      commit (== /opt/navi-iso/navivim on the live system).
+#   2. /opt/navi-iso/navivim — the installer copies the ISO payload onto
+#      the installed system, so navi-update --deploy-only finds it here.
+#   3. fresh clone of xvoidsx/navivim at the pinned commit (network) —
+#      never floats on navivim's main.
+# The neovim release is pinned too: never float on the moving `stable`
+# tag in a shipped ISO (same rule as goose's GOOSE_VERSION).
+NAVIVIM_PIN="82440c2a21086c26c5e3b029acc52a95d9bd460d"
+NAVIVIM_NVIM_VERSION="v0.12.5"
+
+setup_navivim() {
+  step "NaviVim (default terminal IDE)"
+
+  local nvim_dir="" cand
+  for cand in "$REPO_DIR/navivim" "/opt/navi-iso/navivim"; do
+    if [ -x "$cand/install.sh" ]; then nvim_dir="$cand"; break; fi
+  done
+  if [ -z "$nvim_dir" ]; then
+    if ! host_up https://github.com; then
+      warn "github unreachable and no staged NaviVim copy — skipping (re-run install.sh --yes later)"
+      return 0
+    fi
+    nvim_dir="$(mktemp -d)/navivim"
+    info "cloning NaviVim at pinned commit ${NAVIVIM_PIN:0:12}..."
+    if ! git clone -q https://github.com/xvoidsx/navivim.git "$nvim_dir" 2>/dev/null \
+        || ! git -C "$nvim_dir" checkout -q "$NAVIVIM_PIN" 2>/dev/null \
+        || [ ! -x "$nvim_dir/install.sh" ]; then
+      warn "NaviVim clone failed — skipping (re-run install.sh --yes later)"
+      return 0
+    fi
+    ok "NaviVim ${NAVIVIM_PIN:0:12} cloned"
+  else
+    info "NaviVim source: $nvim_dir"
+  fi
+
+  # neovim binary: skip the (re)install when the pinned version is already
+  # in place — makes navi-update cheap and offline-safe.
+  local skip_nvim=0 tarball="" skip_plugins=0 have_ver tarball_arch=""
+  if [ -x /usr/local/bin/nvim ]; then
+    have_ver="$(/usr/local/bin/nvim --version 2>/dev/null | head -n 1 | grep -o 'v[0-9.]*' | head -n 1 || true)"
+    if [ "$have_ver" = "$NAVIVIM_NVIM_VERSION" ]; then
+      skip_nvim=1
+      info "neovim $have_ver already installed — skipping binary install"
+    fi
+  fi
+  # staged tarball (iso/stage.sh): arch-qualified, so a retained ISO
+  # payload can never feed the wrong arch to a different machine.
+  case "$(uname -m)" in
+    x86_64)        tarball_arch="x86_64" ;;
+    aarch64|arm64) tarball_arch="arm64" ;;
+  esac
+  if [ -n "$tarball_arch" ] && [ -f "$nvim_dir/nvim-linux-${tarball_arch}.tar.gz" ]; then
+    tarball="$nvim_dir/nvim-linux-${tarball_arch}.tar.gz"
+    info "using staged neovim tarball"
+  fi
+  if [ "$skip_nvim" -eq 0 ] && [ -z "$tarball" ] && ! host_up https://github.com/neovim/neovim; then
+    warn "neovim release unreachable and no staged tarball — skipping NaviVim (re-run install.sh --yes later)"
+    return 0
+  fi
+  if ! host_up https://github.com; then
+    skip_plugins=1
+    warn "offline: skipping the plugin smoke test — first nvim launch syncs plugins"
+  fi
+
+  # --system needs root; --no-apt because navi owns the package list
+  # (ripgrep, fd-find, shellcheck, build-essential are in PKGS). env(1)
+  # carries the knobs through doas/sudo, which would otherwise strip them.
+  info "installing NaviVim (neovim $NAVIVIM_NVIM_VERSION)..."
+  local env_args="NVIM_VERSION=$NAVIVIM_NVIM_VERSION NAVIVIM_SKIP_NVIM=$skip_nvim NAVIVIM_SKIP_PLUGINS=$skip_plugins"
+  [ -n "$tarball" ] && env_args="$env_args NVIM_TARBALL=$tarball"
+  # shellcheck disable=SC2086
+  if $DOAS env $env_args \
+      timeout -k 30 600 bash "$nvim_dir/install.sh" --system --no-apt </dev/null; then
+    ok "NaviVim installed"
+  else
+    warn "NaviVim install failed — skipping (re-run install.sh --yes later)"
+    return 0
+  fi
+
+  # the tarball ships its own nvim.desktop ("Neovim"); navi's launcher
+  # entry is branded NaviVim (wired/applications/navi-nvim.desktop, shipped
+  # below by install_commands) — drop the upstream duplicate so rofi shows
+  # exactly one.
+  if [ -f /usr/local/share/applications/nvim.desktop ]; then
+    $DOAS rm -f /usr/local/share/applications/nvim.desktop
+    info "upstream nvim.desktop removed (navi-nvim.desktop is the launcher entry)"
+  fi
+
+  # --system seeds /etc/skel (future users). seed the invoking user too —
+  # but never touch an existing config; customized setups are sacred.
+  if [ -e "$HOME/.config/nvim" ] || [ -L "$HOME/.config/nvim" ]; then
+    info "~/.config/nvim already exists — left alone"
+  elif [ -d /etc/skel/.config/nvim ]; then
+    mkdir -p "$HOME/.config"
+    cp -a /etc/skel/.config/nvim "$HOME/.config/nvim"
+    ok "~/.config/nvim seeded from NaviVim"
+  else
+    warn "/etc/skel/.config/nvim missing — NaviVim system install did not seed it"
+  fi
+  if [ ! -f "$HOME/.config/omaterm/nvim.theme" ]; then
+    mkdir -p "$HOME/.config/omaterm"
+    echo "nightshadeNeon" > "$HOME/.config/omaterm/nvim.theme"
+    ok "NaviVim theme default: nightshadeNeon"
   fi
 }
 
@@ -1108,6 +1229,7 @@ main() {
     setup_doas
     setup_sudo
     setup_agents
+    setup_navivim
     setup_environment
     setup_flatpak
     setup_flatpak_polkit
@@ -1140,6 +1262,7 @@ main() {
   setup_doas
   setup_sudo
   setup_agents
+  setup_navivim
   setup_environment
   setup_flatpak
   setup_flatpak_polkit

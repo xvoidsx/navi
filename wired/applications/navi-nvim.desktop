@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=NaviVim
+Comment=NaviVim — navi's terminal IDE (Neovim)
+Exec=nvim %F
+Terminal=true
+Icon=nvim
+Categories=Development;TextEditor;
+NoDisplay=false
