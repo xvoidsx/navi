@@ -3,9 +3,9 @@
 
 ###### welcome to the wired
 
-> **navi 1.3 "mika" is stable and available now.**
+> **navi 1.4.3 "mika" is stable and available now.**
 >
-> Download it from the [Releases](https://github.com/xvoidsx/navi/releases/tag/v1.3-mika) page: `navi-1.3-mika.iso` plus `SHA256SUMS.txt` so you can verify your download. Boots on legacy BIOS and UEFI, x86_64.
+> Download it from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page: `navi-1.4.3-mika.iso` plus `SHA256SUMS.txt` so you can verify your download. Boots on legacy BIOS and UEFI, x86_64.
 
 **navi** is a new GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx).
 
@@ -55,10 +55,10 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 ### notes
 
-**navi 1.3 "mika"** is the current stable release. If you're new, grab the ISO from the [Releases](https://github.com/xvoidsx/navi/releases/tag/v1.3-mika) page and give it a spin in a VM or on a spare machine — it was validated on hardware as old as a 2015 Acer Cloudbook, so it'll run just about anywhere.
+**navi 1.4.3 "mika"** is the current stable release. If you're new, grab the ISO from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page and give it a spin in a VM or on a spare machine — it was validated on hardware as old as a 2015 Acer Cloudbook, so it'll run just about anywhere.
 
 Documentation lives in the built-in manual: press `Super+Shift+H` anywhere in **navi** to open it, or browse the `wired/manual` folder in this repo.
 
 Found a bug or have an idea? Open an issue in this repo's [issue tracker](https://github.com/xvoidsx/navi/issues) — that's where we track everything.
 
-What's next: small maintenance releases on the 1.3 line, then **navi 2 "eiri"** — the coherence release.
+What's next: small maintenance releases on the 1.4 line, then **navi 2 "eiri"** — the coherence release.

@@ -44,6 +44,19 @@ name: navi ISO (1.4.3 "mika")
 # history as plain strings; real `dunstctl history` is busctl JSON where
 # every D-Bus variant arrives wrapped as {"type": "<sig>", "data": <value>}.
 # caught on the Cloudbook, fixed in 1.4.3):
+#
+# POST-RELEASE (after the tag + publish-stable.yml succeed — the site goes
+# stale silently too, and 1.4.2 proved it):
+#   - xvoidsx/enter-the-wired (local copy ~/workspace/navi-site): bump
+#     version strings in index.html + roadmap.html, add a news.html entry
+#     at the top of the feed; keep download buttons pointed at
+#     github.com/xvoidsx/navi/releases/latest so they never pin to an old
+#     tag. Fetch each file's remote version first and diff — the local
+#     copy can lag (it lost the 1.4.2 news entry once, caught pre-push).
+#     Push with gh-push-mika --repo xvoidsx/enter-the-wired --branch main
+#     --root ~/workspace/navi-site, passing the changed files explicitly.
+#   - navi repo README.md: bump any human-facing version strings (check
+#     with grep, same as the installer banner).
 env:
   RELEASE: 1.4.3
   ISO_BASENAME: navi-1.4.3-mika
