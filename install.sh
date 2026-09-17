@@ -63,8 +63,9 @@ PKGS=(
   # hardware, so shipping them all is safe.
   firmware-realtek firmware-iwlwifi firmware-atheros firmware-brcm80211 firmware-mediatek
   # small system utilities we love (2026-09-13): archives, rainbow cat,
-  # python3 dev conveniences, pandora radio, firewall, node runtime.
-  zip unzip bzip2 lolcat python-dev-is-python3 pianobar ufw nodejs npm
+  # python3 dev conveniences, pandora radio, firewall (+ graphical frontend),
+  # node runtime, graphical sftp/ssh file transfer.
+  zip unzip bzip2 lolcat python-dev-is-python3 pianobar ufw gufw nodejs npm filezilla
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -94,7 +95,7 @@ banner() {
 
    ✦  W E L C O M E   T O   T H E   W I R E D  ✦
 
-       n a v i   1 . 2  " m i k a "
+       n a v i   1 . 3  " m i k a "
 
        ナビ — everybody has already entered the wired
 

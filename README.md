@@ -45,9 +45,9 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 ###### navi radio, tuned to the desktop
 
-<img width="1280" height="719" alt="fastfetch showing navi 1.2 mika on a 2015 Acer Aspire Cloudbook" src="screenshots/fastfetch-cloudbook.png" />
+<img width="1280" height="719" alt="fastfetch showing navi 1.3 mika on a 2015 Acer Aspire Cloudbook" src="screenshots/fastfetch-cloudbook.png" />
 
-###### proven on old iron — **navi** 1.2 on a 2015 Acer Cloudbook
+###### proven on old iron — **navi** 1.3 on a 2015 Acer Cloudbook
 
 <img width="1366" height="768" alt="cmus and cava on the navi desktop" src="screenshots/music-desktop.png" />
 

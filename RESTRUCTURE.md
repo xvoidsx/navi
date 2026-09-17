@@ -96,7 +96,7 @@ New: `wired/applications/*.desktop` (7 rofi launchers for the navi commands).
 ## Identity set (2026-09-10)
 
 - `wired/identity/os-release` → `/etc/os-release` (ID=navi, ID_LIKE=debian,
-  VERSION_ID=1.2, codename mika) — fastfetch and friends pick up "navi"
+  VERSION_ID=1.3, codename mika) — fastfetch and friends pick up "navi"
 - `wired/identity/lsb-release` → `/etc/lsb-release`
 - `wired/identity/issue`, `issue.net` → `/etc/issue{,.net}` — TTY login banner
 - `wired/VERSION` → `/usr/share/navi/VERSION` — the release stamp
@@ -111,8 +111,8 @@ New: `wired/applications/*.desktop` (7 rofi launchers for the navi commands).
 
 ## Versioning
 
-- Current release: **navi 1.2 "mika"**. Tag `v1.2-mika` goes on the shared
-  repo when the draft lands, so future work can split by version.
+- Current release: **navi 1.3 "mika"**. Tag `v1.3-mika` is on the shared
+  repo, so future work can split by version.
 
 ## Login screen (2026-09-10)
 

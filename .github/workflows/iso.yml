@@ -1,4 +1,4 @@
-# navi ISO builder (Mika RC21).
+# navi ISO builder (1.3 "mika" stable).
 #
 # Builds the installer ISO inside a privileged debian:trixie container and
 # uploads it as a workflow artifact. These builds are heavy (debootstrap +
@@ -6,30 +6,30 @@
 # changes only.
 #
 # NOTE on triggers: GitHub only registers workflows it sees on the default
-# branch, and mika is unmerged by design — so `workflow_dispatch` cannot
-# start a run until this lands on main. The push trigger below is what runs
-# RC builds in the meantime; dispatch takes over after the merge.
+# branch. `main` is the default branch (mika merged for the 1.3 release),
+# so `workflow_dispatch` works from the Actions tab and the push trigger
+# below runs builds on ISO-relevant changes.
 #
 # The container route (instead of ubuntu-latest + sudo) keeps the whole
 # build on real Debian tooling: live-build, debootstrap, and friends from
 # trixie itself.
 
-name: navi ISO (Mika RC21)
+name: navi ISO (1.3 "mika")
 
 # === RELEASE CHECKLIST ===
-# Bump BOTH values below for every new RC. Everything downstream derives
+# Bump BOTH values below for every new release. Everything downstream derives
 # the image name, volume label, and artifact name from them.
 # Forgetting this ships a misnamed artifact and breaks the publish workflow
 # (this bit us on RC19: the build produced navi-1.2-mika-RC18.iso while
 # publish-rc19.yml looked for the RC19 name — fixed going forward).
 env:
-  RC_LABEL: RC21
-  ISO_BASENAME: navi-1.2-mika-RC21
+  RELEASE: 1.3
+  ISO_BASENAME: navi-1.3-mika
 
 on:
   workflow_dispatch:
   push:
-    branches: [mika]
+    branches: [main]
     paths:
       - 'iso/**'
       - 'install.sh'
@@ -48,14 +48,14 @@ jobs:
     steps:
       # NOTE: actions/checkout needs node, which debian:trixie-slim lacks,
       # so the repo is cloned with plain git instead.
-      - name: Clone navi (mika)
+      - name: Clone navi (main)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates
-          git clone --depth 1 --branch mika \
+          git clone --depth 1 --branch main \
             "https://x-access-token:${GH_TOKEN}@github.com/xvoidsx/navi.git" src
           cd src && git rev-parse --short HEAD
 
@@ -89,7 +89,7 @@ jobs:
             --memtest none \
             --iso-application "navi" \
             --iso-publisher "xvoidsx" \
-            --iso-volume "navi 1.2 mika $RC_LABEL" \
+            --iso-volume "navi 1.3 mika" \
             --image-name "$ISO_BASENAME"
           lb build
 
