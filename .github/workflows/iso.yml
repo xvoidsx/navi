@@ -1,4 +1,4 @@
-# navi ISO builder (1.3 "mika" stable).
+# navi ISO builder (1.4 "mika" stable).
 #
 # Builds the installer ISO inside a privileged debian:trixie container and
 # uploads it as a workflow artifact. These builds are heavy (debootstrap +
@@ -14,7 +14,7 @@
 # build on real Debian tooling: live-build, debootstrap, and friends from
 # trixie itself.
 
-name: navi ISO (1.3 "mika")
+name: navi ISO (1.4 "mika")
 
 # === RELEASE CHECKLIST ===
 # Bump BOTH values below for every new release. Everything downstream derives
@@ -23,8 +23,8 @@ name: navi ISO (1.3 "mika")
 # (this bit us on RC19: the build produced navi-1.2-mika-RC18.iso while
 # publish-rc19.yml looked for the RC19 name — fixed going forward).
 env:
-  RELEASE: 1.3
-  ISO_BASENAME: navi-1.3-mika
+  RELEASE: 1.4
+  ISO_BASENAME: navi-1.4-mika
 
 on:
   workflow_dispatch:
@@ -89,7 +89,7 @@ jobs:
             --memtest none \
             --iso-application "navi" \
             --iso-publisher "xvoidsx" \
-            --iso-volume "navi 1.3 mika" \
+            --iso-volume "navi 1.4 mika" \
             --image-name "$ISO_BASENAME"
           lb build
 
