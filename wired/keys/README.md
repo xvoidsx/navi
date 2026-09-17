@@ -1,5 +1,16 @@
 # xvoidsx release signing key — ceremony
 
+> **Status (2026-09-17): deferred to the eiri era.** Raven ran the
+> ceremony and the key exists (offline master + signing subkey, backups
+> kept), but xvoidsx is deliberately not committing to a signing scheme
+> for the 1.x series — the ceremony has to fit how releases actually get
+> cut (multi-machine remote workflow), and that needs exploration first
+> (GPG vs SSH vs sigstore/keyless vs minisign vs something of our own —
+> "navicheck"?). Until then, `navi-update` pulls the channel with a loud
+> warning instead of verifying. The ceremony below is preserved for when
+> the decision lands; provisioning the key file + fingerprint flips the
+> updater back to fail-closed with no other code changes.
+
 `navi-update` only installs navi's files from a release tag whose
 signature verifies against the xvoidsx release key. No signature,
 no update — fail closed. This document is the ceremony for creating

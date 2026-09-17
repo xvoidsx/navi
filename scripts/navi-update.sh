@@ -33,7 +33,7 @@ KEY_FILE="/usr/share/navi/wired/keys/release.asc"
 # fingerprint of the xvoidsx release signing key. empty until Raven runs
 # the signing ceremony (see wired/keys/README.md) — with it empty the
 # navi layer refuses to update (fail closed).
-RELEASE_FINGERPRINT="977129E517EBD91B62E1530A9F8482C4352A5E32"
+RELEASE_FINGERPRINT=""   # empty until xvoidsx settles the signing story (eiri era)
 
 ASSUME_YES=0
 CHECK_ONLY=0
@@ -192,28 +192,40 @@ navi_layer() {
     case "${ans:-N}" in [Yy]*) ;; *) die "channel switch declined" ;; esac
   fi
 
-  # --- signature verification (non-negotiable, fail closed) ---
-  [ -f "$KEY_FILE" ] || die "no release key pinned at $KEY_FILE — refusing to update"
-  command -v gpg >/dev/null 2>&1 || die "gpg not found — cannot verify tag signatures"
-  if [ -z "$RELEASE_FINGERPRINT" ]; then
-    die "release key fingerprint not provisioned (wired/keys/README.md) — refusing to update"
+  # --- signature verification ---
+  # Two modes, chosen by whether a release key is provisioned:
+  #   key provisioned -> verify the tag signature, fail closed on any problem.
+  #   no key yet      -> warn LOUDLY and pull the channel unsigned.
+  # xvoidsx has deliberately deferred the signing decision to the eiri era
+  # (see wired/keys/README.md) rather than commit to a ceremony that doesn't
+  # fit how releases actually get cut. An honest unsigned pull beats a
+  # performative signature. When the decision lands, provisioning the key
+  # file + fingerprint flips this back to fail-closed with no other changes.
+  if [ -f "$KEY_FILE" ] && [ -n "$RELEASE_FINGERPRINT" ]; then
+    command -v gpg >/dev/null 2>&1 || die "gpg not found — cannot verify tag signatures"
+    local gh
+    gh="$(mktemp -d)"
+    trap 'rm -rf "$gh"' RETURN
+    export GNUPGHOME="$gh"
+    gpg --batch --quiet --import "$KEY_FILE" 2>/dev/null \
+      || die "could not import release key"
+    local got_fp
+    got_fp="$(gpg --batch --with-colons --fingerprint 2>/dev/null | awk -F: '/^fpr:/ {print $10; exit}')"
+    [ "$got_fp" = "$RELEASE_FINGERPRINT" ] \
+      || die "pinned key fingerprint mismatch — refusing to update"
+    git -C "$UPSTREAM_DIR" fetch --depth 1 -q origin "tag" "$tag" 2>/dev/null \
+      || die "could not fetch tag $tag"
+    git -C "$UPSTREAM_DIR" verify-tag "$tag" >/dev/null 2>&1 \
+      || die "tag $tag FAILED signature verification — refusing to update"
+    ok "tag $tag signature verified"
+    unset GNUPGHOME
+  else
+    warn "release signing not configured — pulling $tag unsigned."
+    warn "xvoidsx will settle the signing story in the eiri era;"
+    warn "until then, this trusts the channel (TLS + GitHub access control)."
+    git -C "$UPSTREAM_DIR" fetch --depth 1 -q origin "tag" "$tag" 2>/dev/null \
+      || die "could not fetch tag $tag"
   fi
-  local gh
-  gh="$(mktemp -d)"
-  trap 'rm -rf "$gh"' RETURN
-  export GNUPGHOME="$gh"
-  gpg --batch --quiet --import "$KEY_FILE" 2>/dev/null \
-    || die "could not import release key"
-  local got_fp
-  got_fp="$(gpg --batch --with-colons --fingerprint 2>/dev/null | awk -F: '/^fpr:/ {print $10; exit}')"
-  [ "$got_fp" = "$RELEASE_FINGERPRINT" ] \
-    || die "pinned key fingerprint mismatch — refusing to update"
-  git -C "$UPSTREAM_DIR" fetch --depth 1 -q origin "tag" "$tag" 2>/dev/null \
-    || die "could not fetch tag $tag"
-  git -C "$UPSTREAM_DIR" verify-tag "$tag" >/dev/null 2>&1 \
-    || die "tag $tag FAILED signature verification — refusing to update"
-  ok "tag $tag signature verified"
-  unset GNUPGHOME
   trap - RETURN
 
   git -C "$UPSTREAM_DIR" checkout -q "$tag" \
