@@ -173,7 +173,7 @@ _ui_draw() {
   _t0=$(cat "$UI_DIR/t0" 2>/dev/null || echo 0)
   _now=$(date +%s)
   if [ "$_t0" -gt 0 ]; then _el="  ${N_DIM}T+$(fmt_dur $(( _now - _t0 )))"; else _el=""; fi
-  printf '%s%s\n' "${N_CYAN}         1.3 \"mika\"${_el}${N_OFF}" "$el"
+  printf '%s%s\n' "${N_CYAN}         1.4.2 \"mika\"${_el}${N_OFF}" "$el"
   printf '  %s %s%3d%%%s%s\n' \
     "$(_ui_bar "$n" "$PHASE_TOTAL" 30)" "$N_DIM" "$(( n * 100 / PHASE_TOTAL ))" "$N_OFF" "$el"
   # phase changes shimmer: the phase line flashes green for a few seconds,
@@ -1028,7 +1028,7 @@ ${N_MAGENTA}                       ∅${N_OFF}
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.3 "mika" is installed.                           ║
+  ║   ✓  navi 1.4.2 "mika" is installed.                         ║
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase (twice:           ║

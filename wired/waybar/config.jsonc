@@ -184,7 +184,7 @@
         "escape": true,
         "interval": 10,
         "exec": "/usr/share/navi/wired/waybar/notif-bell.sh",
-        "on-click": "alacritty -e navi-notifs",
+        "on-click": "alacritty --title \"navi-notifs\" -e navi-notifs",
         "tooltip": true
     },
     "custom/power": {

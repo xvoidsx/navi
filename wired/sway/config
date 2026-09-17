@@ -55,6 +55,9 @@ seat * xcursor_theme Adwaita
 # make windows float or tile by default.
 #for_window [class="[.]*"] floating enable
 
+# navi-notifs floats — it's a quick viewer, not a workspace resident.
+for_window [title="navi-notifs"] floating enable
+
 # - - for window title bars - -
 for_window [class="^.*"] border pixel 2
 

@@ -11,6 +11,11 @@
 
 set -uo pipefail
 
+# neon palette — nightshadeNeon, terminal edition
+N_PINK=$'\033[38;5;201m'
+N_GREEN=$'\033[92m'
+N_OFF=$'\033[0m'
+
 HIST_JSON=""
 
 fetch_history() {
@@ -23,21 +28,25 @@ import json, sys, textwrap
 try:
     d = json.loads(sys.argv[1])
 except Exception:
-    print("  (could not read dunst history)"); return
+    print("  (could not read dunst history)")
+    sys.exit()
 data = d.get("data", [])
 hist = data[0] if data else []
 if not hist:
     print("  all quiet — no notifications in history.")
-    return
+    sys.exit()
 for n, h in enumerate(hist):
     app = h.get("appname", "?") or "?"
     summary = (h.get("summary", "") or "").strip().replace("\n", " ")
     body = (h.get("body", "") or "").strip().replace("\n", " ")
     actions = h.get("actions", {}) or {}
     acts = (", actions: " + ", ".join(actions.values())) if actions else ""
-    line = f"  [{n}] {app}: {summary}"
+    # NOTE: no backslashes inside f-string expressions — python < 3.12
+    # chokes on them (SyntaxError: unexpected character after line
+    # continuation character). build the line with concatenation instead.
+    line = "  [" + str(n) + "] " + app + ": " + summary
     if body:
-        line += f" — {textwrap.shorten(body, width=72, placeholder=\"…\")}"
+        line = line + " — " + textwrap.shorten(body, width=72, placeholder="…")
     print(line + acts)
 ' "$HIST_JSON"
 }
@@ -98,10 +107,10 @@ main() {
   while true; do
     fetch_history
     echo
-    echo "  ── notifications ─────────────────────────────"
+    printf '  ── %snotifications%s ─────────────────────────────\n' "$N_PINK" "$N_OFF"
     list_notifs
     echo "  ─────────────────────────────────────────────"
-    echo "  <number> open action · d<number> dismiss · c clear all · q quit"
+    printf '  %s<number> open action · d<number> dismiss · c clear all · q quit%s\n' "$N_GREEN" "$N_OFF"
     read -r -p "  > " cmd
     case "$cmd" in
       q|Q) break ;;
