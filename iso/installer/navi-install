@@ -261,7 +261,8 @@ preflight() {
   done
 
   [ -f "$ISO_ROOT/install.sh" ] && [ -d "$ISO_ROOT/wired" ] \
-    || die "$ISO_ROOT is missing install.sh/wired (broken installer ISO)."
+    && [ -d "$ISO_ROOT/scripts" ] \
+    || die "$ISO_ROOT is missing install.sh/wired/scripts (broken installer ISO)."
 
   ok "preflight: root, $BOOT_MODE boot, tools, navi payload"
 }

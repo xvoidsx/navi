@@ -27,8 +27,15 @@ name: navi ISO (1.4.2 "mika")
 # from the values below and go stale silently (1.4 shipped an installer that
 # still said 1.3; caught on the Cloudbook, fixed in 1.4.2):
 #   - wired/VERSION                     (install.sh reads this; single source of truth)
+#   - wired/identity/*                    (os-release, lsb-release, issue, issue.net —
+#                                        install.sh now re-stamps these from wired/VERSION
+#                                        at deploy time, but keep the repo copies right too)
 #   - iso/installer/navi-install        (banner line + "is installed" box — keep the
 #                                        box-drawing padding aligned after the bump)
+#   - iso/stage.sh payload              (install.sh, wired/, scripts/, iso/installer —
+#                                        scripts/ holds navi-update + navi-wired-restore;
+#                                        leaving it out silently drops them from fresh
+#                                        installs, caught on the Cloudbook in 1.4)
 #   - iso/README.md                     (pipeline doc header)
 #   - the workflow name/comment/volume label in this file
 env:

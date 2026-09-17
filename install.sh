@@ -940,7 +940,26 @@ install_identity() {
   $DOAS install -m 644 "$WIRED_DIR/identity/issue"       /etc/issue
   $DOAS install -m 644 "$WIRED_DIR/identity/issue.net"   /etc/issue.net
   $DOAS install -m 644 "$WIRED_DIR/VERSION" /usr/share/navi/VERSION
-  ok "/etc/os-release now reports navi"
+  # stamp the human-facing version from wired/VERSION (the single source of
+  # truth) so the identity files can never ship a stale release number
+  # again — every deploy and every navi-update refreshes these.
+  local iver iname
+  iver="$(printf '%s' "$NAVI_VERSION" | awk '{print $1}')"
+  iname="$(printf '%s' "$NAVI_VERSION" | awk '{print $2}' | tr -d '"')"
+  $DOAS sed -i \
+    -e "s/^PRETTY_NAME=.*/PRETTY_NAME=\"navi $iver ($iname)\"/" \
+    -e "s/^VERSION_ID=.*/VERSION_ID=\"$iver\"/" \
+    -e "s/^VERSION=.*/VERSION=\"$iver ($iname)\"/" \
+    -e "s/^VERSION_CODENAME=.*/VERSION_CODENAME=$iname/" \
+    /etc/os-release
+  $DOAS sed -i \
+    -e "s/^DISTRIB_RELEASE=.*/DISTRIB_RELEASE=$iver/" \
+    -e "s/^DISTRIB_CODENAME=.*/DISTRIB_CODENAME=$iname/" \
+    -e "s/^DISTRIB_DESCRIPTION=.*/DISTRIB_DESCRIPTION=\"navi $iver ($iname)\"/" \
+    /etc/lsb-release
+  $DOAS sed -i -e "s/navi [0-9][0-9.]* \"[^\"]*\"/navi $iver \"$iname\"/" \
+    /etc/issue /etc/issue.net
+  ok "/etc/os-release stamped navi $iver ($iname)"
   # release channel + version: navi-update reads these to decide what
   # "newer" means. never clobber an existing channel — the user may have
   # opted into a different one (e.g. eiri).

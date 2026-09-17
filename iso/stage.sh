@@ -2,8 +2,8 @@
 # iso/stage.sh — stage the navi repo into a live-build tree.
 #
 # Copies the live-build configuration (iso/config) plus the navi
-# payload the installer needs (install.sh, wired/, iso/installer) into a
-# build directory, ready for `lb config <flags> && lb build`.
+# payload the installer needs (install.sh, wired/, scripts/,
+# iso/installer) into a build directory, ready for `lb config <flags> && lb build`.
 # (The flags live in .github/workflows/iso.yml — see the note there about
 # why there is no auto/config script.)
 #
@@ -18,7 +18,7 @@ HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REPO="$(CDPATH= cd -- "$HERE/.." && pwd)"
 BUILD="${1:-$HERE/build}"
 
-for f in "$REPO/install.sh" "$REPO/wired" "$REPO/iso/installer" "$HERE/config"; do
+for f in "$REPO/install.sh" "$REPO/wired" "$REPO/scripts" "$REPO/iso/installer" "$HERE/config"; do
   if [ ! -e "$f" ]; then
     echo "stage.sh: required path missing: $f" >&2
     exit 1
@@ -29,9 +29,12 @@ rm -rf "$BUILD"
 mkdir -p "$BUILD"
 cp -a "$HERE/config" "$BUILD/config"
 
-# the payload the ISO (and later the installed system) needs
+# the payload the ISO (and later the installed system) needs.
+# scripts/ holds the distro-level tools (navi-update, navi-wired-restore)
+# and the agent/app installers — install.sh deploys them from $REPO_DIR,
+# so leaving it out silently drops navi-update from fresh installs.
 mkdir -p "$BUILD/config/includes.chroot/opt/navi-iso"
-cp -a "$REPO/install.sh" "$REPO/wired" "$REPO/iso/installer" \
+cp -a "$REPO/install.sh" "$REPO/wired" "$REPO/scripts" "$REPO/iso/installer" \
   "$BUILD/config/includes.chroot/opt/navi-iso/"
 
 # live-build only runs hooks when they are executable —
