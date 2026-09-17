@@ -94,8 +94,13 @@ latest_tag() {
   printf '%s' "$t"
 }
 
-tag_version() { # v1.4-mika -> 1.4
-  printf '%s' "$1" | sed -E 's/^v([0-9]+\.[0-9]+).*/\1/'
+tag_version() { # v1.4-mika -> 1.4 ; v1.4.1-mika -> 1.4.1
+  printf '%s' "$1" | sed -E 's/^v([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/'
+}
+
+ver_newer() { # ver_newer A B: true (0) when A is strictly newer than B
+  [ "$1" = "$2" ] && return 1
+  [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ]
 }
 
 # ---------------------------------------------------------------- phase 1: preflight
@@ -179,8 +184,8 @@ navi_layer() {
     die "tag $tag is a new major version — opt in explicitly: navi-update --channel <name>"
   fi
 
-  if [ "$tver" = "$installed" ]; then
-    info "navi files already current ($tag)"
+  if ! ver_newer "$tver" "$installed"; then
+    info "navi files already current ($installed; latest tag: $tag)"
     PH_NAVI="current"
     return 0
   fi
@@ -302,7 +307,7 @@ check_updates() {
     tag="$(latest_tag "$major")"
     if [ -n "$tag" ]; then
       tver="$(tag_version "$tag")"
-      if [ "$tver" != "$installed" ]; then navi_new="1"; navi_ver="$tver"; fi
+      if ver_newer "$tver" "$installed"; then navi_new="1"; navi_ver="$tver"; fi
     fi
   fi
   # apt simulation needs no root; counts are only as fresh as the last update
@@ -317,17 +322,18 @@ check_updates() {
 # ---------------------------------------------------------------- main
 
 main() {
-  for a in "$@"; do
-    case "$a" in
-      --check)   CHECK_ONLY=1 ;;
-      --yes)     ASSUME_YES=1 ;;
-      --channel) shift; CHANNEL_OVERRIDE="${1:?--channel needs a name}"; shift ;;
-      --channel=*) CHANNEL_OVERRIDE="${a#--channel=}" ;;
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --check)   CHECK_ONLY=1; shift ;;
+      --yes)     ASSUME_YES=1; shift ;;
+      --channel)
+        [ -n "${2:-}" ] || die "--channel needs a name"
+        CHANNEL_OVERRIDE="$2"; shift 2 ;;
+      --channel=*) CHANNEL_OVERRIDE="${1#--channel=}"; shift ;;
       --help|-h)
         sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-      *) die "unknown option: $a (try --help)" ;;
+      *) die "unknown option: $1 (try --help)" ;;
     esac
-    shift
   done
 
   ensure_doas
