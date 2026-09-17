@@ -238,6 +238,9 @@ file limit so they can ship in the repo.)
 - **News archive convention:** the 3 newest posts stay full; older posts move
   into the "older signals" archive as `<details>` collapsibles. When adding
   a post, demote the 4th-newest.
+- This repo's `AGENTS.md` is mirrored to the website as `agents.html`. After
+  changing this file, re-run `build-agents-page.sh` in the site repo and push
+  — the repo copy stays the source of truth.
 - Footer creed: "open models, open web" — quiet, not shouty.
 
 ## House conventions
