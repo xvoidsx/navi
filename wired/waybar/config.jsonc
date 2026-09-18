@@ -82,7 +82,7 @@
         },
         "scroll-step": 5,
         "on-click": "pamixer -t",
-        "on-click-right": "pavucontrol"
+        "on-click-right": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-audio\" navi-audio"
     },
     // - - - XXX testing section XXX - - - 
     // this is a 'testing' network module. if it doesn't work out right, we'll remove it
@@ -92,7 +92,7 @@
             "format-disconnected": "⚠ Disconnected",
             "tooltip-format": "Wireless status -  {ifname}: {ipaddr}/{cidr}",
 	    "tooltip-format-wifi": "{essid}",
-            "on-click": "st -e nmtui",
+            "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-networking\" navi-networking",
             "interval": 30 
         },
     // this is a 'testing' audioplayer module. shows currently playing audio and is interactive.

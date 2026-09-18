@@ -526,6 +526,29 @@ setup_navivim() {
   fi
 }
 
+# ---------------------------------------------------------------- system: navi mods (eiri)
+# the Go/Bubble Tea panel mods — prebuilt binaries committed in the repo,
+# so the installed system never needs a Go toolchain. deployed to /usr/bin
+# like the other navi commands; waybar opens them floating via mod-open.sh.
+
+setup_mods() {
+  step "navi mods -> /usr/bin"
+
+  install_mod() { # <mod-dir> <binary>
+    local src="$REPO_DIR/mods/$1/$2"
+    if [ ! -e "$src" ]; then
+      warn "missing mod binary: mods/$1/$2 — skipping"
+      return 0
+    fi
+    $DOAS install -m 0755 "$src" "/usr/bin/$2"
+    ok "$2"
+  }
+
+  install_mod "navi-networking" "navi-networking"
+  install_mod "navi-calendar"   "navi-calendar"
+  install_mod "navi-audio"      "navi-audio"
+}
+
 # ---------------------------------------------------------------- deploy: /usr/share/navi
 
 deploy_share() {
@@ -1230,6 +1253,7 @@ main() {
     setup_sudo
     setup_agents
     setup_navivim
+    setup_mods
     setup_environment
     setup_flatpak
     setup_flatpak_polkit
@@ -1263,6 +1287,7 @@ main() {
   setup_sudo
   setup_agents
   setup_navivim
+  setup_mods
   setup_environment
   setup_flatpak
   setup_flatpak_polkit

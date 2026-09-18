@@ -262,7 +262,10 @@ preflight() {
 
   [ -f "$ISO_ROOT/install.sh" ] && [ -d "$ISO_ROOT/wired" ] \
     && [ -d "$ISO_ROOT/scripts" ] && [ -x "$ISO_ROOT/navivim/install.sh" ] \
-    || die "$ISO_ROOT is missing install.sh/wired/scripts/navivim (broken installer ISO)."
+    && [ -x "$ISO_ROOT/mods/navi-networking/navi-networking" ] \
+    && [ -x "$ISO_ROOT/mods/navi-calendar/navi-calendar" ] \
+    && [ -x "$ISO_ROOT/mods/navi-audio/navi-audio" ] \
+    || die "$ISO_ROOT is missing install.sh/wired/scripts/navivim/mods (broken installer ISO)."
 
   ok "preflight: root, $BOOT_MODE boot, tools, navi payload"
 }

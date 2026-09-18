@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-audio
+Comment=Audio control: playback, recording, devices, routing
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-audio" navi-audio
+Icon=audio-card
+Terminal=false
+Categories=System;Settings;Audio;
+NoDisplay=false

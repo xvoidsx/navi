@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-networking
+Comment=Network control: wifi, speed test, DNS, QR sharing
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-networking" navi-networking
+Icon=network-wireless
+Terminal=false
+Categories=System;Settings;Network;
+NoDisplay=false
