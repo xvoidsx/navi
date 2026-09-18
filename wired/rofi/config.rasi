@@ -1,12 +1,13 @@
 // wired nightshade launcher
-// this is the default launcher used to launch apps and run commands in wired.
+// this is the default launcher used to launch apps and run commands in navi.
+// beautiful and drenched in nightshadeNeon.
 // this file should live at ( $HOME/.config/rofi/config.rasi )
 configuration {
     modi: "combi";
     combi-modi: "window,drun,run";
-    font: "Noto Sans 12";	
+    font: "Noto Sans 12";
     show-icons: true;
-    icon-theme: "Papirus"; 	
+    icon-theme: "Papirus";
     display-window: "Windows";
     display-drun: "Apps";
     display-run: "Run";
@@ -18,90 +19,164 @@ configuration {
 }
 
 * {
-    background: #000000;
+    background: #000000e6;
+    background-solid: #000000;
     foreground: #ff10f0;
     accent: #ff10f0;
-    text-color: #39ff14;
+    neon-green: #39ff14;
+    neon-cyan: #00ffff;
+    neon-red: #ff3131;
+    neon-white: #ffffff;
+    text-color: #ff10f0;
     border-color: #ff10f0;
-    selected-background: #000000;
-    selected-foreground: #39ff14;  
+    selected-background: #2a0a28;
+    selected-foreground: #39ff14;
 }
 
 window {
     background-color: @background;
     border: 2;
     border-color: @border-color;
-    padding: 10;
-    width: 700px;
+    padding: 12;
+    width: 720px;
 }
 
 mainbox {
     background-color: @background;
-    border: 0;
-    padding: 0;
+    border: 1;
+    border-color: @neon-green;
+    padding: 8;
+    spacing: 8;
 }
 
 inputbar {
-    background-color: @background;
+    background-color: @background-solid;
     text-color: @foreground;
     border: 1;
     border-color: @border-color;
     padding: 8px;
+    spacing: 8px;
+}
+
+prompt {
+    background-color: @background-solid;
+    text-color: @foreground;
 }
 
 entry {
-    background-color: @background;
-    text-color: @foreground;
+    background-color: @background-solid;
+    text-color: @neon-white;
+    placeholder-color: #8a8a8a;
 }
 
 listview {
     background-color: @background;
     border: 0;
-    spacing: 0;  
-    scrollbar: true;
+    padding: 4px;
+    spacing: 2px;
+    scrollbar: false;
+    lines: 12;
+}
+
+scrollbar {
+    background-color: @background;
+    handle-color: @neon-green;
+    handle-width: 4px;
 }
 
 element {
     background-color: @background;
     text-color: @foreground;
-    padding: 0;  
-    border: 0;   
+    border: 1;
+    border-color: @background;
+    padding: 5px 10px;
 }
 
 element selected {
     background-color: @selected-background;
     text-color: @selected-foreground;
     border: 1;
-    border-color: #39ff14;
+    border-color: @neon-green;
 }
 
 element selected.normal {
     background-color: @selected-background;
     text-color: @selected-foreground;
+    border: 1;
+    border-color: @neon-green;
 }
 
 element selected.active {
     background-color: @selected-background;
-    text-color: @selected-foreground;  
+    text-color: @neon-cyan;
+    border: 1;
+    border-color: @neon-cyan;
 }
 
-element-text {
-    background-color: #000000;
-    text-color: inherit;
-    highlight: @accent;
+element selected.urgent {
+    background-color: @selected-background;
+    text-color: @neon-red;
+    border: 1;
+    border-color: @neon-red;
 }
 
 element normal {
-    background-color: #000000;
+    background-color: @background;
     text-color: @foreground;
+}
+
+element alternate.normal {
+    background-color: #0d0d0d;
+    text-color: @foreground;
+}
+
+element alternate.active {
+    background-color: #0d0d0d;
+    text-color: @neon-cyan;
+}
+
+element alternate.urgent {
+    background-color: #0d0d0d;
+    text-color: @neon-red;
 }
 
 element active {
-    background-color: #000000;
-    text-color: @foreground;
+    background-color: @background;
+    text-color: @neon-cyan;
 }
 
-element-icon {  
-    background-color: #000000;
-    padding: 0;  
+element urgent {
+    background-color: @background;
+    text-color: @neon-red;
+}
+
+element-text {
+    background-color: inherit;
+    text-color: inherit;
+    highlight: @neon-cyan;
+}
+
+element-icon {
+    background-color: inherit;
+    size: 22px;
+    padding: 0 8px 0 0;
+}
+
+message {
+    background-color: @background-solid;
+    border: 1;
+    border-color: @neon-red;
+    padding: 8px;
+}
+
+textbox {
+    background-color: @background-solid;
+    text-color: @neon-white;
+}
+
+button selected {
+    background-color: @selected-background;
+    text-color: @selected-foreground;
+    border: 1;
+    border-color: @neon-green;
 }
