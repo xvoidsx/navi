@@ -1,6 +1,7 @@
 package theme
 
 import (
+	"regexp"
 	"strings"
 	"time"
 
@@ -73,6 +74,60 @@ func Meter(width int, frac float64, fill, empty lipgloss.TerminalColor) string {
 	emptyStyle := lipgloss.NewStyle().Foreground(empty)
 	return fillStyle.Render(strings.Repeat("█", filled)) +
 		emptyStyle.Render(strings.Repeat("░", width-filled))
+}
+
+// Sparkline renders recent samples as a block-character sparkline —
+// ▁▂▃▄▅▆▇█ — normalized against the window max. Built for live
+// throughput graphs (speed tests) and audio level meters: push a sample
+// per tick, render the tail.
+func Sparkline(samples []float64, width int, color lipgloss.TerminalColor) string {
+	blocks := []rune("▁▂▃▄▅▆▇█")
+	if width < 1 || len(samples) == 0 {
+		return ""
+	}
+	if len(samples) > width {
+		samples = samples[len(samples)-width:]
+	}
+	max := 1e-9
+	for _, s := range samples {
+		if s > max {
+			max = s
+		}
+	}
+	var b strings.Builder
+	for _, s := range samples {
+		idx := int(s/max*7 + 0.5)
+		if idx < 0 {
+			idx = 0
+		}
+		if idx > 7 {
+			idx = 7
+		}
+		b.WriteRune(blocks[idx])
+	}
+	return lipgloss.NewStyle().Foreground(color).Render(b.String())
+}
+
+var ansiSeq = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// GlitchANSI applies Glitch to the visible text of a string that already
+// contains ANSI escape sequences, leaving the sequences themselves intact.
+// This is what makes full-frame transitions (screen changes) possible:
+// glitch the composed view without corrupting its colors.
+func GlitchANSI(s string, intensity float64) string {
+	if intensity <= 0 {
+		return s
+	}
+	parts := ansiSeq.Split(s, -1)
+	matches := ansiSeq.FindAllString(s, -1)
+	var b strings.Builder
+	for i, p := range parts {
+		b.WriteString(Glitch(p, intensity))
+		if i < len(matches) {
+			b.WriteString(matches[i])
+		}
+	}
+	return b.String()
 }
 
 // SpinnerFrames are the nightshadeNeon spinner cells, in order.

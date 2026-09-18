@@ -187,13 +187,13 @@ func (t Transmission) Update(msg tea.Msg) (Transmission, tea.Cmd) {
 		switch {
 		case x < 0.35:
 			t.mood = MoodStatic
-			t.Text = glitchify(mixed, 0.85)
+			t.Text = Glitch(mixed, 0.85)
 		case x < 0.7:
 			t.mood = MoodGlitch
 			t.Text = scrambleCase(mixed, 0.45)
 		default:
 			t.mood = MoodResolve
-			t.Text = glitchify(mixed, 0.18)
+			t.Text = Glitch(mixed, 0.18)
 		}
 		return t, txGlitchCmd()
 
@@ -214,7 +214,7 @@ func (t Transmission) Update(msg tea.Msg) (Transmission, tea.Cmd) {
 		// next flicker tick unless a real transition has started.
 		if txRand.Intn(3) == 0 {
 			t.mood = MoodGlitch
-			t.Text = scrambleCase(glitchify(t.Clean, 0.22), 0.3)
+			t.Text = scrambleCase(Glitch(t.Clean, 0.22), 0.3)
 		} else {
 			t.mood = MoodClean
 			t.Text = t.Clean
@@ -259,7 +259,10 @@ func txFlickerCmd() tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg { return TxFlickerMsg{} })
 }
 
-func glitchify(s string, intensity float64) string {
+// Glitch replaces non-space runes with block noise at the given intensity.
+// It is the shared static-burst primitive: transitions, screen changes,
+// and the transmission layer all dissolve through it.
+func Glitch(s string, intensity float64) string {
 	if intensity <= 0 {
 		return s
 	}
