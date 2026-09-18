@@ -1,0 +1,18 @@
+{
+  "voice": "af_heart",
+  "speed": 1.0,
+  "tts_engine": "piper",
+  "piper_voice": "voices/en_US-libritts_r-medium.onnx",
+  "piper_sample_rate": 22050,
+  "tts_variant": "full",
+  "lang": "en-us",
+  "stt_model": "tiny.en",
+  "stt_device": "cpu",
+  "stt_compute": "int8",
+  "sample_rate_tts": 24000,
+  "record_rate": 16000,
+  "record_channels": 1,
+  "tmp_dir": "${XDG_RUNTIME_DIR:-/tmp}/hey-lain (tmpfs, wiped immediately after STT)",
+  "overlay": "nightshadeNeon: pink #ff10f0, green #39ff14, cyan #00ffff, white #ffffff on black #000000",
+  "notify_title": "Hey Lain!"
+}
