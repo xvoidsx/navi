@@ -136,12 +136,15 @@ system via `--deploy-only` (this is what `navi-update` runs after pulling).
 
 Three commands, three jobs. Don't confuse them:
 
-- **`navi-update`** — pulls the release *channel* (release **tags**, never
+- **`navi-update`** — pulls the release *channel* and re-runs deploy.
+  Two channels, Debian-style: **stable** follows release **tags** (never
   arbitrary main commits — a fix on main is invisible to the updater until
-  it's in a tag) and re-runs deploy. `--check` for dry status; `--channel`
-  for channel selection. Two-mode trust: signing key provisioned → verify
-  fail-closed; no key → **loud warning** + unsigned pull. Preserves
-  customized configs by design.
+  it's in a tag); **eiri** is rolling and tracks the `eiri` branch head
+  (deployed commit remembered in `/var/lib/navi/navi-update.state`).
+  `--check` for dry status; `--channel` for channel selection (switching
+  asks first, then pins `/etc/navi/channel`). Two-mode trust: signing key
+  provisioned → verify fail-closed; no key → **loud warning** + unsigned
+  pull. Preserves customized configs by design.
 - **`navi-wired-restore`** — shows how the live setup drifted from stock and
   restores what you choose, with backups of everything it touches.
 - **`navi-wired-adopt`** — the explicit "give me the new stock desktop"
