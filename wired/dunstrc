@@ -22,8 +22,7 @@
     follow = none
 
     ### Geometry ###
-    # Current option sets the notification window at the top right.
-    geometry = "0x5-30+25"
+    # Dunst 1.12 uses origin and offset below for placement.
     # dynamic width from 0 to 300
     #width = (0, 300)
     # constant width of 300
@@ -52,7 +51,7 @@
 
     # Set the progress bar height. This includes the frame, so make sure
     # it's at least twice as big as the frame width.
-    progress_bar_height = 10
+    progress_bar_height = 8
 
     # Set the frame width of the progress bar
     progress_bar_frame_width = 1
@@ -79,17 +78,17 @@
     separator_height = 1
 
     # Padding between text and separator.
-    padding = 10
+    padding = 12
 
     # Horizontal padding.
-    horizontal_padding = 12
+    horizontal_padding = 14
 
     # Padding between text and icon.
     text_icon_padding = 0
 
     # Defines width in pixels of frame around the notification window.
     # Set to 0 to disable.
-    frame_width = 2
+    frame_width = 1
 
     # Defines color of the frame around the notification window.
     # (Urgency sections below override this per level.)
@@ -101,7 +100,7 @@
     #  * foreground: use the same color as the foreground;
     #  * frame: use the same color as the frame;
     #  * anything else will be interpreted as a X color.
-    separator_color = frame
+    separator_color = "#ff10f0"
     shrink = yes
     # Sort messages by urgency.
     sort = no
@@ -239,7 +238,7 @@
     # corners.
     # The radius will be automatically lowered if it exceeds half of the
     # notification height to avoid clipping text and/or icons.
-    corner_radius = 8
+    corner_radius = 14
 
     # Ignore the dbus closeNotification message.
     # Useful to enforce the timeout set by dunst configuration. Without this
@@ -303,8 +302,8 @@
     # IMPORTANT: colors have to be defined in quotation marks.
     # Otherwise the "#" and following would be interpreted as a comment.
     frame_color = "#39ff14"
-    foreground = "#39ff14"
-    background = "#000000"
+    foreground = "#ffffff"
+    background = "#030803df"
     timeout = 4
     # Icon for notifications with low urgency, uncomment to enable
     #default_icon = /path/to/icon
@@ -312,7 +311,7 @@
 [urgency_normal]
     frame_color = "#ff10f0"
     foreground = "#ffffff"
-    background = "#000000"
+    background = "#080309e0"
     format = "<b><span foreground='#ff10f0'>%s</span></b>\n<span foreground='#ffffff'>%b</span>"
     timeout = 6
     # Icon for notifications with normal urgency, uncomment to enable
@@ -321,7 +320,7 @@
 [urgency_critical]
     frame_color = "#ff3131"
     foreground = "#ffffff"
-    background = "#140404"
+    background = "#170104e6"
     format = "<b><span foreground='#ff3131'>%s</span></b>\n<span foreground='#ffffff'>%b</span>"
     timeout = 8
     # Icon for notifications with critical urgency, uncomment to enable
