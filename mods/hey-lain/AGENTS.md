@@ -113,6 +113,17 @@ no auth, no accounts.
   app called X" rather than a guessed web search. swaymsg / sway-control
   failures degrade to spoken errors ("I couldn't switch workspaces: …"),
   never silent success.
+  Command understanding is quantity-first: "open two terminal windows"
+  never reaches the app lookup as a raw phrase — the count is parsed
+  (digits, one..ten, "a couple of", clamped to 10), adverbs handled
+  ("again"/"another" force a fresh launch even when the app is running;
+  "here"/"there" are no-ops), plurals cleaned ("terminal windows" →
+  terminal → the installed terminal, preferring alacritty), and only
+  then is the app resolved. Unknown apps get "I don't have an app called
+  X", never a guessed search of the quantity phrase. "close all
+  [windows|<app>]" kills every matching window via sway-control
+  close-all (count spoken back); "close/focus the <ordinal> <app>"
+  resolves via nth in tree order.
   `search` opens a DuckDuckGo query in `chromium --app=`. URL-shaped
   targets (contain `://` or a dot) open via
   `swaymsg exec "chromium --app=<url>"`; bare words launch as apps only if

@@ -109,12 +109,37 @@ def find_best(target: str) -> int | None:
     return int(sorted(matches, key=rank)[0]["id"])
 
 
+def window_matches(node: dict[str, Any], wanted: str) -> bool:
+    """The find_best match predicate, without the ranking."""
+    values = [v.casefold() for v in text_values(node) if v]
+    return any(wanted == v or wanted in v for v in values)
+
+
+def find_all(target: str) -> list[dict[str, Any]]:
+    """Every window matching target, in tree order.
+
+    Empty target matches every window with a pid. Used for ordinals
+    ("the second terminal") and close-all. Tree order, not find_best's
+    focus-preferring rank, so "second" is stable and predictable.
+    """
+    tree = json.loads(sway("-t", "get_tree") or "{}")
+    wanted = target.casefold()
+    return [n for n in children(tree)
+            if n.get("pid") and (not wanted or window_matches(n, wanted))]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="safe Hey Lain Sway controller")
     parser.add_argument("--dry-run", action="store_true")
     sub = parser.add_subparsers(dest="op", required=True)
     sub.add_parser("tree")
     sub.add_parser("find").add_argument("target")
+    p = sub.add_parser("find-all"); p.add_argument("target", nargs="?", default="")
+    p = sub.add_parser("close-all"); p.add_argument("target", nargs="?", default="")
+    p = sub.add_parser("nth")
+    p.add_argument("verb", choices=("close", "focus"))
+    p.add_argument("n")
+    p.add_argument("target")
     p = sub.add_parser("workspace"); p.add_argument("name")
     p = sub.add_parser("focus"); p.add_argument("target")
     p = sub.add_parser("move"); p.add_argument("target"); p.add_argument("workspace")
@@ -141,6 +166,38 @@ def main() -> int:
             print(cid)
         elif args.op == "workspace":
             sway("workspace", args.name, dry_run=args.dry_run)
+        elif args.op == "find-all":
+            if args.dry_run:
+                return 1
+            for n in find_all(args.target):
+                print(n["id"])
+        elif args.op == "close-all":
+            wins = find_all(args.target)
+            killed = 0
+            for n in wins:
+                try:
+                    sway(f"[con_id={n['id']}]", "kill")
+                    killed += 1
+                except RuntimeError as e:
+                    print(f"sway-control: could not close window {n['id']}: {e}",
+                          file=sys.stderr)
+            # Always exits 0 with a count: "nothing matched" is a normal
+            # answer for the caller to speak, not an error.
+            print(killed)
+        elif args.op == "nth":
+            wins = find_all(args.target)
+            try:
+                idx = int(args.n)
+            except ValueError:
+                raise RuntimeError(f"not a number: {args.n}")
+            if idx < 1 or idx > len(wins):
+                raise RuntimeError(
+                    f"only found {len(wins)} window(s) matching {args.target}")
+            node = wins[idx - 1]
+            if args.verb == "close":
+                sway(f"[con_id={node['id']}]", "kill", dry_run=args.dry_run)
+            else:
+                sway(f"[con_id={node['id']}]", "focus", dry_run=args.dry_run)
         elif args.op == "focus-direction":
             sway("focus", args.direction, dry_run=args.dry_run)
         elif args.op == "layout":

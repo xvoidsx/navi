@@ -181,6 +181,16 @@ if [[ "$LOW" =~ ^(open|launch|start)\ (.+)\ on\ workspace\ (.+)$ ]]; then
     exit 0
   fi
 fi
+# Ordinal workspaces: "go to the second workspace", "move to the third
+# workspace" (bare move = switch, same as the digit form in the case
+# statement below). Runs before the single-open rule so the whole phrase
+# isn't swallowed as an app name.
+if [[ "$LOW" =~ ^(go\ to|take\ me\ to|switch\ to|switch|move\ to)\ the\ (first|second|third|fourth|fifth)\ workspace$ ]]; then
+  case "${BASH_REMATCH[2]}" in
+    first) Q=1;; second) Q=2;; third) Q=3;; fourth) Q=4;; fifth) Q=5;;
+  esac
+  printf '[ACTION: workspace %s]\n%s\n' "$Q" "$(ack workspace "$Q")"; exit 0
+fi
 if [[ "$LOW" =~ ^(open|launch|start|go\ to|take\ me\ to)\ (.+)$ ]]; then
   TARGET="${BASH_REMATCH[2]}"
   TARGET=$(echo "$TARGET" | sed -E 's/^(the|my) //; s/ (website|site|page|app)$//')
