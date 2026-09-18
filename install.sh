@@ -123,6 +123,12 @@ EOF
   # the version line is spaced out for the aesthetic; wired/VERSION is the
   # single source of truth, so this never goes stale.
   printf '\n       n a v i   %s\n' "$(printf '%s' "$NAVI_VERSION" | sed 's/./& /g; s/ $//')"
+  # eiri: the mods/ tree marks an experimental eiri build. wired/VERSION
+  # stays the release version until release integration — the channel
+  # stamp is deliberately separate from the version number.
+  if [ -d "$REPO_DIR/mods/navi-audio" ]; then
+    printf '\n       ✦  e x p e r i m e n t a l   e i r i   b u i l d  ✦\n'
+  fi
   cat <<'EOF'
 
        ナビ — everybody has already entered the wired

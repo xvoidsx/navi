@@ -82,6 +82,7 @@ TIPS=(
   "thirteen phases. lucky number thirteen."
   "that stopwatch is timing your wifi, not you. probably."
   "the ∅ breathes while it works. watch it. it's calming."
+  "experimental eiri build: the cohesion release. note what glows, report what breaks."
   "the wired will provide."
 )
 
@@ -173,7 +174,11 @@ _ui_draw() {
   _t0=$(cat "$UI_DIR/t0" 2>/dev/null || echo 0)
   _now=$(date +%s)
   if [ "$_t0" -gt 0 ]; then _el="  ${N_DIM}T+$(fmt_dur $(( _now - _t0 )))"; else _el=""; fi
-  printf '%s%s\n' "${N_CYAN}           1.5 \"mika\"${_el}${N_OFF}" "$el"
+  # eiri: version from the staged payload, never hardcoded; the ✦eiri
+  # marker shows when the mods/ tree is present.
+  _ver="$(cat "$ISO_ROOT/wired/VERSION" 2>/dev/null || echo 'unknown')"
+  _eiri=""; [ -d "$ISO_ROOT/mods/navi-audio" ] && _eiri=" ${N_MAGENTA}✦eiri${N_CYAN}"
+  printf '%s%s\n' "${N_CYAN}           ${_ver}${_eiri}${_el}${N_OFF}" "$el"
   printf '  %s %s%3d%%%s%s\n' \
     "$(_ui_bar "$n" "$PHASE_TOTAL" 30)" "$N_DIM" "$(( n * 100 / PHASE_TOTAL ))" "$N_OFF" "$el"
   # phase changes shimmer: the phase line flashes green for a few seconds,
@@ -1026,13 +1031,24 @@ main() {
   ui_stop
   clear
 
+  # eiri: the version is read from the staged payload, never hardcoded —
+  # hardcoded version strings go stale silently (1.3 survived into 1.4).
+  # the mods/ tree marks an experimental eiri build.
+  iso_ver="$(cat "$ISO_ROOT/wired/VERSION" 2>/dev/null || echo 'unknown')"
+  box_line() { printf '  ║   %-59s║\n' "$1"; }
+
   cat <<EOF
 
 ${N_MAGENTA}                       ∅${N_OFF}
 
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
-  ║   ✓  navi 1.5 "mika" is installed.                           ║
+EOF
+  box_line "✓  navi $iso_ver is installed."
+  if [ -d "$ISO_ROOT/mods/navi-audio" ]; then
+    printf '  ║   %s%-59s%s║\n' "$N_MAGENTA" "✦  experimental eiri build — the cohesion release" "$N_OFF"
+  fi
+  cat <<EOF
   ║                                                              ║
   ║   remove the ISO and reboot.                                 ║
   ║   1. enter your disk encryption passphrase (twice:           ║
@@ -1040,6 +1056,13 @@ ${N_MAGENTA}                       ∅${N_OFF}
   ║   2. log in at the navi login screen                         ║
   ║   3. you land in the wired. welcome home.                    ║
   ║                                                              ║
+EOF
+  if [ -d "$ISO_ROOT/mods/navi-audio" ]; then
+    box_line "new in this build: panel mods — right-click volume"
+    box_line "for navi-audio, click network for navi-networking."
+    box_line ""
+  fi
+  cat <<EOF
   ║   ${N_CYAN}the wired will provide.${N_OFF}                                   ║
   ║                                                              ║
   ╚══════════════════════════════════════════════════════════════╝
