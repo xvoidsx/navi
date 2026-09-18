@@ -48,8 +48,14 @@ no auth, no accounts.
 - `bin/record-start.sh` / `bin/record-stop.sh` — capture lifecycle. One
   unique `input-<timestamp>-<pid>.wav` per session; current path tracked in
   `$RUNTIME/current`. `arecord` is the fallback if `pw-record` is missing.
-  `record-start` verifies the recorder survives launch; `record-stop`
+  `record-start` verifies the recorder survives launch and starts
+  `bin/mic-level.py` (live mic levels → `$RUNTIME/mic-level`, stdlib-only,
+  guarded against doubling); `record-stop` kills it (pidfile + pattern
+  sweep) and drops the level file. `record-stop`
   reports byte counts to the log.
+- `bin/mic-level.py` — tails the in-progress recording wav (robust wav-header
+  skip), publishes 0-100 peak levels of the most recent ~50ms to
+  `$RUNTIME/mic-level` at 10Hz; exits when the wav stops growing.
 - `bin/listen.py` (runs on `venv/bin/python`) — STT guards, in order:
   reject unreadable files, skip clips under 0.4s, transcribe with VAD,
   retry without VAD if empty, drop no-speech hallucinations (tiny.en hears
@@ -176,6 +182,17 @@ no auth, no accounts.
   fallback. NEVER run `kokoro speak` (writes wav files into its recordings
   dir) — use `bin/speak.py`, which streams raw PCM with zero files.
   `bin/kokoro-serve.sh` manages the warm Kokoro server (:8765).
+  `feed()` slices PCM into ~100ms frames and publishes per-frame peak levels
+  to `$RUNTIME/voice-level` (pipe backpressure paces the emits to the audio);
+  the file is removed when playback ends.
+- `bin/overlay-visualizer.sh` — the foot overlay renderer. Both directions of
+  the conversation get REAL waveforms: LISTENING draws a scrolling green
+  waveform from `$RUNTIME/mic-level` history, SPEAKING a pink one from
+  `$RUNTIME/voice-level` history (48 columns x 3 rows, bottom-anchored `#`
+  bars). Between them: HEARD = cyan static burst, THINKING = pink pulse,
+  ACTING = green/pink shimmer sweep, WAITING = cyan breathing glow. Histories
+  clear on state change; cursor-home redraw (no flicker), one full clear on
+  transitions. ASCII-only by design (font safety).
 - `opencode run` hangs/errors when shelled per utterance (no headless auth
   path here) — do NOT use it in the voice loop. Upgrade path for session
   memory: `opencode serve` + fixed session id as a future `BRAIN_URL`.

@@ -71,6 +71,7 @@ def main():
 
     import numpy as np
     runtime = RUNTIME
+    level_file = os.path.join(runtime, "voice-level")
 
     def service_healthy() -> bool:
         try:
@@ -210,7 +211,27 @@ def main():
                                  "-t", "raw", "-c", "1"],
                                 stdin=subprocess.PIPE, stderr=err)
 
-    def feed(player, pcm, n):
+    def emit_level(frame):
+        # Publish live voice energy for the overlay waveform (tmpfs, ~10Hz).
+        try:
+            a = np.frombuffer(frame, dtype="<i2")
+            peak = float(np.max(np.abs(a))) if a.size else 0.0
+            with open(level_file, "w") as f:
+                f.write(str(min(100, int(peak / 327.67))))
+        except Exception:
+            pass
+
+    def write_frames(player, pcm, sr):
+        # Slice into ~100ms frames so the overlay waveform tracks the voice
+        # in realtime; pipe backpressure paces the level emits to the audio.
+        step = max(2, (sr // 10) * 2)
+        assert player.stdin is not None
+        for i in range(0, len(pcm), step):
+            frame = pcm[i:i+step]
+            emit_level(frame)
+            player.stdin.write(frame)
+
+    def feed(player, pcm, n, sr):
         # If aplay died mid-stream (device hiccup), restart it and keep
         # going instead of silently truncating the speech.
         if player.poll() is not None:
@@ -219,15 +240,13 @@ def main():
             except Exception: pass
             player = start_player()
         try:
-            assert player.stdin is not None
-            player.stdin.write(pcm)
+            write_frames(player, pcm, sr)
         except (BrokenPipeError, ValueError):
             log(f"chunk {n}: pipe broke, restarting aplay once")
             try: player.stdin.close()
             except Exception: pass
             player = start_player()
-            assert player.stdin is not None
-            player.stdin.write(pcm)
+            write_frames(player, pcm, sr)
         return player
 
     # Pre-resolve first chunk so notify ~= first audible audio.
@@ -236,16 +255,20 @@ def main():
     player = start_player(rate=first_sr)
     # Fire notification AT first audio, not before synth
     subprocess.Popen(["notify-send", TITLE, text])
-    player = feed(player, first_pcm, 1)
+    player = feed(player, first_pcm, 1, first_sr)
 
     for n, s in enumerate(sentences[1:], 2):
-        pcm, _ = resolve(s, n, len(sentences))
-        player = feed(player, pcm, n)
+        pcm, sr = resolve(s, n, len(sentences))
+        player = feed(player, pcm, n, sr)
     try:
         player.stdin.close()
     except Exception:
         pass
     rc = player.wait()
+    try:
+        os.remove(level_file)
+    except OSError:
+        pass
     log(f"done rc={rc} total={time.monotonic()-t0:.1f}s")
 
 if __name__ == "__main__":

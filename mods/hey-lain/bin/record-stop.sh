@@ -34,6 +34,13 @@ pkill -INT -f "pw-record.*hey-lain" 2>/dev/null || true
 sleep 0.2
 pkill -KILL -f "pw-record.*hey-lain" 2>/dev/null || true
 pkill -KILL -f "arecord.*hey-lain" 2>/dev/null || true
+# Stop the mic level monitor too (pidfile + pattern sweep, then drop the file).
+if [ -f "$RUNTIME/mic-level.pid" ]; then
+  kill "$(cat "$RUNTIME/mic-level.pid" 2>/dev/null)" 2>/dev/null || true
+  rm -f "$RUNTIME/mic-level.pid"
+fi
+pkill -f "mic-level.py" 2>/dev/null || true
+rm -f "$RUNTIME/mic-level"
 
 WAV=""
 [ -f "$CURRENT" ] && WAV=$(cat "$CURRENT" 2>/dev/null || true)

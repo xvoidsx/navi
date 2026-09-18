@@ -220,6 +220,21 @@ case "$LOW" in
     printf '[ACTION: fetch-news %s]\n%s\n' "$Q" "$(ack news)"; exit 0 ;;
   *lock\ the\ screen*|*lock\ screen*|*lock\ up*) printf '[ACTION: lock]\nLocking up.\n'; exit 0 ;;
   *close\ this*|*close\ that\ window*|*close\ the\ window*|*close\ it*) printf '[ACTION: close]\nClosing it.\n'; exit 0 ;;
+  *what\ time\ is\ it*|*tell\ me\ the\ time*|*current\ time*|*what\'s\ the\ time*)
+    printf 'It is %s.\n' "$(date +'%-I:%M %p')"; exit 0 ;;
+  *what\ day\ is\ it*|*what\'s\ the\ date*|*what\ is\ today\'s\ date*|*tell\ me\ today\'s\ date*|*what\'s\ today\'s\ date*)
+    printf 'Today is %s.\n' "$(date +'%A, %-d %B')"; exit 0 ;;
+  *battery*)
+    _bat=""
+    for _b in /sys/class/power_supply/BAT*; do [ -d "$_b" ] && { _bat="$_b"; break; }; done
+    if [ -n "$_bat" ]; then
+      _pct=$(cat "$_bat/capacity" 2>/dev/null || echo "?")
+      _st=$(cat "$_bat/status" 2>/dev/null || echo unknown)
+      printf 'The battery is at %s percent and %s.\n' "$_pct" "$(echo "$_st" | tr '[:upper:]' '[:lower:]')"
+    else
+      printf 'I do not see a battery on this machine.\n'
+    fi
+    exit 0 ;;
 esac
 
 # Cloud-first (Ollama Cloud proxy via localhost; needs no key handling here),

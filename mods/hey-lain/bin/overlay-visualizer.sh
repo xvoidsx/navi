@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
-# Minimal, focus-safe nightshadeNeon visualizer rendered inside foot.
-# Arguments: runtime directory. State is read from overlay-state.
+# Hey Lain! overlay visualizer — nightshadeNeon, rendered inside foot.
+# Arguments: runtime directory.
+# State is read from overlay-state. Live audio levels come from mic-level
+# (while Raven speaks) and voice-level (while Lain speaks): both directions
+# of the conversation get REAL waveforms. The states between them get
+# synthetic motion in the same visual language:
+#   LISTENING  incoming green waveform   (live mic)
+#   HEARD      cyan static burst         (transition)
+#   THINKING   pink pulse
+#   ACTING     green/pink shimmer sweep
+#   SPEAKING   outgoing pink waveform    (live voice)
+#   WAITING    cyan breathing glow
+# Deliberately ASCII-only: some terminal/font combinations render block and
+# box-drawing Unicode as mojibake. These characters remain clean everywhere.
 set -uo pipefail
 
 RUNTIME_PATH="${1:?runtime directory required}"
@@ -10,54 +22,118 @@ C=$'\033[38;2;0;255;255m'    # neon cyan
 W=$'\033[97m'
 D=$'\033[2m'
 R=$'\033[0m'
-# Deliberately ASCII-only: some terminal/font combinations render block and
-# box-drawing Unicode as mojibake. These characters remain clean everywhere.
-GLYPHS=" .:-=+*#%@"
-SPIN="|/-\\"
+
+COLS=44          # waveform columns; rows are 4 + COLS + 4 = 52 wide
+INNER=52         # inner width between the border pipes
 frame=0
 last=""
 
+declare -a hist_in=()
+declare -a hist_out=()
+
+line() { printf '\033[2K%s\n' "$1"; }
+
+read_level() { # $1 = level file -> 0-100
+  local v
+  v=$(cat "$1" 2>/dev/null || echo 0)
+  [[ "$v" =~ ^[0-9]+$ ]] || v=0
+  [ "$v" -gt 100 ] && v=100
+  printf '%s' "$v"
+}
+
+push_hist() { # $1 = array name, $2 = value (cap at COLS)
+  local -n arr=$1
+  arr+=("$2")
+  while [ "${#arr[@]}" -gt "$COLS" ]; do arr=("${arr[@]:1}"); done
+}
+
+# Print 3 rows of '#' bars from a 0-100 history array, bottom-anchored.
+wave_rows() { # $1 = array name, $2 = color
+  local -n h=$1
+  local color=$2 r c lvl hh row
+  for r in 0 1 2; do
+    row=""
+    for ((c = 0; c < COLS; c++)); do
+      lvl=${h[$c]:-0}
+      hh=$(( lvl * 4 / 101 ))   # 0..3
+      if [ "$hh" -gt 0 ] && [ "$hh" -ge $((3 - r)) ]; then row+="#"; else row+=" "; fi
+    done
+    line "  ${G}|${R}    ${color}${row}${R}    ${G}|${R}"
+  done
+}
+
+# Print 3 rows of '#' bars at a uniform height (pulse / breathing).
+flat_rows() { # $1 = color, $2 = height 0..3
+  local color=$1 hh=$2 r c row
+  for r in 0 1 2; do
+    row=""
+    for ((c = 0; c < COLS; c++)); do
+      if [ "$hh" -gt 0 ] && [ "$hh" -ge $((3 - r)) ]; then row+="#"; else row+=" "; fi
+    done
+    line "  ${G}|${R}    ${color}${row}${R}    ${G}|${R}"
+  done
+}
+
+# Shimmer band sweeping across a dotted field, alternating green/pink.
+sweep_rows() {
+  local r c row d pos color="$G"
+  [ $(( (frame / 8) % 2 )) -eq 1 ] && color="$P"
+  pos=$(( (frame * 3) % (COLS + 12) ))
+  for r in 0 1 2; do
+    row=""
+    for ((c = 0; c < COLS; c++)); do
+      d=$(( c - pos + 6 )); [ "$d" -lt 0 ] && d=$(( -d ))
+      if [ "$d" -le 2 ]; then row+="#"
+      elif [ "$d" -le 5 ]; then row+="+"
+      else row+="."
+      fi
+    done
+    line "  ${G}|${R}    ${color}${row}${R}    ${G}|${R}"
+  done
+}
+
+# Full static burst.
+noise_rows() { # $1 = color
+  local color=$1 r c row hh
+  for r in 0 1 2; do
+    row=""
+    for ((c = 0; c < COLS; c++)); do
+      hh=$(( RANDOM % 4 ))
+      if [ "$hh" -gt 0 ] && [ "$hh" -ge $((3 - r)) ]; then row+="#"; else row+=" "; fi
+    done
+    line "  ${G}|${R}    ${color}${row}${R}    ${G}|${R}"
+  done
+}
+
+title_line() { # $title, $accent in scope
+  local n pad core="*  ${title}  *"
+  n=${#core}
+  pad=$(( INNER - 8 - n ))
+  [ "$pad" -lt 0 ] && pad=0
+  line "  ${G}|${R}        ${accent}${core}${R}$(printf '%*s' "$pad" '')${G}|${R}"
+}
+
+sub_line() { # $subtitle in scope
+  local pad
+  pad=$(( INNER - 8 - ${#subtitle} ))
+  [ "$pad" -lt 0 ] && pad=0
+  line "  ${G}|${R}        ${D}${subtitle}${R}$(printf '%*s' "$pad" '')${G}|${R}"
+}
+
+blank_line() {
+  line "  ${G}|${R}$(printf '%*s' "$INNER" '')${G}|${R}"
+}
+
+BAR="  ${G}+--------------------------------------------------+${R}"
+
 printf '\033[?1049h\033[?25l'
 trap 'printf "\033[?1049l\033[?25h\033[0m"; exit' INT TERM EXIT
-
-meter() {
-  local mode="$1" k height color out="" phase
-  for k in $(seq 0 31); do
-    phase=$((frame + k * 3))
-    case "$mode" in
-      listen) height=$(( (phase * phase + k * 7) % 8 )); color="$G"; [ "$height" -ge 5 ] && color="$C"; [ "$height" -ge 7 ] && color="$P" ;;
-      speak) height=$(( (phase * 5 + k * k + frame / 2) % 8 )); color="$P"; [ "$height" -ge 4 ] && color="$C" ;;
-      think) height=$(( (phase + k) % 5 )); color="$P" ;;
-      act) height=$(( (phase * 2 + k * 5) % 8 )); color="$G"; [ "$height" -ge 6 ] && color="$P" ;;
-      calm) height=$(( (frame / 3 + k) % 3 + 1 )); color="$C" ;;
-      *) height=1; color="$W" ;;
-    esac
-    out="${out}${color}${GLYPHS:$height:1}${R}"
-  done
-  printf '%s' "$out"
-}
-
-centerpiece() {
-  local mode="$1" n
-  case "$mode" in
-    listen) printf '%s' "${G}[ o o o o o ]${R}" ;;
-    speak) printf '%s' "${P}[${C}*${P}] [${C}*${P}] [${C}*${P}]${R}" ;;
-    think) printf '%s' "${P}${SPIN:frame%10:1}${R}" ;;
-    act) printf '%s' "${P}[${G}*${P}]${G} [! ] ${P}[${G}*${P}]${R}" ;;
-    calm) n=$((frame / 4 % 3)); [ "$n" -eq 0 ] && printf '%s' "${C}[ . ]${R}" || printf '%s' "${C}[ o ]${R}" ;;
-    *) printf '%s' "${W}[ . ]${R}" ;;
-  esac
-}
-
-line() {
-  printf '\033[2K%s\n' "$1"
-}
 
 while true; do
   state=$(cat "$RUNTIME_PATH/overlay-state" 2>/dev/null || echo LISTENING)
   case "$state" in
     LISTENING) title="Lain is listening..."; subtitle="Press Alt+V again to send"; mode=listen; accent="$G" ;;
-    HEARD) title="Lain heard you..."; subtitle="turning your voice into intent"; mode=think; accent="$C" ;;
+    HEARD) title="Lain heard you..."; subtitle="turning your voice into intent"; mode=heard; accent="$C" ;;
     THINKING) title="Lain is thinking..."; subtitle="finding the best next move"; mode=think; accent="$P" ;;
     ACTING) title="Lain is taking action!"; subtitle="working with your desktop"; mode=act; accent="$G" ;;
     SPEAKING) title="Lain says..."; subtitle="Press Alt+V to talk back"; mode=speak; accent="$P" ;;
@@ -65,19 +141,37 @@ while true; do
     *) title="Lain is ready..."; subtitle="Press Alt+V to begin"; mode=calm; accent="$C" ;;
   esac
 
-  [ "$state" != "$last" ] && printf '\033[2J' && last="$state"
+  # Fresh waveforms per state; one full clear on transitions (geometry
+  # changes there), cursor-home redraws otherwise (no flicker).
+  if [ "$state" != "$last" ]; then
+    printf '\033[2J'; last="$state"; hist_in=(); hist_out=()
+  fi
+
+  case "$mode" in
+    listen) push_hist hist_in "$(read_level "$RUNTIME_PATH/mic-level")" ;;
+    speak) push_hist hist_out "$(read_level "$RUNTIME_PATH/voice-level")" ;;
+  esac
+
   printf '\033[H'
-  line "${G}  +--------------------------------------------------+${R}"
-  line "${G}  |${R}        ${accent}*  ${W}${title}${R}        ${accent}*${R}         ${G}|${R}"
-  line "${G}  |${R}                                                    ${G}|${R}"
-  line "${G}  |${R}        $(centerpiece "$mode")                        ${G}|${R}"
-  line "${G}  |${R}   $(meter "$mode")   ${G}|${R}"
-  line "${G}  |${R}   $(meter "$mode")   ${G}|${R}"
-  line "${G}  |${R}   $(meter "$mode")   ${G}|${R}"
-  line "${G}  |${R}                                                    ${G}|${R}"
-  line "${G}  |${R}        ${D}${subtitle}${R}                         ${G}|${R}"
-  line "${G}  |${R}                                                    ${G}|${R}"
-  line "${G}  +--------------------------------------------------+${R}"
+  line "$BAR"
+  title_line
+  blank_line
+  case "$mode" in
+    listen) wave_rows hist_in "$G" ;;
+    speak) wave_rows hist_out "$P" ;;
+    heard) noise_rows "$C" ;;
+    think) # pink pulse: triangle 0..3 over 16 frames
+      ph=$(( frame % 16 )); [ "$ph" -gt 8 ] && ph=$(( 16 - ph ))
+      flat_rows "$P" $(( ph * 3 / 8 )) ;;
+    act) sweep_rows ;;
+    calm) # cyan breathing: slow triangle 0..2 over 32 frames
+      ph=$(( frame % 32 )); [ "$ph" -gt 16 ] && ph=$(( 32 - ph ))
+      flat_rows "$C" $(( ph * 2 / 16 )) ;;
+  esac
+  blank_line
+  sub_line
+  blank_line
+  line "$BAR"
   frame=$((frame + 1))
   sleep 0.12
 done

@@ -45,5 +45,11 @@ if ! [ -f "/proc/$_NEWPID/cmdline" ]; then
   exit 1
 fi
 log "rec pid $_NEWPID -> $WAV"
+# Live mic levels for the overlay waveform (stdlib-only python, ~0.3% CPU).
+# Guarded: a monitor from a half-dead session is reused, never doubled.
+if [ ! -f "$RUNTIME/mic-level.pid" ] || ! kill -0 "$(cat "$RUNTIME/mic-level.pid" 2>/dev/null)" 2>/dev/null; then
+  python3 "$BIN/mic-level.py" "$WAV" "$RUNTIME/mic-level" >>"$LOG" 2>&1 &
+  echo $! > "$RUNTIME/mic-level.pid"
+fi
 "$BIN/listen-overlay.sh" show 2>/dev/null || true
 notify-send "Hey Lain!" "…listening (tap Alt+V again to send)" -t 2000
