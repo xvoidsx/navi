@@ -42,6 +42,14 @@ jobs:
       image: debian:trixie
       options: --privileged
     steps:
+      - name: Branch guard
+        run: |
+          # eiri ISOs are cut from the eiri branch only. this workflow must
+          # never run on main — the releases page is the stable download
+          # surface and must stay unmistakably mika.
+          [ "${{ github.ref }}" = "refs/heads/eiri" ] \
+            || { echo "refusing: iso-eiri.yml runs on eiri only (got ${{ github.ref }})"; exit 1; }
+
       # NOTE: actions/checkout needs node, which debian:trixie-slim lacks,
       # so the repo is cloned with plain git instead.
       - name: Clone navi (eiri)
