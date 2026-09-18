@@ -63,6 +63,30 @@ REPLY=$("$BIN/brain.sh" "$TEXT" 2>>"$LOG" || true)
 if [ -z "${REPLY// }" ]; then
   REPLY="Sorry, my brain hiccupped. Try again?"
 fi
+# Session memory: the last few exchanges, so follow-ups ("louder", "why?",
+# "yeah do that") resolve against what was just said and done. brain.sh
+# reads this back as prior messages. Local only — the wav is already
+# deleted by this point, and only the transcript + Lain's spoken reply
+# are kept (never audio).
+MEM_DIR="${XDG_STATE_HOME:-$HOME/.local/share}/hey-lain"
+MEM_FILE="$MEM_DIR/conversation.json"
+mkdir -p "$MEM_DIR" 2>/dev/null || true
+LAIN_SPOKEN="$(printf '%s\n' "$REPLY" | grep -v '^\[ACTION:' | sed '/^[[:space:]]*$/d' | head -n 12 || true)"
+USER_TEXT="$TEXT" LAIN_REPLY="$LAIN_SPOKEN" MEM_FILE="$MEM_FILE" python3 - <<'EOF' 2>/dev/null || true
+import json, os
+mem = os.environ["MEM_FILE"]
+try:
+    hist = json.load(open(mem))
+    if not isinstance(hist, list):
+        hist = []
+except Exception:
+    hist = []
+u = os.environ.get("USER_TEXT", "").strip()
+l = os.environ.get("LAIN_REPLY", "").strip()
+if u or l:
+    hist.append({"user": u, "lain": l})
+json.dump(hist[-8:], open(mem, "w"))
+EOF
 log "reply: $REPLY"
 log "stage brain took $((SECONDS-T0))s"; T0=$SECONDS
 # Flash what Lain is about to do, THEN act (overlay hides as action starts).

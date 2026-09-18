@@ -267,26 +267,54 @@ TIMEOUT="${BRAIN_TIMEOUT:-30}"
 LOCAL_FALLBACK="gemma3:270m"
 LOCAL_URL="http://127.0.0.1:11434/api/chat"
 
+# Session memory: recent exchanges (written by hey-lain.sh), fed back as
+# prior messages so follow-ups resolve. Local context keeps small-model
+# replies specific instead of generic.
+MEM_FILE="${XDG_STATE_HOME:-$HOME/.local/share}/hey-lain/conversation.json"
+HISTORY_JSON="[]"
+if [ -f "$MEM_FILE" ]; then
+  HISTORY_JSON="$(cat "$MEM_FILE" 2>/dev/null || echo '[]')"
+fi
+CTX="It is $(date '+%A %-H:%M')."
+if command -v playerctl >/dev/null 2>&1; then
+  NOW_PLAYING="$(timeout 1 playerctl metadata --format '{{artist}} - {{title}}' 2>/dev/null || true)"
+  [ -n "$NOW_PLAYING" ] && CTX="$CTX Now playing: $NOW_PLAYING."
+fi
+SYSTEM="$SYSTEM
+Local context: $CTX"
+
 ask() {
   local model="$1" payload resp out
   # gpt-oss reasons: roomy cap or replies truncate. Others stop at EOS anyway.
   local cap=150
   case "$model" in *gpt-oss*) cap=400 ;; esac
-  if [ "$BACKEND" = "openai" ] || [ "$BACKEND" = "openrouter" ]; then
-    # OpenAI-compatible chat completions (OpenAI, OpenRouter).
-    payload=$(python3 - "$SYSTEM" "$USER_TEXT" "$model" "$cap" <<'EOF'
+  # One payload builder for both protocols: system + conversation history
+  # + the current utterance, so follow-ups resolve against what was said.
+  payload=$(python3 - "$SYSTEM" "$HISTORY_JSON" "$USER_TEXT" "$model" "$cap" "$BACKEND" <<'EOF'
 import json, sys
-system, user, model, cap = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
-print(json.dumps({
-    "model": model,
-    "max_tokens": cap,
-    "messages": [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
-    ],
-}))
+system, history_json, user, model, cap, backend = \
+    sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), sys.argv[6]
+msgs = [{"role": "system", "content": system}]
+try:
+    hist = json.loads(history_json)
+except Exception:
+    hist = []
+for h in hist[-8:]:
+    if isinstance(h, dict):
+        if h.get("user"):
+            msgs.append({"role": "user", "content": h["user"]})
+        if h.get("lain"):
+            msgs.append({"role": "assistant", "content": h["lain"]})
+msgs.append({"role": "user", "content": user})
+if backend in ("openai", "openrouter"):
+    print(json.dumps({"model": model, "max_tokens": cap, "messages": msgs}))
+else:
+    print(json.dumps({"model": model, "stream": False, "keep_alive": "30m",
+                      "options": {"num_predict": cap}, "messages": msgs}))
 EOF
 )
+  if [ "$BACKEND" = "openai" ] || [ "$BACKEND" = "openrouter" ]; then
+    # OpenAI-compatible chat completions (OpenAI, OpenRouter).
     resp=$(curl -s --max-time "$TIMEOUT" "$URL" \
       -H "Authorization: Bearer $API_KEY" \
       -H "Content-Type: application/json" \
@@ -300,21 +328,6 @@ print(d['choices'][0]['message']['content'].strip())" <<<"$resp" 2>/dev/null || 
   else
     # Ollama-native /api/chat (local models AND ollama-cloud *-cloud names
     # proxied through the local daemon).
-    payload=$(python3 - "$SYSTEM" "$USER_TEXT" "$model" "$cap" <<'EOF'
-import json, sys
-system, user, model, cap = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
-print(json.dumps({
-    "model": model,
-    "stream": False,
-    "keep_alive": "30m",
-    "options": {"num_predict": cap},
-    "messages": [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
-    ],
-}))
-EOF
-)
     resp=$(curl -s --max-time "$TIMEOUT" "$URL" -d "$payload" 2>/dev/null || true)
     out=$(python3 -c "import json,sys; print(json.load(sys.stdin).get('message',{}).get('content','').strip())" <<<"$resp" 2>/dev/null || true)
   fi

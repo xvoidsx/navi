@@ -74,12 +74,21 @@ no auth, no accounts.
   ask-back if empty), news/headlines (→fetch-news, topic or top stories),
   volume up/down/mute, media play-pause/next/prev,
   brightness up/down,   screenshot, lock, close-window, dismiss/thanks (→overlay-hide), with "hey lain /
-  please / could you" prefix stripping. Anything else goes to Ollama `/api/chat`
-  (`BRAIN_MODEL` default `gemma4:31b-cloud` via the localhost proxy — no key
-  handling needed in scripts, ~0.8s/reply. Token cap is per-model
-  (gpt-oss reasons: 400, else 150 — lowering gpt-oss truncates replies).
-  Falls back to local `gemma3:270m`, then to a spoken offline line. `BRAIN_URL`, `BRAIN_TIMEOUT` overrides, `num_predict`
-  capped at 120 for voice-length replies).
+  please / could you" prefix stripping. Anything else goes to the LLM —
+  backend from `~/.config/hey-lain/brain.json` (`navi-lain-config` writes
+  it): `local` / `ollama-cloud` via Ollama `/api/chat`, or `openai` /
+  `openrouter` via OpenAI-compatible chat completions + Bearer key.
+  Default is local `gemma3:270m` (no key, no cloud — the low-end default).
+  Token cap is per-model (gpt-oss reasons: 400, else 150 — lowering gpt-oss
+  truncates replies). Cloud backends fall back to local `gemma3:270m`,
+  then to a spoken offline line. `BRAIN_MODEL`, `BRAIN_URL`,
+  `BRAIN_TIMEOUT`, `HEY_LAIN_API_KEY` env overrides win over the file.
+  The LLM gets conversation history (last 8 exchanges, from
+  `~/.local/share/hey-lain/conversation.json`, written by `hey-lain.sh`)
+  plus local context (day/time, now-playing via playerctl) so small-model
+  replies stay specific. `SYSTEM_PROMPT.txt` is few-shot tuned for small
+  models: fuzzy phrasing → best-guess `[ACTION:]`, genuine ambiguity →
+  one short question.
 - `bin/actions.sh` — ONE leading `[ACTION: name args]` per reply; speech
   text is computed AFTER the side effect (missing apps get an honest
   "couldn't find X" instead of a false "Opening…"). Actions:
@@ -215,10 +224,13 @@ no auth, no accounts.
 
 ## Known limits / next steps
 
-- No session memory yet (each utterance is stateless; `opencode serve`
-  backend would fix this).
-- Brain is cloud (gemma4:31b-cloud, needs network + Ollama Cloud access);
-  local 270m fallback covers outages. STT+TTS stay on-device regardless.
+- Session memory: last 8 exchanges in `~/.local/share/hey-lain/conversation.json`
+  (transcript + Lain's spoken reply only — never audio), fed back as prior
+  messages. `opencode serve` + fixed session id remains the future upgrade
+  path for deeper memory.
+- Brain default is local `gemma3:270m` (needs `ollama pull gemma3:270m`;
+  the installer does it when ollama + network are up); cloud backends are
+  user-configured via `navi-lain-config`.
 - Overlay position is hardcoded for 1366x768; multi-monitor needs `$RUNTIME`
   geometry lookup.
 - `setup.sh` apt-installs need sudo; venv + model prefetch already done.
