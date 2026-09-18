@@ -114,13 +114,20 @@ navi interface.
 - Share the current network as a WIFI: QR payload rendered in-terminal
   (`qrterminal`, half-blocks). Secrets are read only when the user opens Share.
 - Cloudflare-backed speed test (latency HEAD rounds, 50 MB download, 20 MB
-  upload) with a progress bar driven by atomic counters + a tick cmd.
-- Persistent two-line keymap. Connection-only actions dim when there is no
+  upload) with a progress bar driven by atomic counters + a tick cmd, plus a
+  live throughput sparkline sampled once per tick.
+- Persistent keymap. Connection-only actions dim when there is no
   active link instead of disappearing, so the footer never shifts.
 - Esc while a background op is in flight cancels the context instead of
   quitting. Ctrl+C always quits.
+- Screen changes dissolve through a brief static burst (ANSI-aware glitch).
+- When there is no link and nothing is happening, the networks screen
+  breathes (a slow neon pulse) instead of sitting dead.
 - Reserved header row for ambient Lain transmissions (see below). The row is
   always allocated so the frame height does not jump.
+- Built on the shared `mods/theme` design system (frame, footer, divider,
+  meter, sparkline, spinner, transmission ticker). `--dump` renders sample
+  screens to stdout for headless visual checks.
 
 Planned / not yet done:
 

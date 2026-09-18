@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -15,254 +13,24 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
-	"unicode"
 
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mdp/qrterminal/v3"
+	theme "github.com/rav3ndust/navi-theme"
 )
 
 // ─────────────────────────────────────────────────────────────────────────
 // Styles
 // ─────────────────────────────────────────────────────────────────────────
 
-var (
-	neonPink  = lipgloss.Color("#ff10f0")
-	neonGreen = lipgloss.Color("#39ff14")
-	cyan      = lipgloss.Color("#00ffff")
-	dim       = lipgloss.Color("#444444")
-	gray      = lipgloss.Color("#666666")
-	white     = lipgloss.Color("#ffffff")
-	dark      = lipgloss.Color("#0f0f0f")
-	red       = lipgloss.Color("#ff3131")
-	violet    = lipgloss.Color("#bf5fff")
-	ghost     = lipgloss.Color("#7a4a7a")
-)
+// frameWidth is the family-standard mod window width. Views assume it;
+// do not let status strings wrap inside it.
+var frameWidth = 62
 
-var (
-	titleStyle     = lipgloss.NewStyle().Foreground(neonPink).Background(dark).Bold(true)
-	logoStyle      = lipgloss.NewStyle().Foreground(neonGreen).Background(dark).Bold(true)
-	headerStyle    = lipgloss.NewStyle().Foreground(cyan).Bold(true)
-	selectedStyle  = lipgloss.NewStyle().Foreground(neonPink).Bold(true)
-	normalStyle    = lipgloss.NewStyle().Foreground(white)
-	dimStyle       = lipgloss.NewStyle().Foreground(dim)
-	grayStyle      = lipgloss.NewStyle().Foreground(gray)
-	connectedStyle = lipgloss.NewStyle().Foreground(neonGreen).Bold(true)
-	errorStyle     = lipgloss.NewStyle().Foreground(red).Bold(true)
-	borderStyle    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(dim).Background(dark).Padding(0, 1)
-	inputStyle     = lipgloss.NewStyle().Foreground(neonPink).Bold(true)
-	spinnerStyle   = lipgloss.NewStyle().Foreground(neonPink)
-	dotOnStyle     = lipgloss.NewStyle().Foreground(neonGreen)
-	dotOffStyle    = lipgloss.NewStyle().Foreground(red)
-
-	lainCleanStyle   = lipgloss.NewStyle().Foreground(neonPink).Italic(true)
-	lainGlitchStyle  = lipgloss.NewStyle().Foreground(violet).Italic(true)
-	lainStaticStyle  = lipgloss.NewStyle().Foreground(ghost).Italic(true)
-	lainResolveStyle = lipgloss.NewStyle().Foreground(cyan).Italic(true)
-
-	frameWidth = 62
-)
-
-// lainRand drives the ambient message ticker below. Kept separate from a
-// global math/rand source so this doesn't depend on Go-version-specific
-// auto-seeding behavior.
-var lainRand = rand.New(rand.NewSource(time.Now().UnixNano()))
-
-// lainPhrases are short transmissions that periodically materialize and
-// dissolve in the header, a nod to Serial Experiments Lain. Keep each one
-// under ~50 chars so it never wraps inside the frame.
-var lainPhrases = []string{
-	"connecting to the Wired...",
-	"no matter where you go, everyone's connected",
-	"the Wired is everywhere",
-	"close the world, open the nExt",
-	"present day, present time...",
-	"layer 07 accessed",
-	"you are receiving this",
-	"protocol seven initiated",
-	"the boundary is thinning",
-	"Navi is watching",
-	"this world is not the only one",
-	"identity: unresolved",
-	"let's all love lain",
-	"the network remembers you",
-	"god is on line two",
-	"who's there?",
-	"reality is a matter of consensus",
-	"I am here. I have always been here.",
-	"do you wanna be a god?",
-	"the body is only a terminal",
-	"information wants a body",
-	"your Navi knows your name",
-	"signal without a source",
-	"don't confuse the layers",
-	"full range. full motion.",
-	"Chisa is still online",
-	"Eiri is only code now",
-	"a voice in the power lines",
-	"you left a ghost in the cache",
-	"layer 01: WEIRD",
-	"layer 13: EGO",
-	"to be everywhere is to be nowhere",
-	"the city is a circuit board",
-	"sleep is just a disconnect",
-	"who is editing you?",
-}
-
-var lainRare = []string{
-	"I saw you through the other screen",
-	"stop looking for the operator",
-	"this message is older than the device",
-	"you already accepted the handshake",
-	"there is no logout from here",
-}
-
-const (
-	lainGlitchSteps = 10
-	lainHoldMin     = 5
-	lainHoldExtra   = 6
-)
-
-type lainMood int
-
-const (
-	lainMoodClean lainMood = iota
-	lainMoodGlitch
-	lainMoodStatic
-	lainMoodResolve
-)
-
-func pickLainPhrase(prev string) string {
-	pool := lainPhrases
-	if lainRand.Intn(9) == 0 {
-		pool = lainRare
-	}
-	next := pool[lainRand.Intn(len(pool))]
-	for next == prev && len(pool) > 1 {
-		next = pool[lainRand.Intn(len(pool))]
-	}
-	return next
-}
-
-func glitchify(s string, intensity float64) string {
-	if intensity <= 0 {
-		return s
-	}
-	noise := []rune("░▒▓█#%&@?▌▐▄▀╱╲╳·")
-	runes := []rune(s)
-	out := make([]rune, len(runes))
-	for i, r := range runes {
-		if r == ' ' {
-			out[i] = r
-			continue
-		}
-		if lainRand.Float64() < intensity {
-			out[i] = noise[lainRand.Intn(len(noise))]
-		} else {
-			out[i] = r
-		}
-	}
-	return string(out)
-}
-
-func scrambleCase(s string, intensity float64) string {
-	runes := []rune(s)
-	for i, r := range runes {
-		if !unicode.IsLetter(r) {
-			continue
-		}
-		if lainRand.Float64() < intensity {
-			if unicode.IsUpper(r) {
-				runes[i] = unicode.ToLower(r)
-			} else {
-				runes[i] = unicode.ToUpper(r)
-			}
-		}
-	}
-	return string(runes)
-}
-
-func padRunes(s string, n int) []rune {
-	r := []rune(s)
-	if len(r) >= n {
-		return r
-	}
-	out := make([]rune, n)
-	copy(out, r)
-	for i := len(r); i < n; i++ {
-		out[i] = ' '
-	}
-	return out
-}
-
-// glitchMix crossfades two strings through a noise peak so the header
-// never blanks between transmissions.
-func glitchMix(from, to string, t float64) string {
-	if t <= 0 {
-		return from
-	}
-	if t >= 1 {
-		return to
-	}
-	a, b := []rune(from), []rune(to)
-	n := len(a)
-	if len(b) > n {
-		n = len(b)
-	}
-	fa, fb := padRunes(from, n), padRunes(to, n)
-	out := make([]rune, n)
-	noise := []rune("░▒▓█#%&@?▌▐")
-	peak := 1 - 2*math.Abs(t-0.5)
-	if peak < 0 {
-		peak = 0
-	}
-	for i := 0; i < n; i++ {
-		var src rune
-		if t < 0.5 {
-			src = fa[i]
-		} else {
-			src = fb[i]
-		}
-		switch {
-		case src == ' ':
-			if peak > 0.7 && lainRand.Intn(8) == 0 {
-				out[i] = noise[lainRand.Intn(len(noise))]
-			} else {
-				out[i] = ' '
-			}
-		case lainRand.Float64() < peak*0.9:
-			out[i] = noise[lainRand.Intn(len(noise))]
-		default:
-			out[i] = src
-		}
-	}
-	_ = a
-	_ = b
-	return string(out)
-}
-
-func divider() string {
-	return dimStyle.Render(strings.Repeat("─", frameWidth-2))
-}
-
-// footer renders the persistent hotkey bar. Every item is shown all the
-// time (per navi's UX preference); items that need an active connection
-// are dimmed further when one isn't available, rather than disappearing,
-// so the keymap never shifts under the user's fingers.
-func footer(active bool, items ...[2]string) string {
-	parts := make([]string, 0, len(items))
-	for _, it := range items {
-		key, label := it[0], it[1]
-		style := dimStyle
-		if !active {
-			style = lipgloss.NewStyle().Foreground(lipgloss.Color("#333333"))
-		}
-		parts = append(parts, style.Render(key+" "+label))
-	}
-	return strings.Join(parts, "   ")
-}
+// okStyle is the one local style: "good news" green, composed from theme
+// tokens. Everything else comes from the theme package directly.
+var okStyle = theme.DotOn.Copy().Bold(true)
 
 // ─────────────────────────────────────────────────────────────────────────
 // Domain types
@@ -346,11 +114,23 @@ type forgetMsg struct{ err error }
 type speedTestDoneMsg speedTestResult
 type speedTickMsg struct{}
 
-type lainShowMsg struct{ text string }
-type lainGlitchTickMsg struct{}
-type lainHoldDoneMsg struct{}
-type lainFlickerMsg struct{}
+// transTickMsg drives the static-dissolve screen transition.
+type transTickMsg struct{}
 
+// idleTickMsg drives the breathing idle glow when there is no link.
+type idleTickMsg struct{}
+
+const transFrames = 4
+
+func transTickCmd() tea.Cmd {
+	return tea.Tick(45*time.Millisecond, func(time.Time) tea.Msg { return transTickMsg{} })
+}
+
+func idleTickCmd() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(time.Time) tea.Msg { return idleTickMsg{} })
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────
 // Model
 // ─────────────────────────────────────────────────────────────────────────
@@ -371,8 +151,23 @@ type model struct {
 	err           error
 	qr            string
 
-	spinner  spinner.Model
-	progress progress.Model
+	// Theme chrome: the shared nightshadeNeon spinner frame counter and
+	// the ambient Serial Experiments Lain transmission ticker.
+	spinFrame int
+	spinTag   int
+	tx        theme.Transmission
+
+	// transition counts down a brief static-dissolve when changing
+	// screens; place() glitches the frame while it is nonzero.
+	transition int
+
+	// samples is a ring of recent throughput readings (Mbps) taken on
+	// each speed-test tick, rendered as a live sparkline.
+	samples   []float64
+	lastBytes int64
+
+	// idleTick tracks whether the breathing-idle ticker is in flight.
+	idleTick bool
 
 	// cancel, when non-nil, aborts whatever background operation is
 	// currently in flight (scan, connect, speed test, ...). Pressing esc
@@ -382,32 +177,14 @@ type model struct {
 	speedProgress *speedProgress
 	speedResult   speedTestResult
 	speedRunning  bool
-
-	lainText    string
-	lainFrom    string
-	lainClean   string
-	lainVisible bool
-	lainFrame   int
-	lainMood    lainMood
-	lainBusy    bool
 }
 
 func initialModel() model {
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = spinnerStyle
-
-	p := progress.New(
-		progress.WithGradient("#ff10f0", "#39ff14"),
-		progress.WithWidth(40),
-		progress.WithoutPercentage(),
-	)
-
-	return model{loading: true, spinner: s, progress: p}
+	return model{loading: true}
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, lainFirstCmd(), func() tea.Msg { return startMsg{} })
+	return tea.Batch(theme.SpinnerTick(m.spinTag, 80*time.Millisecond), m.tx.Init(), func() tea.Msg { return startMsg{} })
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -894,35 +671,39 @@ func speedTickCmd() tea.Cmd {
 	return tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg { return speedTickMsg{} })
 }
 
-func lainFirstCmd() tea.Cmd {
-	return tea.Tick(900*time.Millisecond, func(time.Time) tea.Msg {
-		return lainShowMsg{text: pickLainPhrase("")}
-	})
-}
-
-func lainGlitchCmd() tea.Cmd {
-	return tea.Tick(55*time.Millisecond, func(time.Time) tea.Msg {
-		return lainGlitchTickMsg{}
-	})
-}
-
-func lainHoldCmd() tea.Cmd {
-	d := time.Duration(lainHoldMin+lainRand.Intn(lainHoldExtra)) * time.Second
-	return tea.Tick(d, func(time.Time) tea.Msg { return lainHoldDoneMsg{} })
-}
-
-func lainFlickerCmd() tea.Cmd {
-	d := time.Duration(1400+lainRand.Intn(2600)) * time.Millisecond
-	return tea.Tick(d, func(time.Time) tea.Msg { return lainFlickerMsg{} })
-}
-
 // startOp creates a fresh cancellable context, stashes its cancel func on
 // the model so a subsequent esc can abort the operation, and returns the
 // context for use in the accompanying command.
 func (m *model) startOp() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
+	// Bump the spinner tag so ticks from a previous operation die.
+	m.spinTag++
 	return ctx
+}
+
+// syncIdle arms the breathing-idle ticker when the mod is truly idle —
+// not loading, not testing, no link — and disarms it otherwise.
+func (m *model) syncIdle(cmd tea.Cmd) tea.Cmd {
+	want := !m.loading && !m.speedRunning && m.info.SSID == ""
+	if want && !m.idleTick {
+		m.idleTick = true
+		return tea.Batch(cmd, idleTickCmd())
+	}
+	if !want {
+		m.idleTick = false
+	}
+	return cmd
+}
+
+// goScreen switches screens through a brief static dissolve.
+func (m *model) goScreen(s screen) tea.Cmd {
+	if m.screen == s {
+		return nil
+	}
+	m.screen = s
+	m.transition = transFrames
+	return transTickCmd()
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -934,10 +715,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
+	case theme.SpinnerTickMsg:
+		if msg.Tag == m.spinTag {
+			m.spinFrame++
+			if m.loading || m.speedRunning {
+				return m, theme.SpinnerTick(m.spinTag, 80*time.Millisecond)
+			}
+		}
+		return m, nil
 
 	case startMsg:
 		ctx := m.startOp()
@@ -970,10 +755,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.message = fmt.Sprintf("connected to %s", m.selected.SSID)
 		m.password = ""
-		m.screen = screenNetworks
+		trans := m.goScreen(screenNetworks)
 		m.loading = true
 		ctx := m.startOp()
-		return m, tea.Batch(scanCmd(ctx), infoCmd(ctx))
+		return m, tea.Batch(scanCmd(ctx), infoCmd(ctx), trans)
 
 	case disconnectedMsg:
 		m.loading = false
@@ -987,10 +772,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.info = ConnectionInfo{}
 		m.message = "disconnected"
-		m.screen = screenNetworks
+		trans := m.goScreen(screenNetworks)
 		m.err = nil
 		ctx := m.startOp()
-		return m, scanCmd(ctx)
+		return m, tea.Batch(scanCmd(ctx), trans)
 
 	case dnsMsg:
 		m.loading = false
@@ -1003,9 +788,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.message = "DNS set to " + msg.preset
-		m.screen = screenDashboard
+		trans := m.goScreen(screenDashboard)
 		ctx := m.startOp()
-		return m, infoCmd(ctx)
+		return m, tea.Batch(infoCmd(ctx), trans)
 
 	case infoMsg:
 		m.loading = false
@@ -1032,6 +817,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err == nil {
 			m.qr = msg.payload
 			m.screen = screenShare
+			m.transition = transFrames
+			return m, transTickCmd()
 		}
 
 	case forgetMsg:
@@ -1045,9 +832,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.message = "forgot " + m.selected.SSID
-		m.screen = screenNetworks
+		trans := m.goScreen(screenNetworks)
 		ctx := m.startOp()
-		return m, scanCmd(ctx)
+		return m, tea.Batch(scanCmd(ctx), trans)
 
 	case speedTestDoneMsg:
 		m.speedRunning = false
@@ -1060,71 +847,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = nil
 
 	case speedTickMsg:
-		if m.speedRunning {
+		if m.speedRunning && m.speedProgress != nil {
+			// Sample throughput once per tick for the live sparkline.
+			// Ticks are 120ms apart, so the delta converts directly.
+			if m.speedProgress.stage.Load() != stageLatency {
+				done := m.speedProgress.bytesDone.Load()
+				mbps := float64(done-m.lastBytes) / 0.12 * 8 / 1_000_000
+				m.lastBytes = done
+				m.samples = append(m.samples, mbps)
+				if len(m.samples) > 48 {
+					m.samples = m.samples[len(m.samples)-48:]
+				}
+			}
 			return m, speedTickCmd()
 		}
 
-	case lainShowMsg:
-		m.lainFrom = m.lainClean
-		if strings.TrimSpace(m.lainFrom) == "" {
-			m.lainFrom = strings.Repeat(" ", len([]rune(msg.text)))
-		}
-		m.lainClean = msg.text
-		m.lainVisible = true
-		m.lainBusy = true
-		m.lainFrame = 0
-		m.lainMood = lainMoodStatic
-		m.lainText = glitchMix(m.lainFrom, m.lainClean, 0.05)
-		return m, lainGlitchCmd()
+	case theme.TxShowMsg, theme.TxGlitchTickMsg, theme.TxHoldDoneMsg, theme.TxFlickerMsg:
+		var cmd tea.Cmd
+		m.tx, cmd = m.tx.Update(msg)
+		return m, cmd
 
-	case lainGlitchTickMsg:
-		if !m.lainBusy {
-			return m, nil
+	case transTickMsg:
+		if m.transition > 0 {
+			m.transition--
+			if m.transition > 0 {
+				return m, transTickCmd()
+			}
 		}
-		m.lainFrame++
-		t := float64(m.lainFrame) / float64(lainGlitchSteps)
-		if t >= 1 {
-			m.lainText = m.lainClean
-			m.lainMood = lainMoodClean
-			m.lainBusy = false
-			return m, tea.Batch(lainHoldCmd(), lainFlickerCmd())
-		}
-		mixed := glitchMix(m.lainFrom, m.lainClean, t)
-		switch {
-		case t < 0.35:
-			m.lainMood = lainMoodStatic
-			m.lainText = glitchify(mixed, 0.85)
-		case t < 0.7:
-			m.lainMood = lainMoodGlitch
-			m.lainText = scrambleCase(mixed, 0.45)
-		default:
-			m.lainMood = lainMoodResolve
-			m.lainText = glitchify(mixed, 0.18)
-		}
-		return m, lainGlitchCmd()
+		return m, nil
 
-	case lainHoldDoneMsg:
-		if m.lainBusy {
-			return m, nil
-		}
-		return m, func() tea.Msg {
-			return lainShowMsg{text: pickLainPhrase(m.lainClean)}
-		}
-
-	case lainFlickerMsg:
-		if m.lainBusy || !m.lainVisible || m.lainClean == "" {
-			return m, nil
-		}
-		// A brief nervous twitch while the phrase sits. Resolves on the
-		// next flicker tick unless a real transition has started.
-		if lainRand.Intn(3) == 0 {
-			m.lainMood = lainMoodGlitch
-			m.lainText = scrambleCase(glitchify(m.lainClean, 0.22), 0.3)
-		} else {
-			m.lainMood = lainMoodClean
-			m.lainText = m.lainClean
-		}
-		return m, lainFlickerCmd()
+	case idleTickMsg:
+		m.idleTick = false
+		return m, m.syncIdle(nil)
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -1141,37 +895,50 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.speedRunning = false
 				m.message = "cancelled"
 				m.err = nil
-				return m, nil
+				return m, m.syncIdle(nil)
 			}
 		}
+		prev := m.screen
+		var cmd tea.Cmd
+		var nm tea.Model
 		switch m.screen {
 		case screenNetworks:
-			return m.updateNetworks(msg)
+			nm, cmd = m.updateNetworks(msg)
 		case screenPassword:
-			return m.updatePassword(msg)
+			nm, cmd = m.updatePassword(msg)
 		case screenOpenConfirm:
-			return m.updateOpenConfirm(msg)
+			nm, cmd = m.updateOpenConfirm(msg)
 		case screenDashboard:
-			return m.updateDashboard(msg)
+			nm, cmd = m.updateDashboard(msg)
 		case screenDNS:
-			return m.updateDNS(msg)
+			nm, cmd = m.updateDNS(msg)
 		case screenCustomDNS:
-			return m.updateCustomDNS(msg)
+			nm, cmd = m.updateCustomDNS(msg)
 		case screenDetails:
-			return m.updateDetails(msg)
+			nm, cmd = m.updateDetails(msg)
 		case screenShare:
+			nm = m
 			if msg.String() == "esc" || msg.String() == "q" {
 				m.screen = screenDashboard
 				m.qr = ""
+				nm = m
 			}
-			return m, nil
 		case screenForgetConfirm:
-			return m.updateForget(msg)
+			nm, cmd = m.updateForget(msg)
 		case screenSpeedTest:
-			return m.updateSpeedTest(msg)
+			nm, cmd = m.updateSpeedTest(msg)
 		}
+		if mm, ok := nm.(model); ok {
+			m = mm
+		}
+		if m.screen != prev {
+			// Screen changed: dissolve through static.
+			m.transition = transFrames
+			cmd = tea.Batch(cmd, transTickCmd())
+		}
+		return m, m.syncIdle(cmd)
 	}
-	return m, nil
+	return m, m.syncIdle(nil)
 }
 
 func (m model) updateNetworks(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -1424,6 +1191,8 @@ func (m model) startSpeedTest() (tea.Model, tea.Cmd) {
 	m.speedProgress = newSpeedProgress()
 	m.speedResult = speedTestResult{}
 	m.speedRunning = true
+	m.samples = nil
+	m.lastBytes = 0
 	m.screen = screenSpeedTest
 	m.err = nil
 	ctx := m.startOp()
@@ -1459,40 +1228,23 @@ func (m model) View() string {
 	}
 }
 
-func (m model) lainRow() string {
-	text := " "
-	if m.lainVisible && m.lainText != "" {
-		text = " " + m.lainText
-	}
-	style := lainCleanStyle
-	switch m.lainMood {
-	case lainMoodGlitch:
-		style = lainGlitchStyle
-	case lainMoodStatic:
-		style = lainStaticStyle
-	case lainMoodResolve:
-		style = lainResolveStyle
-	}
-	return style.Width(frameWidth).Render(text)
-}
-
 func (m model) frame(content string) string {
-	dot := dotOffStyle.Render("●")
-	if m.info.SSID != "" {
-		dot = dotOnStyle.Render("●")
-	}
-	title := logoStyle.Render(" ∅ ") + titleStyle.Render(" navi networking")
-	headerLine := lipgloss.NewStyle().Width(frameWidth - 4).Render(title)
-	header := lipgloss.JoinHorizontal(lipgloss.Top, headerLine, dot+"  ")
-
-	body := lipgloss.NewStyle().Width(frameWidth).Render(content)
-	return borderStyle.Render(header + "\n" + m.lainRow() + "\n" + body)
+	return theme.Frame(frameWidth, "navi networking", m.info.SSID != "", m.tx.View(frameWidth), content)
 }
+
 func (m model) place(content string) string {
 	if m.width == 0 {
 		return content
 	}
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.frame(content))
+	out := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.frame(content))
+	if m.transition > 0 {
+		// Static dissolve between screens: glitch the composed frame,
+		// fading as the transition counts down. ANSI-aware so colors
+		// survive the noise.
+		intensity := 0.12 + 0.55*float64(m.transition)/float64(transFrames)
+		out = theme.GlitchANSI(out, intensity)
+	}
+	return out
 }
 
 // networksFooter is the full, persistent hotkey bar shared by the network
@@ -1500,196 +1252,202 @@ func (m model) place(content string) string {
 // the two screens.
 func (m model) networksFooter() string {
 	active := m.info.SSID != ""
-	line1 := footer(true,
+	line1 := theme.Footer(true,
 		[2]string{"↑↓", "navigate"},
 		[2]string{"enter", "connect"},
 		[2]string{"r", "rescan"},
 	)
-	line2 := footer(active,
+	line2 := theme.Footer(active,
 		[2]string{"d", "dns"},
 		[2]string{"i", "details"},
 		[2]string{"s", "share"},
 		[2]string{"x", "disconnect"},
+	)
+	line3 := theme.Footer(active,
 		[2]string{"f", "forget"},
 		[2]string{"t", "speed"},
 	)
-	return line1 + "\n" + line2 + "\n" + dimStyle.Render("q quit")
+	return line1 + "\n" + line2 + "\n" + line3 + "\n" + theme.Dimmed.Render("q quit")
 }
 
 func (m model) networkView() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("NETWORKS"))
+	b.WriteString(theme.Header.Render("NETWORKS"))
 	b.WriteString("\n\n")
 	if m.loading {
-		b.WriteString(m.spinner.View() + " " + dimStyle.Render("scanning for networks..."))
+		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("scanning for networks..."))
 		b.WriteString("\n")
 	} else if len(m.networks) == 0 {
-		b.WriteString(dimStyle.Render("  no Wi-Fi networks found"))
+		b.WriteString(theme.Dimmed.Render("  no Wi-Fi networks found"))
 		b.WriteString("\n")
 	} else {
 		for i, n := range m.networks {
 			cursor := "  "
 			if i == m.cursor {
-				cursor = selectedStyle.Render("› ")
+				cursor = theme.Selected.Render("› ")
 			}
 			name := n.SSID
 			if n.InUse {
-				name = connectedStyle.Render(name)
+				name = okStyle.Render(name)
 			} else if i == m.cursor {
-				name = selectedStyle.Render(name)
+				name = theme.Selected.Render(name)
 			}
 			sec := n.Security
 			if sec == "" {
 				sec = "OPEN"
 			}
-			b.WriteString(fmt.Sprintf("%s%-28s %s  %s", cursor, name, signalBars(n.Signal), dimStyle.Render(sec)))
+			b.WriteString(fmt.Sprintf("%s%-28s %s  %s", cursor, name, signalBars(n.Signal), theme.Dimmed.Render(sec)))
 			if n.InUse {
-				b.WriteString("  " + connectedStyle.Render("●"))
+				b.WriteString("  " + okStyle.Render("●"))
 			}
 			b.WriteString("\n")
 		}
 	}
 	if m.message != "" {
-		b.WriteString("\n" + connectedStyle.Render("✓ "+m.message) + "\n")
+		b.WriteString("\n" + okStyle.Render("✓ "+m.message) + "\n")
 	}
 	if m.err != nil {
-		b.WriteString("\n" + errorStyle.Render("× "+m.err.Error()) + "\n")
+		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
 	}
-	b.WriteString("\n" + divider() + "\n")
+	if !m.loading && m.info.SSID == "" && m.err == nil && m.message == "" {
+		// No link, nothing happening: the mod breathes, waiting.
+		b.WriteString("\n" + theme.Glow("  ○ no link — listening for the Wired", time.Now()) + "\n")
+	}
+	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
 	b.WriteString(m.networksFooter())
 	return m.place(b.String())
 }
 func (m model) passwordView() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("CONNECT"))
+	b.WriteString(theme.Header.Render("CONNECT"))
 	b.WriteString("\n\n")
-	b.WriteString(normalStyle.Render("  Network  ") + selectedStyle.Render(m.selected.SSID) + "\n")
-	b.WriteString(dimStyle.Render("  Security  ") + normalStyle.Render(m.selected.Security) + "\n\n")
-	b.WriteString(normalStyle.Render("  Password") + "\n\n")
-	b.WriteString(inputStyle.Render("  > " + strings.Repeat("•", len([]rune(m.password)))))
+	b.WriteString(theme.Normal.Render("  Network  ") + theme.Selected.Render(m.selected.SSID) + "\n")
+	b.WriteString(theme.Dimmed.Render("  Security  ") + theme.Normal.Render(m.selected.Security) + "\n\n")
+	b.WriteString(theme.Normal.Render("  Password") + "\n\n")
+	b.WriteString(theme.Input.Render("  > " + strings.Repeat("•", len([]rune(m.password)))))
 	if m.loading {
-		b.WriteString("\n\n" + m.spinner.View() + " " + dimStyle.Render("connecting..."))
+		b.WriteString("\n\n" + theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("connecting..."))
 	}
 	if m.err != nil {
-		b.WriteString("\n\n" + errorStyle.Render("  × "+m.err.Error()))
+		b.WriteString("\n\n" + theme.Error.Render("  × "+m.err.Error()))
 	}
-	b.WriteString("\n\n" + dimStyle.Render("  enter connect   esc cancel"))
+	b.WriteString("\n\n" + theme.Dimmed.Render("  enter connect   esc cancel"))
 	return m.place(b.String())
 }
 func (m model) openConfirmView() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("CONNECT"))
+	b.WriteString(theme.Header.Render("CONNECT"))
 	b.WriteString("\n\n")
-	b.WriteString(selectedStyle.Render("  "+m.selected.SSID) + "\n\n")
-	b.WriteString(errorStyle.Render("  OPEN NETWORK") + "\n\n")
-	b.WriteString(normalStyle.Render("  This network has no password."))
+	b.WriteString(theme.Selected.Render("  "+m.selected.SSID) + "\n\n")
+	b.WriteString(theme.Error.Render("  OPEN NETWORK") + "\n\n")
+	b.WriteString(theme.Normal.Render("  This network has no password."))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("  navi will never join an open network without"))
+	b.WriteString(theme.Dimmed.Render("  navi will never join an open network without"))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("  your explicit confirmation."))
+	b.WriteString(theme.Dimmed.Render("  your explicit confirmation."))
 	b.WriteString("\n\n")
-	b.WriteString(normalStyle.Render("  Signal  ") + signalBars(m.selected.Signal) + "\n")
-	b.WriteString(normalStyle.Render("  BSSID   ") + grayStyle.Render(m.selected.BSSID) + "\n\n")
+	b.WriteString(theme.Normal.Render("  Signal  ") + signalBars(m.selected.Signal) + "\n")
+	b.WriteString(theme.Normal.Render("  BSSID   ") + theme.Grayed.Render(m.selected.BSSID) + "\n\n")
 	if m.loading {
-		b.WriteString(m.spinner.View() + " " + dimStyle.Render("connecting...") + "\n\n")
+		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("connecting...") + "\n\n")
 	}
-	b.WriteString(selectedStyle.Render("  [ enter ] connect"))
-	b.WriteString("   " + dimStyle.Render("[ esc ] cancel"))
+	b.WriteString(theme.Selected.Render("  [ enter ] connect"))
+	b.WriteString("   " + theme.Dimmed.Render("[ esc ] cancel"))
 	return m.place(b.String())
 }
 func (m model) dashboardView() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("CONNECTION"))
+	b.WriteString(theme.Header.Render("CONNECTION"))
 	b.WriteString("\n\n")
 	if m.info.SSID == "" {
-		b.WriteString(dimStyle.Render("  no active Wi-Fi connection"))
+		b.WriteString(theme.Dimmed.Render("  no active Wi-Fi connection"))
 	} else {
-		b.WriteString(connectedStyle.Render("  ● "+m.info.SSID) + "\n\n")
-		b.WriteString(normalStyle.Render("  Signal    ") + signalBars(m.info.Signal) + "\n")
-		b.WriteString(normalStyle.Render("  Security  ") + m.info.Security + "\n")
-		b.WriteString(normalStyle.Render("  Device    ") + m.info.Device + "\n")
-		b.WriteString(normalStyle.Render("  BSSID     ") + grayStyle.Render(m.info.BSSID) + "\n")
+		b.WriteString(okStyle.Render("  ● "+m.info.SSID) + "\n\n")
+		b.WriteString(theme.Normal.Render("  Signal    ") + signalBars(m.info.Signal) + "\n")
+		b.WriteString(theme.Normal.Render("  Security  ") + m.info.Security + "\n")
+		b.WriteString(theme.Normal.Render("  Device    ") + m.info.Device + "\n")
+		b.WriteString(theme.Normal.Render("  BSSID     ") + theme.Grayed.Render(m.info.BSSID) + "\n")
 	}
 	if m.err != nil {
-		b.WriteString("\n" + errorStyle.Render("× "+m.err.Error()))
+		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()))
 	}
-	b.WriteString("\n\n" + divider() + "\n")
+	b.WriteString("\n\n" + theme.Divider(frameWidth) + "\n")
 	b.WriteString(m.networksFooter())
 	return m.place(b.String())
 }
 func (m model) dnsView() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("DNS"))
+	b.WriteString(theme.Header.Render("DNS"))
 	b.WriteString("\n\n")
-	b.WriteString(normalStyle.Render("  Connection  ") + selectedStyle.Render(m.info.SSID) + "\n\n")
+	b.WriteString(theme.Normal.Render("  Connection  ") + theme.Selected.Render(m.info.SSID) + "\n\n")
 	for i, p := range dnsPresets {
 		cursor := "  "
 		if i == m.dnsCursor {
-			cursor = selectedStyle.Render("› ")
+			cursor = theme.Selected.Render("› ")
 		}
 		b.WriteString(cursor + p.Name + "\n")
 	}
 	if m.loading {
-		b.WriteString("\n" + m.spinner.View() + " " + dimStyle.Render("applying..."))
+		b.WriteString("\n" + theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("applying..."))
 	}
 	if m.err != nil {
-		b.WriteString("\n\n" + errorStyle.Render("× "+m.err.Error()))
+		b.WriteString("\n\n" + theme.Error.Render("× "+m.err.Error()))
 	}
-	b.WriteString("\n\n" + dimStyle.Render("  enter select   ↑↓ navigate   esc back"))
+	b.WriteString("\n\n" + theme.Dimmed.Render("  enter select   ↑↓ navigate   esc back"))
 	return m.place(b.String())
 }
 func (m model) customDNSView() string {
 	labels := []string{"IPv4 primary", "IPv4 secondary", "IPv6 primary", "IPv6 secondary"}
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("CUSTOM DNS"))
+	b.WriteString(theme.Header.Render("CUSTOM DNS"))
 	b.WriteString("\n\n")
 	for i, l := range labels {
 		cursor := "  "
 		if i == m.customCursor {
-			cursor = selectedStyle.Render("› ")
+			cursor = theme.Selected.Render("› ")
 		}
 		val := m.customDNS[i]
 		if val == "" {
-			val = dimStyle.Render("enter address")
+			val = theme.Dimmed.Render("enter address")
 		}
-		b.WriteString(cursor + normalStyle.Render(l+"  ") + val + "\n")
+		b.WriteString(cursor + theme.Normal.Render(l+"  ") + val + "\n")
 	}
 	if m.loading {
-		b.WriteString("\n" + m.spinner.View() + " " + dimStyle.Render("applying DNS..."))
+		b.WriteString("\n" + theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("applying DNS..."))
 	}
 	if m.err != nil {
-		b.WriteString("\n\n" + errorStyle.Render("× "+m.err.Error()))
+		b.WriteString("\n\n" + theme.Error.Render("× "+m.err.Error()))
 	}
-	b.WriteString("\n\n" + dimStyle.Render("  ↑↓ select   tab next   enter apply   esc cancel"))
+	b.WriteString("\n\n" + theme.Dimmed.Render("  ↑↓ select   tab next   enter apply   esc cancel"))
 	return m.place(b.String())
 }
 func (m model) detailsView() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("CONNECTION DETAILS"))
+	b.WriteString(theme.Header.Render("CONNECTION DETAILS"))
 	b.WriteString("\n\n")
 	if m.loading {
-		b.WriteString(m.spinner.View() + " " + dimStyle.Render("loading...") + "\n")
+		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("loading...") + "\n")
 	}
 	rows := [][2]string{{"SSID", m.info.SSID}, {"Device", m.info.Device}, {"BSSID", m.info.BSSID}, {"Signal", fmt.Sprintf("%d%%", m.info.Signal)}, {"Security", m.info.Security}, {"IPv4", m.info.IPv4}, {"Gateway", m.info.Gateway}, {"DNS IPv4", m.info.DNSv4}, {"DNS IPv6", m.info.DNSv6}}
 	for _, r := range rows {
-		b.WriteString(fmt.Sprintf("  %-12s %s\n", r[0], normalStyle.Render(r[1])))
+		b.WriteString(fmt.Sprintf("  %-12s %s\n", r[0], theme.Normal.Render(r[1])))
 	}
 	if m.err != nil {
-		b.WriteString("\n" + errorStyle.Render("× "+m.err.Error()))
+		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()))
 	}
-	b.WriteString("\n" + dimStyle.Render("esc back"))
+	b.WriteString("\n" + theme.Dimmed.Render("esc back"))
 	return m.place(b.String())
 }
 func (m model) shareView() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("SHARE NETWORK"))
+	b.WriteString(theme.Header.Render("SHARE NETWORK"))
 	b.WriteString("\n\n")
 	if m.loading {
-		b.WriteString(m.spinner.View() + " " + dimStyle.Render("generating QR code..."))
+		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("generating QR code..."))
 		return m.place(b.String())
 	}
-	b.WriteString(connectedStyle.Render("  "+m.info.SSID) + "\n")
-	b.WriteString(dimStyle.Render("  scan this QR code with your phone") + "\n\n")
+	b.WriteString(okStyle.Render("  "+m.info.SSID) + "\n")
+	b.WriteString(theme.Dimmed.Render("  scan this QR code with your phone") + "\n\n")
 	if m.qr != "" {
 		var buf bytes.Buffer
 		cfg := qrterminal.Config{Level: qrterminal.M, Writer: &buf, HalfBlocks: true, QuietZone: 1}
@@ -1698,28 +1456,28 @@ func (m model) shareView() string {
 			b.WriteString("  " + line + "\n")
 		}
 	}
-	b.WriteString("\n" + dimStyle.Render("esc back"))
+	b.WriteString("\n" + theme.Dimmed.Render("esc back"))
 	if m.err != nil {
-		b.WriteString("\n\n" + errorStyle.Render("× "+m.err.Error()))
+		b.WriteString("\n\n" + theme.Error.Render("× "+m.err.Error()))
 	}
 	return m.place(b.String())
 }
 func (m model) forgetView() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("FORGET NETWORK"))
+	b.WriteString(theme.Header.Render("FORGET NETWORK"))
 	b.WriteString("\n\n")
-	b.WriteString(normalStyle.Render("  Forget ") + selectedStyle.Render(m.selected.SSID) + normalStyle.Render("?\n\n  This removes its saved NetworkManager profile.\n\n"))
+	b.WriteString(theme.Normal.Render("  Forget ") + theme.Selected.Render(m.selected.SSID) + theme.Normal.Render("?\n\n  This removes its saved NetworkManager profile.\n\n"))
 	if m.loading {
-		b.WriteString(m.spinner.View() + " " + dimStyle.Render("forgetting...") + "\n\n")
+		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("forgetting...") + "\n\n")
 	}
-	b.WriteString(selectedStyle.Render("  [ enter ] forget"))
-	b.WriteString("   " + dimStyle.Render("[ esc ] cancel"))
+	b.WriteString(theme.Selected.Render("  [ enter ] forget"))
+	b.WriteString("   " + theme.Dimmed.Render("[ esc ] cancel"))
 	return m.place(b.String())
 }
 
 func (m model) speedTestView() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("SPEED TEST"))
+	b.WriteString(theme.Header.Render("SPEED TEST"))
 	b.WriteString("\n\n")
 
 	switch {
@@ -1730,7 +1488,7 @@ func (m model) speedTestView() string {
 		}
 		switch stage {
 		case stageLatency:
-			b.WriteString(m.spinner.View() + " " + dimStyle.Render("measuring latency..."))
+			b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("measuring latency..."))
 		case stageDownload, stageUpload:
 			label := "↓ download"
 			if stage == stageUpload {
@@ -1745,24 +1503,28 @@ func (m model) speedTestView() string {
 					frac = 1
 				}
 			}
-			b.WriteString(normalStyle.Render("  " + label))
-			b.WriteString("\n\n  " + m.progress.ViewAs(frac))
-			b.WriteString("\n  " + dimStyle.Render(fmt.Sprintf("%.1f / %.1f MB", float64(done)/1_000_000, float64(total)/1_000_000)))
+			b.WriteString(theme.Normal.Render("  " + label))
+			b.WriteString("\n\n  " + theme.Meter(40, frac, theme.Pink, theme.Faint))
+			b.WriteString("\n  " + theme.Dimmed.Render(fmt.Sprintf("%.1f / %.1f MB", float64(done)/1_000_000, float64(total)/1_000_000)))
+			if len(m.samples) > 1 {
+				b.WriteString("\n\n  " + theme.Sparkline(m.samples, 40, theme.Cyan))
+				b.WriteString("\n  " + theme.Grayed.Render(fmt.Sprintf("%.1f Mbps live", m.samples[len(m.samples)-1])))
+			}
 		}
-		b.WriteString("\n\n" + dimStyle.Render("  esc cancel"))
+		b.WriteString("\n\n" + theme.Dimmed.Render("  esc cancel"))
 
 	case m.speedResult.err != nil:
-		b.WriteString(errorStyle.Render("× " + m.speedResult.err.Error()))
-		b.WriteString("\n\n" + dimStyle.Render("  t retry   esc back"))
+		b.WriteString(theme.Error.Render("× " + m.speedResult.err.Error()))
+		b.WriteString("\n\n" + theme.Dimmed.Render("  t retry   esc back"))
 
 	case m.speedResult.downloadMbps > 0:
-		b.WriteString(normalStyle.Render("  Latency   ") + fmt.Sprintf("%.0f ms", m.speedResult.latencyMs) + "\n")
-		b.WriteString(normalStyle.Render("  Download  ") + connectedStyle.Render(fmt.Sprintf("%.1f Mbps", m.speedResult.downloadMbps)) + "\n")
-		b.WriteString(normalStyle.Render("  Upload    ") + connectedStyle.Render(fmt.Sprintf("%.1f Mbps", m.speedResult.uploadMbps)) + "\n")
-		b.WriteString("\n" + dimStyle.Render("  t run again   esc back"))
+		b.WriteString(theme.Normal.Render("  Latency   ") + fmt.Sprintf("%.0f ms", m.speedResult.latencyMs) + "\n")
+		b.WriteString(theme.Normal.Render("  Download  ") + okStyle.Render(fmt.Sprintf("%.1f Mbps", m.speedResult.downloadMbps)) + "\n")
+		b.WriteString(theme.Normal.Render("  Upload    ") + okStyle.Render(fmt.Sprintf("%.1f Mbps", m.speedResult.uploadMbps)) + "\n")
+		b.WriteString("\n" + theme.Dimmed.Render("  t run again   esc back"))
 
 	default:
-		b.WriteString(dimStyle.Render("  press t to run a speed test"))
+		b.WriteString(theme.Dimmed.Render("  press t to run a speed test"))
 	}
 	return m.place(b.String())
 }
@@ -1770,19 +1532,23 @@ func (m model) speedTestView() string {
 func signalBars(signal int) string {
 	switch {
 	case signal >= 80:
-		return connectedStyle.Render("▰▰▰▰")
+		return okStyle.Render("▰▰▰▰")
 	case signal >= 60:
-		return lipgloss.NewStyle().Foreground(neonGreen).Render("▰▰▰▱")
+		return theme.DotOn.Render("▰▰▰▱")
 	case signal >= 40:
-		return lipgloss.NewStyle().Foreground(cyan).Render("▰▰▱▱")
+		return theme.Header.Render("▰▰▱▱")
 	case signal >= 20:
-		return dimStyle.Render("▰▱▱▱")
+		return theme.Dimmed.Render("▰▱▱▱")
 	default:
-		return dimStyle.Render("▱▱▱▱")
+		return theme.Dimmed.Render("▱▱▱▱")
 	}
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--dump" {
+		dumpSample()
+		return
+	}
 	if _, err := exec.LookPath("nmcli"); err != nil {
 		fmt.Fprintln(os.Stderr, "navi-networking: nmcli was not found.")
 		fmt.Fprintln(os.Stderr, "Install NetworkManager first.")
@@ -1794,4 +1560,29 @@ func main() {
 		os.Exit(1)
 	}
 	time.Sleep(50 * time.Millisecond)
+}
+
+// dumpSample renders the key screens with fake data to stdout, for
+// headless visual checks without nmcli or a TTY.
+func dumpSample() {
+	m := initialModel()
+	m.width, m.height = 80, 24
+	m.loading = false
+	m.networks = []Network{
+		{SSID: "wired-uplink", Signal: 92, Security: "WPA2", InUse: true},
+		{SSID: "ghost-ap", Signal: 61, Security: "WPA2"},
+		{SSID: "open-cafe", Signal: 34, Security: ""},
+	}
+	m.info = ConnectionInfo{SSID: "wired-uplink", Signal: 92, Security: "WPA2", Device: "wlan0"}
+	m.tx = theme.Transmission{Visible: true, Clean: "present day, present time...", Text: "present day, present time..."}
+	fmt.Println(m.View())
+
+	m.screen = screenSpeedTest
+	m.speedRunning = true
+	m.speedProgress = newSpeedProgress()
+	m.speedProgress.stage.Store(stageDownload)
+	m.speedProgress.bytesDone.Store(25_000_000)
+	m.speedProgress.totalBytes.Store(speedTestDownloadBytes)
+	m.samples = []float64{12, 18, 24, 31, 28, 35, 42, 38, 45, 51, 47, 55}
+	fmt.Println(m.View())
 }
