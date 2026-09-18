@@ -16,6 +16,13 @@ exec 9>"$LOCK"
 if ! flock -n 9; then
   exit 0  # another run is already processing
 fi
+# LOCK DISCIPLINE: fd 9 is the single-flight lock for the whole run, held
+# through speech. flock lives on the open file description, so ANY long-lived
+# child that inherits fd 9 (bash never sets CLOEXEC on user fds; setsid and &
+# don't close them) pins the lock after we exit — every later tap then wedges
+# at "Working on it" until that child is killed. Daemon-spawners must close it
+# first (exec 9>&-); see piper-serve.sh / kokoro-serve.sh. Python children are
+# safe (subprocess closes fds by default).
 
 log() { echo "$(date '+%F %T') hey-lain: $*" >> "$LOG"; }
 T0=$SECONDS  # stage timing: reply latency is the sum of these

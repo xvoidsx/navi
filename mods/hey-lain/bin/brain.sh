@@ -159,6 +159,15 @@ if [[ "$LOW" =~ ^(open|launch|start|go\ to|take\ me\ to)\ (.+)\ and\ (.+)$ ]] ||
   unset TARGETS_TEXT
   exit 0
 fi
+# Bare "go to workspace N" / "take me to workspace N": without this the
+# single-open rule below swallows "workspace N" as an app name and opens a
+# web search for it. ("switch"/"switch to" already reach the case statement
+# because "switch" isn't an open-verb.)
+if [[ "$LOW" =~ ^(go\ to|take\ me\ to)\ workspace\ (.+)$ ]]; then
+  Q="${BASH_REMATCH[2]}"
+  case "$Q" in one) Q=1;; two) Q=2;; three) Q=3;; four) Q=4;; five) Q=5;; six) Q=6;; seven) Q=7;; eight) Q=8;; nine) Q=9;; ten) Q=10;; esac
+  printf '[ACTION: workspace %s]\n%s\n' "$Q" "$(ack workspace "$Q")"; exit 0
+fi
 if [[ "$LOW" =~ ^(open|launch|start|go\ to|take\ me\ to)\ (.+)$ ]]; then
   TARGET="${BASH_REMATCH[2]}"
   TARGET=$(echo "$TARGET" | sed -E 's/^(the|my) //; s/ (website|site|page|app)$//')
@@ -189,6 +198,14 @@ case "$LOW" in
     printf '[ACTION: workspace %s]\n[ACTION: open %s]\n%s\n' "$DEST" "$APP" "$(ack action)"; exit 0 ;;
   workspace\ *|switch\ workspace\ *|switch\ to\ workspace\ *|go\ to\ workspace\ *)
     Q=$(echo "$LOW" | sed -E 's/^(switch |switch to |go to )?workspace //')
+    case "$Q" in one) Q=1;; two) Q=2;; three) Q=3;; four) Q=4;; five) Q=5;; six) Q=6;; seven) Q=7;; eight) Q=8;; nine) Q=9;; ten) Q=10;; esac
+    printf '[ACTION: workspace %s]\n%s\n' "$Q" "$(ack workspace "$Q")"; exit 0 ;;
+  move\ to\ workspace\ *|send\ to\ workspace\ *)
+    # Bare "move to workspace N" (no app named): the user means THEMSELVES,
+    # i.e. switch — "move firefox to workspace 2" (app given) is the next
+    # case and moves a window. Without this, the empty-target form fell
+    # through to the LLM, which usually answered without an action tag.
+    Q=$(echo "$LOW" | sed -E 's/^(move|send) to workspace //')
     case "$Q" in one) Q=1;; two) Q=2;; three) Q=3;; four) Q=4;; five) Q=5;; six) Q=6;; seven) Q=7;; eight) Q=8;; nine) Q=9;; ten) Q=10;; esac
     printf '[ACTION: workspace %s]\n%s\n' "$Q" "$(ack workspace "$Q")"; exit 0 ;;
   move\ *\ to\ workspace\ *|send\ *\ to\ workspace\ *)

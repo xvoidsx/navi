@@ -19,8 +19,12 @@ case "${1:-status}" in
   start)
     [ -n "$KOKORO" ] || { echo "kokoro is not installed; Piper remains the default." >&2; exit 1; }
     if alive; then echo "kokoro-serve already running"; exit 0; fi
+    # Same fd discipline as piper-serve.sh: a daemon must never inherit
+    # hey-lain.sh's single-flight flock (fd 9) — inheriting it pins the
+    # lock forever and every later Alt+V wedges at "Working on it".
+    exec 9>&- 2>/dev/null || true
     # --model full: fp32 is ~2x FASTER than int8 on pre-VNNI Intel (measured).
-    setsid "$KOKORO" serve --host 127.0.0.1 --port "$PORT" --model full >>"$LOG" 2>&1 &
+    setsid "$KOKORO" serve --host 127.0.0.1 --port "$PORT" --model full >>"$LOG" 2>&1 < /dev/null &
     echo $! > "$PIDFILE"
     for _ in $(seq 1 40); do
       curl -s --max-time 2 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q '"status": "ok"' && {

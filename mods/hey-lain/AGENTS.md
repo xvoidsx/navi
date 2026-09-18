@@ -74,7 +74,12 @@ no auth, no accounts.
   ask-back if empty), news/headlines (→fetch-news, topic or top stories),
   volume up/down/mute, media play-pause/next/prev,
   brightness up/down,   screenshot, lock, close-window, dismiss/thanks (→overlay-hide), with "hey lain /
-  please / could you" prefix stripping. Anything else goes to the LLM —
+  please / could you" prefix stripping. Bare "move to workspace N" (no app
+  named) means switch workspaces — the app-named form ("move firefox to
+  workspace 2") moves a window; bare "go to/take me to workspace N" also
+  switches (the open-verb rule used to swallow "workspace N" as an app name).
+  Compound "X and Y" requests plan both halves recursively and only execute
+  when BOTH halves produce action tags; anything else goes to the LLM —
   backend from `~/.config/hey-lain/brain.json` (`navi-lain-config` writes
   it): `local` / `ollama-cloud` via Ollama `/api/chat`, or `openai` /
   `openrouter` via OpenAI-compatible chat completions + Bearer key.
@@ -153,6 +158,14 @@ no auth, no accounts.
   SPEAKING (conversation view persists after success). speak.py runs in the
   FOREGROUND (no exec) so the trap still works; lock stays held through
   speech (no barge-in: mic+speakers = echo in the next transcript).
+  LOCK-FD DISCIPLINE (field bug 2026-09-18): the flock lives on fd 9 and
+  flock pins to the open file description — any long-lived daemon spawned
+  under the lock that inherits fd 9 (bash never sets CLOEXEC on user fds;
+  `setsid`/`&` don't close them) holds the lock FOREVER after hey-lain.sh
+  exits, and every later Alt+V wedges at "Working on it — one sec…" until
+  the daemon is killed. `piper-serve.sh`/`kokoro-serve.sh` did exactly this
+  via `setsid … &` in `tts-ready.sh`'s path; they now `exec 9>&-` before
+  daemonizing. Python `subprocess` children are safe (close_fds).
   `HEY_LAIN_LOG` is exported for speak.py; stage timings (stop/stt/brain/
   speak seconds) are logged per run — read them before optimizing latency.
 - `bin/warmup.sh` — starts `piper-serve` + `kokoro-serve`, pre-seeds the

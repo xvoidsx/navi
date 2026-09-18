@@ -22,7 +22,14 @@ case "${1:-status}" in
       echo "piper-tts is not installed in $PYTHON; run install.sh --skip-apt" >&2
       exit 1
     }
-    setsid "$PYTHON" "$HERE/bin/piper-serve.py" >>"$LOG" 2>&1 &
+    # The daemon must NEVER inherit the caller's file descriptors: hey-lain.sh
+    # holds its single-flight flock on fd 9, and a daemon that inherits it
+    # pins the lock forever — every later Alt+V then reports "Working on it"
+    # until the daemon is killed (flock lives on the open file description,
+    # released only when the LAST fd referencing it closes). Closing an
+    # fd that was never opened is a harmless no-op.
+    exec 9>&- 2>/dev/null || true
+    setsid "$PYTHON" "$HERE/bin/piper-serve.py" >>"$LOG" 2>&1 < /dev/null &
     sleep 0.4
     pgrep -f "piper-serve.py" 2>/dev/null | head -n 1 > "$PIDFILE"
     for _ in $(seq 1 30); do
