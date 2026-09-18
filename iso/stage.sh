@@ -45,8 +45,12 @@ mkdir -p "$BUILD/config/includes.chroot/opt/navi-iso"
 cp -a "$REPO/install.sh" "$REPO/wired" "$REPO/scripts" "$REPO/mods" "$REPO/iso/installer" \
   "$BUILD/config/includes.chroot/opt/navi-iso/"
 for m in navi-networking/navi-networking navi-calendar/navi-calendar navi-audio/navi-audio; do
-  [ -x "$BUILD/config/includes.chroot/opt/navi-iso/mods/$m" ] \
+  # the payload must carry EXECUTABLE binaries. git doesn't always preserve
+  # the +x bit (gh-push-mika stored these as 100644 once and red-lit an ISO
+  # build), so enforce it here instead of trusting the checkout mode.
+  [ -f "$BUILD/config/includes.chroot/opt/navi-iso/mods/$m" ] \
     || { echo "stage.sh: mod binary missing: mods/$m" >&2; exit 1; }
+  chmod 0755 "$BUILD/config/includes.chroot/opt/navi-iso/mods/$m"
 done
 
 # NaviVim: pin the editor exactly like the ISO pins everything else. the
