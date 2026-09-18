@@ -857,9 +857,7 @@ func (m model) writeStreams(b *strings.Builder, streams []Stream, playback bool)
 			b.WriteString(theme.Dimmed.Render(truncateRunes(detail, 56)) + "\n")
 		}
 	}
-	// Honest footnote: the shimmer is aesthetic. pactl exposes no live
-	// levels, and we never present the decoration as measured data.
-	b.WriteString(theme.Fainted.Render("  signal shimmer is decorative — pactl exposes no live levels") + "\n")
+	// (no footnote: the shimmer just is what it is.)
 }
 
 func (m model) writeDevices(b *strings.Builder, nodes []AudioNode, isSink bool) {
