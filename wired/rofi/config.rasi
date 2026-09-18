@@ -1,5 +1,6 @@
-// nightshadeNeon - rofi config for navi
-// ( this file should live at $HOME/.config/rofi/config.rasi )
+// navi - rofi (nightshadeNeon)
+( this file should live at $HOME/.config/rofi/config.rasi )
+
 configuration {
     modi: "combi";
     combi-modi: "window,drun,run";
@@ -17,8 +18,13 @@ configuration {
 }
 
 * {
-    background: #000000e6;
-    background-solid: #000000;
+    background: #000000cf;
+    background-solid: #000000eb;
+    glass-surface: #120510d4;
+    glass-deep: #050005e8;
+    glass-edge: #39ff1499;
+    glass-highlight: #ffffff22;
+    neon-pink: #ff10f0;
     foreground: #ff10f0;
     accent: #ff10f0;
     neon-green: #39ff14;
@@ -27,48 +33,51 @@ configuration {
     neon-white: #ffffff;
     text-color: #ff10f0;
     border-color: #ff10f0;
-    selected-background: #2a0a28;
+    selected-background: #2a0a28dc;
     selected-foreground: #39ff14;
 }
 
 window {
     background-color: @background;
-    border: 2;
-    border-color: @border-color;
-    padding: 12;
+    border: 1;
+    border-color: @glass-edge;
+    border-radius: 16px;
+    padding: 14;
     width: 720px;
 }
 
 mainbox {
-    background-color: @background;
+    background-color: @glass-surface;
     border: 1;
-    border-color: @neon-green;
-    padding: 8;
+    border-color: @glass-highlight;
+    border-radius: 11px;
+    padding: 9;
     spacing: 8;
 }
 
 inputbar {
-    background-color: @background-solid;
+    background-color: @glass-deep;
     text-color: @foreground;
     border: 1;
-    border-color: @border-color;
+    border-color: @neon-pink;
+    border-radius: 9px;
     padding: 8px;
     spacing: 8px;
 }
 
 prompt {
-    background-color: @background-solid;
+    background-color: @glass-deep;
     text-color: @foreground;
 }
 
 entry {
-    background-color: @background-solid;
+    background-color: @glass-deep;
     text-color: @neon-white;
     placeholder-color: #8a8a8a;
 }
 
 listview {
-    background-color: @background;
+    background-color: transparent;
     border: 0;
     padding: 4px;
     spacing: 2px;
@@ -77,16 +86,17 @@ listview {
 }
 
 scrollbar {
-    background-color: @background;
+    background-color: @glass-deep;
     handle-color: @neon-green;
     handle-width: 4px;
 }
 
 element {
-    background-color: @background;
-    text-color: @foreground;
+    background-color: transparent;
+    text-color: @neon-white;
     border: 1;
-    border-color: @background;
+    border-color: transparent;
+    border-radius: 8px;
     padding: 5px 10px;
 }
 
@@ -119,32 +129,32 @@ element selected.urgent {
 }
 
 element normal {
-    background-color: @background;
-    text-color: @foreground;
+    background-color: transparent;
+    text-color: @neon-white;
 }
 
 element alternate.normal {
-    background-color: #0d0d0d;
-    text-color: @foreground;
+    background-color: #12051099;
+    text-color: @neon-white;
 }
 
 element alternate.active {
-    background-color: #0d0d0d;
+    background-color: #12051099;
     text-color: @neon-cyan;
 }
 
 element alternate.urgent {
-    background-color: #0d0d0d;
+    background-color: #12051099;
     text-color: @neon-red;
 }
 
 element active {
-    background-color: @background;
+    background-color: transparent;
     text-color: @neon-cyan;
 }
 
 element urgent {
-    background-color: @background;
+    background-color: transparent;
     text-color: @neon-red;
 }
 
@@ -161,14 +171,14 @@ element-icon {
 }
 
 message {
-    background-color: @background-solid;
+    background-color: @glass-deep;
     border: 1;
     border-color: @neon-red;
     padding: 8px;
 }
 
 textbox {
-    background-color: @background-solid;
+    background-color: @glass-deep;
     text-color: @neon-white;
 }
 
