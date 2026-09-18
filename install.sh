@@ -77,7 +77,7 @@ PKGS=(
   # minimal installs don't pull them in on their own, and without them the
   # greeter falls back to the default theme with a module-not-installed error.
   qml6-module-qtquick-controls qml6-module-qtquick-layouts
-  fonts-jetbrains-mono fonts-firacode fonts-noto fonts-cascadia-code wdisplays papirus-icon-theme
+  fonts-jetbrains-mono fonts-firacode fonts-noto fonts-cascadia-code wdisplays papirus-icon-theme moka-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak dconf-cli
   chromium firefox-esr
@@ -1049,8 +1049,8 @@ setup_flatpak() {
   if [ ! -f "$override_dir/global" ]; then
     cat > "$override_dir/global" <<'EOF'
 [Environment]
-GTK_THEME=Yaru-magenta-dark
-ICON_THEME=Papirus-Dark
+GTK_THEME=nightshadeNeon
+ICON_THEME=Moka
 EOF
     ok "flatpak theme overrides applied"
   else
@@ -1144,15 +1144,28 @@ setup_webapps() {
 # settings.ini covers plain GTK apps, but GSettings-aware apps (nemo and
 # friends) read org.gnome.desktop.interface — whose schema default is
 # Adwaita, which is why installs kept falling back to it. seed system-wide
-# dconf defaults so Yaru-magenta-dark wins from first boot. no locks: users
+# dconf defaults so nightshadeNeon wins from first boot. no locks: users
 # can still override per-account with gsettings or a theme tool.
 setup_gtk_theme() {
-  step "gtk theme defaults (yaru-magenta-dark)"
+  step "gtk theme defaults (nightshadeNeon + moka)"
+  # the house theme rides in wired/themes/, so it lands in the iron
+  # structure on every install and update; copy it into the system
+  # dir GTK actually reads.
+  local theme_src="$WIRED_SHARE/themes/nightshadeNeon"
+  [ -d "$theme_src" ] || theme_src="$WIRED_DIR/themes/nightshadeNeon"
+  if [ -d "$theme_src" ]; then
+    $DOAS mkdir -p /usr/share/themes
+    $DOAS rm -rf /usr/share/themes/nightshadeNeon
+    $DOAS cp -a "$theme_src" /usr/share/themes/nightshadeNeon
+    ok "nightshadeNeon installed to /usr/share/themes"
+  else
+    warn "wired/themes/nightshadeNeon not found — skipping theme install"
+  fi
   $DOAS install -d -m 755 /etc/dconf/db/local.d
   $DOAS tee /etc/dconf/db/local.d/00-navi-theme >/dev/null <<'EOF'
 [org/gnome/desktop/interface]
-gtk-theme='Yaru-magenta-dark'
-icon-theme='Papirus-Dark'
+gtk-theme='nightshadeNeon'
+icon-theme='Moka'
 color-scheme='prefer-dark'
 EOF
   # The profile is the piece RC20.x was missing: without
@@ -1163,7 +1176,7 @@ EOF
   printf '%s\n' 'user-db:user' 'system-db:local' 'system-db:site' 'system-db:distro' \
     | $DOAS tee /etc/dconf/profile/user >/dev/null
   $DOAS dconf update
-  ok "yaru-magenta-dark seeded as the gtk default (user-overridable)"
+  ok "nightshadeNeon seeded as the gtk default (user-overridable)"
 }
 
 # ---------------------------------------------------------------- login screen
