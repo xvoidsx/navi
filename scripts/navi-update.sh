@@ -10,15 +10,19 @@
 # doas/sudo internally. never overwrites a config you modified — those
 # are reported, and navi-wired-restore can bring in the new defaults.
 #
-# security: the navi layer only moves to a tag whose signature verifies
-# against the pinned xvoidsx release key. no signature -> no update.
+# security: stable moves to release tags (signature verification flips on
+# once xvoidsx settles the signing story — until then, loud unsigned pulls
+# that trust the channel: TLS + GitHub access control). eiri tracks the
+# branch head, always unsigned, always loud about it.
 # there is no --insecure flag and there never will be.
 #
 #   navi-update [--check] [--channel <name>] [--yes]
 #
 # --check     report available updates, change nothing (for the waybar mod)
-# --channel   release channel: stable (default) or eiri. switching channels
-#             is an explicit major-version opt-in and always asks first.
+# --channel   release channel: stable (default) or eiri. stable follows
+#             release tags (v1.x); eiri is rolling and tracks the eiri
+#             branch head. switching channels is an explicit opt-in and
+#             always asks first (unless stdin isn't a terminal / --yes).
 # --yes       non-interactive: accept defaults (still asks on channel switch
 #             unless stdin is not a terminal)
 
@@ -27,6 +31,7 @@ set -euo pipefail
 REPO_URL="https://github.com/xvoidsx/navi.git"
 UPSTREAM_DIR="$HOME/.cache/navi/upstream"
 CHANNEL_FILE="/etc/navi/channel"
+STATE_FILE="/var/lib/navi/navi-update.state"  # channel= + commit= of the last navi-layer deploy
 VERSION_FILE="/etc/navi/version"
 SHARE_VERSION="/usr/share/navi/VERSION"
 KEY_FILE="/usr/share/navi/wired/keys/release.asc"
@@ -72,6 +77,36 @@ channel_major() {
     eiri)   echo 2 ;;
     *) die "unknown channel: $1 (try stable or eiri)" ;;
   esac
+}
+
+read_state() { # sets STATE_CHANNEL / STATE_COMMIT; empty when unknown
+  STATE_CHANNEL=""; STATE_COMMIT=""
+  [ -f "$STATE_FILE" ] || return 0
+  STATE_CHANNEL="$(sed -n 's/^channel=//p' "$STATE_FILE" 2>/dev/null | head -n 1)"
+  STATE_COMMIT="$(sed -n 's/^commit=//p' "$STATE_FILE" 2>/dev/null | head -n 1)"
+}
+
+write_state() { # <channel> <commit> — remember what the navi layer deployed
+  $DOAS mkdir -p "$(dirname "$STATE_FILE")"
+  printf 'channel=%s\ncommit=%s\n' "$1" "$2" | $DOAS tee "$STATE_FILE" >/dev/null
+}
+
+confirm_channel_switch() { # <channel> — interactive opt-in for --channel
+  if [ -n "$CHANNEL_OVERRIDE" ] && [ -t 0 ] && [ "$ASSUME_YES" -eq 0 ]; then
+    local ans
+    read -r -p "    switch to channel '$1'? (bleeding edge — it moves fast) [y/N] " ans
+    case "${ans:-N}" in [Yy]*) ;; *) die "channel switch declined" ;; esac
+  fi
+}
+
+persist_channel() { # <channel> — pin an explicit --channel switch for next time
+  [ -n "$CHANNEL_OVERRIDE" ] || return 0
+  local cur=""
+  [ -f "$CHANNEL_FILE" ] && cur="$(tr -d '[:space:]' < "$CHANNEL_FILE")"
+  [ "$cur" = "$1" ] && return 0
+  printf '%s\n' "$1" | $DOAS tee "$CHANNEL_FILE" >/dev/null \
+    || warn "could not write $CHANNEL_FILE — pass --channel $1 next time too"
+  ok "channel pinned to '$1'"
 }
 
 installed_version() {
@@ -154,6 +189,54 @@ snapshot_hook() {
   fi
 }
 
+# ---------------------------------------------------------------- eiri: the rolling channel
+#
+# eiri has no release tags yet (branch-only until 2.0 ships), so the tag
+# machinery below can never see it — --channel eiri used to die with
+# "no release tags found". Track the branch head instead, and remember
+# the deployed commit in STATE_FILE so --check and repeat runs know
+# what's already on the machine.
+
+eiri_layer() {
+  local remote_sha
+  git -C "$UPSTREAM_DIR" fetch --prune --filter=blob:none -q origin eiri 2>/dev/null \
+    || die "could not fetch the eiri branch from $REPO_URL"
+  remote_sha="$(git -C "$UPSTREAM_DIR" rev-parse -q --verify origin/eiri 2>/dev/null)" \
+    || die "no eiri branch upstream — the channel isn't published yet"
+
+  read_state
+  if [ "$STATE_CHANNEL" = "eiri" ] && [ "$STATE_COMMIT" = "$remote_sha" ]; then
+    info "navi files already current (eiri @ ${remote_sha:0:7})"
+    PH_NAVI="current"
+    return 0
+  fi
+  if [ -n "$STATE_COMMIT" ]; then
+    info "new eiri commits: ${STATE_COMMIT:0:7} -> ${remote_sha:0:7}"
+  else
+    info "eiri branch head is ${remote_sha:0:7} (no recorded deploy — treating as new)"
+  fi
+
+  confirm_channel_switch "eiri"
+
+  warn "the eiri branch is unsigned — pulling it trusts the channel"
+  warn "(TLS + GitHub access control), same deal as mika-era updates."
+  warn "eiri is the bleeding edge: it moves fast and occasionally breaks."
+  git -C "$UPSTREAM_DIR" checkout -q "$remote_sha" \
+    || die "could not check out eiri @ ${remote_sha:0:7}"
+  [ -x "$UPSTREAM_DIR/install.sh" ] || die "install.sh missing at eiri @ ${remote_sha:0:7} — aborting"
+
+  say "deploying eiri @ ${remote_sha:0:7} (user-modified configs will be kept)"
+  if [ "$ASSUME_YES" -eq 1 ]; then
+    bash "$UPSTREAM_DIR/install.sh" --deploy-only --yes
+  else
+    bash "$UPSTREAM_DIR/install.sh" --deploy-only
+  fi
+  write_state "eiri" "$remote_sha"
+  persist_channel "eiri"
+  ok "navi files at eiri @ ${remote_sha:0:7}"
+  PH_NAVI="updated to eiri @ ${remote_sha:0:7}"
+}
+
 # ---------------------------------------------------------------- phase 3: navi layer
 
 navi_layer() {
@@ -171,6 +254,11 @@ navi_layer() {
   else
     git clone --filter=blob:none -q "$REPO_URL" "$UPSTREAM_DIR" \
       || die "could not clone $REPO_URL"
+  fi
+
+  if [ "$ch" = "eiri" ]; then
+    eiri_layer
+    return 0
   fi
 
   tag="$(latest_tag "$major")"
@@ -304,10 +392,21 @@ check_updates() {
     git clone --filter=blob:none -q "$REPO_URL" "$UPSTREAM_DIR" 2>/dev/null || true
   fi
   if [ -d "$UPSTREAM_DIR/.git" ]; then
-    tag="$(latest_tag "$major")"
-    if [ -n "$tag" ]; then
-      tver="$(tag_version "$tag")"
-      if ver_newer "$tver" "$installed"; then navi_new="1"; navi_ver="$tver"; fi
+    if [ "$ch" = "eiri" ]; then
+      git -C "$UPSTREAM_DIR" fetch --prune --filter=blob:none -q origin eiri 2>/dev/null || true
+      tag="$(git -C "$UPSTREAM_DIR" rev-parse -q --verify origin/eiri 2>/dev/null || true)"
+      if [ -n "$tag" ]; then
+        read_state
+        if [ "$STATE_CHANNEL" != "eiri" ] || [ "$STATE_COMMIT" != "$tag" ]; then
+          navi_new="1"; navi_ver="eiri"
+        fi
+      fi
+    else
+      tag="$(latest_tag "$major")"
+      if [ -n "$tag" ]; then
+        tver="$(tag_version "$tag")"
+        if ver_newer "$tver" "$installed"; then navi_new="1"; navi_ver="$tver"; fi
+      fi
     fi
   fi
   # apt simulation needs no root; counts are only as fresh as the last update
