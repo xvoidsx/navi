@@ -1,7 +1,7 @@
-PRETTY_NAME="navi 1.5 (mika)"
+PRETTY_NAME="navi 1.5.1 (mika)"
 NAME="navi"
-VERSION_ID="1.5"
-VERSION="1.5 (mika)"
+VERSION_ID="1.5.1"
+VERSION="1.5.1 (mika)"
 VERSION_CODENAME=mika
 ID=navi
 ID_LIKE=debian

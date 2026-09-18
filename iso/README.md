@@ -1,8 +1,8 @@
-# navi ISO pipeline — 1.4.5 "mika" stable
+# navi ISO pipeline — 1.5.1 "mika" stable
 
 Builds the installer ISO: a Debian 13 (trixie) live image that boots
 **straight into the navi CLI system installer** — no desktop, no "try navi"
-mode. The ISO is the clean-machine test vehicle for the 1.4.5 "mika" stable
+mode. The ISO is the clean-machine test vehicle for the 1.5.1 "mika" stable
 release.
 
 ## Layout
