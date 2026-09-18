@@ -485,32 +485,26 @@ it on one reserved line.
 
 ## Shared Design System
 
-As the widget family grows, common Bubble Tea/Lip Gloss components should be
-centralized where practical.
+The shared design system lives in `mods/theme/` (`github.com/rav3ndust/navi-theme`):
+the canonical nightshadeNeon palette, base styles, and the common components —
+`Frame` (∅ header + status dot + ambient row + border), `Footer` (persistent
+key-hint bar), `Divider`, `Meter`, `Spinner`, `Transmission` (the ambient
+Lain ticker), and `Glow` (the breathing idle).
 
-Potential shared components include:
+Every mod renders from these tokens and components — never hardcode a hex
+color or rebuild a header/footer inside a mod. Cohesion comes from shared
+code, not shared taste: when the palette shifts, every mod shifts with it.
+A mod adopts it via a `replace` directive in its go.mod:
 
-- navi title/header
-- section headers
-- selection rows
-- status indicators
-- key-hint footer
-- confirmation dialogs
-- error messages
-- spinners
-- QR-code frames
-- common nightshadeNeon styles
+	require github.com/rav3ndust/navi-theme v0.0.0
+	replace github.com/rav3ndust/navi-theme => ../theme
 
-Do not copy increasingly large blocks of styling code between mods.
-
-However, avoid creating a huge framework before there are enough mods to
-justify one.
-
-Start simple and extract genuinely shared components as repetition appears.
-
-The Lain ticker, phrase lists, and glitch helpers are specific to
-`navi-networking`. Do not promote them into a shared package unless another
-widget actually wants the same ambient line.
+The Lain ticker graduated into the shared package with the eiri cohesion
+mandate: the frame chrome now reserves the ambient row in every mod, so the
+ticker is shared chrome, not networking-specific. It stays opt-in per mod —
+a mod renders the row through `Transmission.View`, or passes its own row
+(or a blank one) to `Frame`. The row is always allocated so frame height
+never jumps.
 
 ---
 
