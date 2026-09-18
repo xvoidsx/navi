@@ -29,7 +29,7 @@ env:
   RELEASE: 2.0
   ISO_BASENAME: navi-2.0-eiri
   # bump to cut a fresh ISO (push trigger watches this file)
-  EIRI_BUILD: 1
+  EIRI_BUILD: 2
 
 on:
   # NOTE: workflow_dispatch requires the workflow file to exist on the
@@ -75,10 +75,10 @@ jobs:
             "https://x-access-token:${GH_TOKEN}@github.com/xvoidsx/navi.git" src
           cd src && git rev-parse --short HEAD
           # guard: never ship a mislabeled ISO — the branch must carry the
-          # eiri version string.
-          grep -q 'eiri' src/wired/VERSION \
+          # eiri version string. (we're cd'd into src/ here.)
+          grep -q 'eiri' wired/VERSION \
             || { echo "wired/VERSION does not say eiri — refusing to build"; exit 1; }
-          cat src/wired/VERSION
+          cat wired/VERSION
 
       # nodejs: JS actions (upload-artifact) run inside the container and
       # need node; trixie ships node 20, which actions/*@v4 require.
