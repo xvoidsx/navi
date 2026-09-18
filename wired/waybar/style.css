@@ -1,246 +1,370 @@
-/* THEME NAME: nightshadeNeon-Glitch */
-/* main stylesheet for wiredWM's 'waybar configuration'
- *	- by rav3ndust
- * a copy of this file should live at /etc/xdg/waybar/style.css */
+/* THEME NAME: nightshadeNeon — obsidian glass edition
+ * Palette specification: #ff10f0 / #39ff14 / #00ffff / #ff3131 / #ffffff / #000000
+ * GTK has no native backdrop-filter under vanilla Sway. Layered alpha, highlights,
+ * and inset shadow provide the frosted-glass illusion without a compositor blur.
+ */
+
+@define-color neon-pink #ff10f0;
+@define-color neon-green #39ff14;
+@define-color neon-cyan #00ffff;
+@define-color neon-red #ff3131;
+@define-color neon-white #ffffff;
+@define-color neon-black #000000;
+
 * {
-    font-size: 10px; /* Font size for better readability */
-    /* font-family: Cascadia Code; */
-    /* Font Awesome first: the battery/network glyphs are FA codepoints,
-       which Noto Sans doesn't carry. Noto covers everything else. */
-    font-family: "Font Awesome 6 Free", "Noto Sans";
-    font-weight: bold; /* Make all text bold */
+    font-family: "Noto Sans", sans-serif;
+    font-size: 10px;
+    font-weight: bold;
+    transition: 240ms ease;
 }
 
+/* Full-width obsidian glass: dark enough to disappear into a black wallpaper,
+ * but translucent enough to keep a soft, physical depth over any other image. */
 window#waybar {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.85), rgba(15, 15, 15, 0.8)); /* Dark gradient for depth */
-    color: #fdf6e3;
-    padding: 0;
-    margin: 10px; /* Floating effect */
-    border-radius: 15px; /* Smoother base corners */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); /* Modern elevation */
-    animation: neonPulse 5s infinite alternate; /* Subtle bar pulse */
+    color: @neon-white;
+    background:
+        linear-gradient(90deg, rgba(255, 16, 240, 0.10), transparent 18%, transparent 82%, rgba(57, 255, 20, 0.08)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.075), transparent 30%),
+        linear-gradient(180deg, rgba(10, 5, 11, 0.80), rgba(0, 0, 0, 0.90));
+    border: 1px solid rgba(57, 255, 20, 0.44);
+    border-top-color: rgba(255, 255, 255, 0.15);
+    border-bottom-color: rgba(0, 0, 0, 0.92);
+    border-radius: 15px;
+    margin: 8px 8px 0;
+    padding: 2px 6px;
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.84),
+        0 0 16px rgba(255, 16, 240, 0.30),
+        0 0 34px rgba(57, 255, 20, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.20),
+        inset 0 2px 7px rgba(255, 255, 255, 0.035),
+        inset 0 -12px 20px rgba(0, 0, 0, 0.60),
+        inset 0 0 28px rgba(255, 16, 240, 0.045);
+    animation: bar-breath 5.5s ease-in-out infinite alternate;
 }
 
-@keyframes neonPulse {
+/* Ensure Waybar's inner GTK box does not paint over the panel-wide glass. */
+window#waybar > box {
+    background: transparent;
+}
+
+@keyframes bar-breath {
     from {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 10px rgba(128, 0, 128, 0.2); /* Base state */
+        border-color: rgba(57, 255, 20, 0.34);
+        box-shadow:
+            0 10px 30px rgba(0, 0, 0, 0.84),
+            0 0 14px rgba(255, 16, 240, 0.24),
+            0 0 28px rgba(57, 255, 20, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.14),
+            inset 0 -12px 20px rgba(0, 0, 0, 0.60);
     }
     to {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 15px rgba(128, 0, 128, 0.3); /* Brighter pulse */
+        border-color: rgba(255, 16, 240, 0.54);
+        box-shadow:
+            0 12px 34px rgba(0, 0, 0, 0.90),
+            0 0 25px rgba(255, 16, 240, 0.46),
+            0 0 42px rgba(57, 255, 20, 0.16),
+            inset 0 1px 0 rgba(255, 255, 255, 0.18),
+            inset 0 -12px 20px rgba(0, 0, 0, 0.68);
     }
 }
 
-#custom-right-arrow-dark,
-#custom-left-arrow-dark {
-    color: #1a1a1a;
-}
-#custom-right-arrow-light,
-#custom-left-arrow-light {
-    color: #292b2e;
-    background: #1a1a1a;
-}
-
+/* Shared module glass. It is deliberately nearly black: the glow, not a blue
+ * surface, does the visual work. */
 #workspaces,
+#window,
 #clock,
 #pulseaudio,
+#network,
+#battery,
+#backlight,
+#idle_inhibitor,
+#power-profiles-daemon,
+#tray,
+#custom-wired-launcher,
+#custom-power,
+#custom-update,
+#custom-bell,
 #memory,
 #cpu,
-#battery,
-#disk,
-#tray,
-#idle_inhibitor,
-#backlight,
-#power-profiles-daemon {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85)); /* Dark gradient */
-    border: 1px solid rgba(128, 0, 128, 0.4); /* Darker neon pink border */
-    border-radius: 10px; /* Pill shape */
-    padding: 2px 5px; /* Tighter padding */
-    margin: 0 8px; /* Slightly wider spacing */
-    color: #00ffff; /* Default cyan text */
-    font-size: 10px; /* Consistent text size */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3); /* Glassy pink glow */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+#disk {
+    min-height: 20px;
+    margin: 3px 4px;
+    padding: 2px 8px;
+    color: @neon-white;
+    background:
+        linear-gradient(115deg, rgba(255, 255, 255, 0.09), transparent 22%, transparent 76%, rgba(57, 255, 20, 0.025)),
+        linear-gradient(180deg, rgba(22, 5, 20, 0.48), rgba(0, 0, 0, 0.68));
+    border: 1px solid rgba(255, 16, 240, 0.36);
+    border-top-color: rgba(255, 255, 255, 0.11);
+    border-radius: 10px;
+    box-shadow:
+        0 3px 10px rgba(0, 0, 0, 0.62),
+        0 0 10px rgba(255, 16, 240, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10),
+        inset 0 -1px 6px rgba(0, 0, 0, 0.64);
+    text-shadow: 0 0 6px currentColor;
+    animation: signal-drift 7s ease-in-out infinite;
+    transition: background 550ms ease-out, border-color 800ms ease-out, box-shadow 1500ms ease-out, color 500ms ease-out;
 }
 
-@keyframes glitchText {
-    0% {
-        color: #00ffff; /* Cyan */
-        text-shadow: 0 0 5px rgba(0, 255, 255, 0.5), 1px 1px 0 rgba(0, 0, 0, 0.2);
+@keyframes signal-drift {
+    0% { border-color: rgba(255, 16, 240, 0.36); }
+    85% { border-color: rgba(255, 16, 240, 0.36); }
+    90% { border-color: rgba(57, 255, 20, 0.58); }
+    94% { border-color: rgba(0, 255, 255, 0.42); }
+    100% { border-color: rgba(255, 16, 240, 0.36); }
+}
+
+#workspaces:hover,
+#clock:hover,
+#pulseaudio:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover {
+    background:
+        linear-gradient(115deg, rgba(255, 255, 255, 0.15), transparent 25%, transparent 72%, rgba(57, 255, 20, 0.07)),
+        linear-gradient(180deg, rgba(39, 5, 35, 0.62), rgba(0, 0, 0, 0.76));
+    border-color: rgba(57, 255, 20, 0.72);
+    box-shadow:
+        0 4px 15px rgba(0, 0, 0, 0.74),
+        0 0 22px rgba(255, 16, 240, 0.52),
+        0 0 38px rgba(57, 255, 20, 0.23),
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        inset 0 0 14px rgba(255, 16, 240, 0.12);
+    animation: glass-hover 2.8s ease-in-out infinite alternate;
+}
+
+/* Hover stays alive as long as the pointer is present; the 1.5s shadow
+ * transition above turns its exit into a soft, lingering afterglow. */
+@keyframes glass-hover {
+    from {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.74), 0 0 18px rgba(255, 16, 240, 0.44), 0 0 30px rgba(57, 255, 20, 0.17), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 0 11px rgba(255, 16, 240, 0.09);
     }
-    33% {
-        color: #ff10f0; /* Neon Pink */
-        text-shadow: 0 0 5px rgba(255, 20, 147, 0.5), -1px -1px 0 rgba(0, 0, 0, 0.2);
-    }
-    66% {
-        color: #39ff14; /* Neon Green */
-        text-shadow: 0 0 5px rgba(57, 255, 20, 0.5), 1px -1px 0 rgba(0, 0, 0, 0.2);
-    }
-    100% {
-        color: #00ffff; /* Back to Cyan */
-        text-shadow: 0 0 5px rgba(0, 255, 255, 0.5), -1px 1px 0 rgba(0, 0, 0, 0.2);
+    to {
+        box-shadow: 0 4px 17px rgba(0, 0, 0, 0.78), 0 0 27px rgba(255, 16, 240, 0.68), 0 0 46px rgba(57, 255, 20, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 0 17px rgba(255, 16, 240, 0.16);
     }
 }
 
-/* TESTING */
-#custom-wired-launcher {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85)); /* Dark gradient */
-    border: 1px solid rgba(128, 0, 128, 0.4); /* Darker neon pink border */
-    border-radius: 10px; /* Pill shape */
-    padding: 2px 5px; /* Tighter padding */
-    margin: 0 8px; /* Slightly wider spacing */
-    color: #00ffff; /* Cyan to match other modules */
-    font-size: 12px; /* Slightly larger for emoji visibility */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3); /* Glassy pink glow */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+/* The title is intentionally quiet so active controls carry the neon signal. */
+#window {
+    color: rgba(255, 255, 255, 0.62);
+    border-color: rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    text-shadow: none;
+    animation: none;
 }
-/* END TESTING */
 
+/* sway/window places its state class on the bar itself. Collapse every visual
+ * contribution from the title module when the focused workspace is empty. */
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    text-shadow: none;
+    opacity: 0;
+}
+
+/* Workspace switcher: green frames, pink active state, red urgency. */
 #workspaces {
-    box-shadow: inset 0 0 10px rgba(128, 0, 128, 0.2); /* Purple inner shadow for depth */
+    padding: 2px 4px;
+    border-color: rgba(57, 255, 20, 0.42);
+    box-shadow:
+        0 3px 10px rgba(0, 0, 0, 0.62),
+        0 0 12px rgba(57, 255, 20, 0.16),
+        inset 0 0 10px rgba(57, 255, 20, 0.05);
 }
 
 #workspaces button {
-    padding: 0px 6px; /* Tighter padding */
-    color: #00ffff; /* Default cyan text */
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85)); /* Dark gradient */
-    border: 1px solid rgba(128, 0, 128, 0.4); /* Darker neon pink border */
-    border-radius: 12px; /* Pill shape */
-    transition: all 0.3s ease; /* Smooth transitions */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3); /* Glassy pink glow */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
-}
-
-#workspaces button.focused {
-    color: #ff10f0; /* Pink neon for active workspace */
-    border: 2px solid #39ff14; /* Green neon border */
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.7), 0 0 10px rgba(57, 255, 20, 0.4), inset 0 0 5px rgba(57, 255, 20, 0.3); /* Enhanced focus glow with inner shine */
+    min-width: 20px;
+    margin: 1px 2px;
+    padding: 1px 5px;
+    color: rgba(255, 255, 255, 0.62);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    box-shadow: none;
 }
 
 #workspaces button:hover {
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.8), 0 0 20px rgba(128, 0, 128, 0.5); /* Brighter glassy pink glow */
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6); /* Enhanced text depth */
+    color: @neon-green;
+    background: rgba(57, 255, 20, 0.09);
+    border-color: rgba(57, 255, 20, 0.46);
+    box-shadow: 0 0 12px rgba(57, 255, 20, 0.28), inset 0 0 7px rgba(57, 255, 20, 0.08);
 }
 
-#workspaces button.inactive {
-    background: linear-gradient(180deg, rgba(200, 0, 0, 0.9), rgba(150, 0, 0, 0.7)); /* Darker red gradient */
-    color: black; /* Inactive text color */
-    border: 1px solid rgba(255, 0, 0, 0.3); /* Red glassy border */
+#workspaces button.focused,
+#workspaces button.active {
+    color: @neon-white;
+    background: linear-gradient(135deg, rgba(255, 16, 240, 0.30), rgba(255, 16, 240, 0.08));
+    border-color: @neon-green;
+    box-shadow:
+        0 0 10px rgba(255, 16, 240, 0.60),
+        0 0 20px rgba(57, 255, 20, 0.30),
+        inset 0 0 9px rgba(255, 16, 240, 0.18);
+    text-shadow: 0 0 8px @neon-pink;
 }
 
-#pulseaudio {
-    color: #ff10f0; /* Pink neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+#workspaces button.urgent {
+    color: @neon-white;
+    background: rgba(255, 49, 49, 0.20);
+    border-color: @neon-red;
+    box-shadow: 0 0 14px rgba(255, 49, 49, 0.50);
 }
 
-#network {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85)); /* Dark gradient */
-    border: 1px solid rgba(128, 0, 128, 0.4); /* Darker neon pink border */
-    border-radius: 10px; /* Pill shape */
-    padding: 2px 5px; /* Tighter padding */
-    margin: 0 8px; /* Slightly wider spacing */
-    color: #ff10f0; /* Pink neon */
-    transition: all 0.3s ease; /* Smooth transition */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3); /* Glassy pink glow */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+/* Stable color roles from the NightshadeNeon specification. */
+#custom-wired-launcher,
+#custom-power,
+#clock,
+#power-profiles-daemon {
+    color: @neon-pink;
 }
 
-#network:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7), 0 0 15px rgba(128, 0, 128, 0.5); /* Brighter glassy pink glow */
-}
-
-#network.disconnected {
-    color: #ff3131; /* Red for disconnected */
-    border: 1px solid rgba(255, 0, 0, 0.3); /* Red glassy border */
-}
-
-#memory {
-    color: #39ff14; /* Green neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
-}
-
+#network,
+#backlight,
+#memory,
 #cpu {
-    color: #000000; /* Match original scheme */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+    color: @neon-green;
+}
+
+#pulseaudio,
+#idle_inhibitor {
+    color: @neon-cyan;
 }
 
 #battery {
-    color: #ff10f0; /* Pink neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+    color: @neon-white;
 }
 
-#disk {
-    color: #ff10f0; /* Pink neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
-}
-
-#clock,
-#clock * { /* Target the clock and all its child elements */
-    color: #39ff14; /* Green neon */
-    font-weight: bold; /* Make clock text bold */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
-}
-
-#idle_inhibitor {
-    color: #ff10f0; /* Pink neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
-}
-
-#backlight {
-    color: #39ff14; /* Green neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
-}
-
-#power-profiles-daemon {
-    color: #ff10f0; /* Pink neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
-}
-
+#custom-wired-launcher,
 #custom-power {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85)); /* Dark gradient */
-    border: 1px solid rgba(128, 0, 128, 0.4); /* Darker neon pink border */
-    border-radius: 10px; /* Pill shape */
-    padding: 2px 5px; /* Tighter padding */
-    margin: 0 8px; /* Slightly wider spacing */
-    color: #ff10f0; /* Pink neon */
-    font-size: 12px; /* Slightly larger for emoji visibility */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3); /* Glassy pink glow */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+    font-size: 12px;
+}
+
+#network.disconnected,
+#battery.critical {
+    color: @neon-white;
+    background: linear-gradient(135deg, rgba(255, 49, 49, 0.25), rgba(0, 0, 0, 0.80));
+    border-color: @neon-red;
+    box-shadow: 0 0 16px rgba(255, 49, 49, 0.58), inset 0 0 9px rgba(255, 49, 49, 0.12);
+    animation: alert-pulse 1.4s ease-in-out infinite alternate;
+}
+
+#battery.warning {
+    color: @neon-pink;
+    border-color: rgba(255, 16, 240, 0.72);
+}
+
+@keyframes alert-pulse {
+    from { box-shadow: 0 0 8px rgba(255, 49, 49, 0.30), inset 0 0 5px rgba(255, 49, 49, 0.05); }
+    to { box-shadow: 0 0 24px rgba(255, 49, 49, 0.78), inset 0 0 12px rgba(255, 49, 49, 0.17); }
+}
+
+#tray {
+    padding-left: 7px;
+    padding-right: 7px;
+}
+
+#tray > .passive {
+    opacity: 0.58;
+}
+
+#tray > .needs-attention {
+    background: rgba(255, 49, 49, 0.24);
+    border-radius: 7px;
+}
+
+/* Repo-only modules: the update checker and the notification bell ship in the
+ * repo configs but were absent from the reference machine, so they get their
+ * rules here in the same glass language. Pink when updates demand attention,
+ * cyan when notifications are waiting, quiet when there is nothing to say. */
+#custom-update.up-to-date,
+#custom-bell.no-notifs {
+    color: rgba(255, 255, 255, 0.38);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    text-shadow: none;
+    animation: none;
+}
+
+#custom-update.updates-available {
+    color: @neon-pink;
+    border-color: rgba(255, 16, 240, 0.72);
+    animation: update-pulse 2s ease-in-out infinite alternate;
+}
+
+#custom-bell.has-notifs {
+    color: @neon-cyan;
+    border-color: rgba(0, 255, 255, 0.66);
+    box-shadow:
+        0 3px 10px rgba(0, 0, 0, 0.62),
+        0 0 16px rgba(0, 255, 255, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10),
+        inset 0 0 9px rgba(0, 255, 255, 0.10);
+}
+
+@keyframes update-pulse {
+    from {
+        box-shadow:
+            0 3px 10px rgba(0, 0, 0, 0.62),
+            0 0 10px rgba(255, 16, 240, 0.35),
+            inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    }
+    to {
+        box-shadow:
+            0 3px 12px rgba(0, 0, 0, 0.66),
+            0 0 26px rgba(255, 16, 240, 0.70),
+            inset 0 0 10px rgba(255, 16, 240, 0.14);
+    }
+}
+
+/* Small state cues reward a glance without adding visual noise. */
+#workspaces button.empty {
+    color: rgba(255, 255, 255, 0.30);
+    background: transparent;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#pulseaudio.muted {
+    color: rgba(255, 255, 255, 0.48);
+    border-color: rgba(255, 255, 255, 0.20);
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.50), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    text-shadow: none;
+}
+
+#idle_inhibitor.activated {
+    color: @neon-green;
+    border-color: rgba(57, 255, 20, 0.66);
+    box-shadow: 0 0 14px rgba(57, 255, 20, 0.42), inset 0 0 9px rgba(57, 255, 20, 0.10);
 }
 
 #custom-power:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7), 0 0 15px rgba(128, 0, 128, 0.5); /* Brighter glassy pink glow */
+    color: @neon-red;
+    border-color: @neon-red;
+    box-shadow: 0 0 22px rgba(255, 49, 49, 0.56), inset 0 0 11px rgba(255, 49, 49, 0.13);
 }
 
+tooltip {
+    color: @neon-white;
+    background:
+        linear-gradient(135deg, rgba(255, 16, 240, 0.11), transparent 46%),
+        rgba(0, 0, 0, 0.95);
+    border: 1px solid @neon-green;
+    border-radius: 9px;
+    box-shadow: 0 0 18px rgba(255, 16, 240, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.11);
+}
 
-/* navi mods: update indicator + notification bell.
-   the modules report state via classes — quiet states stay dim so the
-   lit ones actually mean something. */
-#custom-update,
-#custom-bell {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85));
-    border: 1px solid rgba(128, 0, 128, 0.4);
-    border-radius: 10px;
-    padding: 2px 8px;
-    margin: 0 8px;
-    font-size: 12px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3);
-}
-#custom-update.up-to-date,
-#custom-bell.no-notifs {
-    color: rgba(160, 160, 180, 0.55); /* dim — nothing needs you */
-}
-#custom-update.updates-available {
-    color: #ff10f0;
-    border-color: rgba(255, 16, 240, 0.6);
-    animation: updatePulse 2s ease-in-out infinite;
-}
-#custom-bell.has-notifs {
-    color: #00ffff;
-    border-color: rgba(0, 255, 255, 0.6);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 12px rgba(0, 255, 255, 0.45);
-}
-@keyframes updatePulse {
-    0%   { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(255, 16, 240, 0.3); }
-    50%  { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 16px rgba(255, 16, 240, 0.65); }
-    100% { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(255, 16, 240, 0.3); }
+tooltip label {
+    color: @neon-white;
 }
