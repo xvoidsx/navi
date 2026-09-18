@@ -28,12 +28,31 @@ brave_nightly_install () {
   curl -fsS https://dl.brave.com/install.sh | CHANNEL=nightly sh
 }
 main () {
- echo "$x"; sleep 1
- echo "Installing Firefox Nightly..."; sleep 1
- firefox_nightly_install
- echo "Installing Brave Browser Nightly..."; sleep 1
- brave_nightly_install
- echo "Nightly browsers installed."; sleep 1
+  # target: firefox | brave | all (default all). lets navi-extras offer each
+  # browser on its own instead of forcing the pair.
+  local target="${1:-all}"
+  echo "$x"; sleep 1
+  case "$target" in
+    firefox)
+      echo "Installing Firefox Nightly..."; sleep 1
+      firefox_nightly_install
+      ;;
+    brave)
+      echo "Installing Brave Browser Nightly..."; sleep 1
+      brave_nightly_install
+      ;;
+    all|"")
+      echo "Installing Firefox Nightly..."; sleep 1
+      firefox_nightly_install
+      echo "Installing Brave Browser Nightly..."; sleep 1
+      brave_nightly_install
+      ;;
+    *)
+      echo "usage: $0 [firefox|brave|all]" >&2
+      exit 2
+      ;;
+  esac
+  echo "Nightly browsers installed."; sleep 1
 }
 # - - - - - |
-main
+main "$@"

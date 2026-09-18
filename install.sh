@@ -772,7 +772,7 @@ install_commands() {
 
   # distro-level tools live in scripts/ (repo root), outside the /wired
   # desktop layer — same /usr/bin destination, same rofi visibility.
-  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore" "navi-wired-adopt.sh:navi-wired-adopt"; do
+  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore" "navi-wired-adopt.sh:navi-wired-adopt" "navi-extras.sh:navi-extras"; do
     local src="$REPO_DIR/scripts/${pair%%:*}" name="${pair##*:}"
     if [ -e "$src" ]; then
       $DOAS install -m 0755 "$src" "/usr/bin/$name"
@@ -973,22 +973,24 @@ setup_dirs() {
   ok "user directories ready"
 }
 
-run_app_installers() {
-  step "app + agent installers"
+# ---------------------------------------------------------------- optional extras
+# The third-party installers (scripts/installers/*) used to run with prompts
+# at the tail of the installer — one failure there aborted the whole install
+# (set -e), and --yes/ASSUME_YES auto-ran all of them silently. Now they
+# ship deployed to /usr/share/navi/installers and the user picks them from
+# the navi-extras menu whenever they want them.
+deploy_installers() {
+  step "optional extras -> $SHARE_DIR/installers"
   local dir="$REPO_DIR/scripts/installers"
-  [ -d "$dir" ] || { info "no scripts/installers/ — skipping"; return 0; }
-  local f
-  for f in "$dir"/*.sh; do
-    [ -e "$f" ] || break
-    local name
-    name="$(basename "$f" .sh)"
-    if confirm "run installer: $name?"; then
-      bash "$f"
-      ok "$name finished"
-    else
-      info "skipped $name"
-    fi
-  done
+  if [ ! -d "$dir" ]; then
+    info "no scripts/installers/ — extras menu will be empty"
+    return 0
+  fi
+  $DOAS rm -rf "$SHARE_DIR/installers"
+  $DOAS mkdir -p "$SHARE_DIR/installers"
+  $DOAS cp -a "$dir"/. "$SHARE_DIR/installers"/
+  $DOAS find "$SHARE_DIR/installers" -name '*.sh' -exec chmod 0755 {} +
+  ok "installers staged for navi-extras"
 }
 
 # ---------------------------------------------------------------- default webapps
@@ -1192,6 +1194,8 @@ done_banner() {
   ║                                                              ║
   ║   config backups live in ~/.config-backup-navi/              ║
   ║   press Super+D and try: naviWalls · remoji · learn          ║
+  ║   optional extras live in the navi-extras menu:              ║
+  ║   Super+D -> navi-extras: nightly browsers, ani-cli, charm   ║
   ║                                                              ║
   ╚══════════════════════════════════════════════════════════════╝
 
@@ -1221,6 +1225,7 @@ main() {
     install_packages
     build_mpvpaper
     deploy_share
+    deploy_installers
     manifest_begin
     deploy_configs
     install_identity
@@ -1238,7 +1243,6 @@ main() {
     setup_sddm
     setup_chromium
     setup_fonts
-    run_app_installers
     setup_webapps
     ok "deploy-only refresh complete (navi $NAVI_VERSION)"
     exit 0
@@ -1254,6 +1258,7 @@ main() {
   install_packages
   build_mpvpaper
   deploy_share
+  deploy_installers
   manifest_begin
   deploy_configs
   install_identity
@@ -1271,7 +1276,6 @@ main() {
   setup_sddm
   setup_chromium
   setup_fonts
-  run_app_installers
   setup_webapps
   tighten_sudo
   done_banner

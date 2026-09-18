@@ -117,6 +117,13 @@ system via `--deploy-only` (this is what `navi-update` runs after pulling).
   ALL`, password-required), validated with `visudo -c`, self-removing on
   check failure. Effective on the *next* sudo call — no re-login (group
   membership needs a re-login; a sudoers rule doesn't).
+- Third-party installers (`scripts/installers/`: nightly browsers, ani-cli,
+  charm, cliamp) are **not** run by the installer — one failure there used
+  to abort the whole install under `set -e`, and `--yes`/`ASSUME_YES`
+  auto-ran all of them silently. They're deployed to
+  `/usr/share/navi/installers/` and offered through the **`navi-extras`**
+  post-install menu instead (`/usr/bin/navi-extras`, rofi-visible,
+  `alacritty -e navi-extras`).
 
 ## The self-maintenance layer
 
