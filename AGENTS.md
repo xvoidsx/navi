@@ -129,12 +129,15 @@ system via `--deploy-only` (this is what `navi-update` runs after pulling).
 
 Three commands, three jobs. Don't confuse them:
 
-- **`navi-update`** — pulls the release *channel* (release **tags**, never
+- **`navi-update`** — pulls the release *channel* and re-runs deploy.
+  Two channels, Debian-style: **stable** follows release **tags** (never
   arbitrary main commits — a fix on main is invisible to the updater until
-  it's in a tag) and re-runs deploy. `--check` for dry status; `--channel`
-  for channel selection. Two-mode trust: signing key provisioned → verify
-  fail-closed; no key → **loud warning** + unsigned pull. Preserves
-  customized configs by design.
+  it's in a tag); **eiri** is rolling and tracks the `eiri` branch head
+  (deployed commit remembered in `/var/lib/navi/navi-update.state`).
+  `--check` for dry status; `--channel` for channel selection (switching
+  asks first, then pins `/etc/navi/channel`). Two-mode trust: signing key
+  provisioned → verify fail-closed; no key → **loud warning** + unsigned
+  pull. Preserves customized configs by design.
 - **`navi-wired-restore`** — shows how the live setup drifted from stock and
   restores what you choose, with backups of everything it touches.
 - **`navi-wired-adopt`** — the explicit "give me the new stock desktop"
@@ -182,7 +185,16 @@ The convention is `wired/waybar/mod-open.sh <title> <cmd…>`:
 
 **Release naming:** 1.x = **"mika"**, 2.x = **"eiri"**. Tags look like
 `v1.4.6-mika`. The updater discovers "newer" via `sort -V` over tags
-matching `^v1\.[0-9]+`, so patch versions sort correctly.
+matching `^v1\.[0-9]+`, so patch versions sort correctly. **Eiri is never
+tagged** — it has no `v2.x` tags by design; the rolling channel is the
+`eiri` branch head, full stop. Don't create one.
+
+**Channel / artifact policy (standing):** stable ships as **GitHub
+releases** from tags; eiri ships as **branch-scoped workflow artifacts**
+only and **never touches the releases page**. `/releases/latest` always
+resolves to stable (currently 1.5 "mika"). The site's download buttons
+track `/releases/latest` for exactly this reason — never pin them to a
+tag, and never point them at an eiri artifact.
 
 **Never claim** publication, updater success, hardware validation, or public
 deployment without verifying it. The ping/announcement is a contract — keep
