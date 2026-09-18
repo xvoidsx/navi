@@ -31,6 +31,11 @@ chmod +x "$HERE"/bin/*.sh "$HERE"/bin/*.py "$HERE/install.sh"
 
 if [ "$PREFETCH" -eq 1 ]; then
   "$VENV/bin/python" -c "from faster_whisper import WhisperModel; WhisperModel('tiny.en', device='cpu', compute_type='int8')"
+  # Piper TTS voice — the "voice model" tts-ready.sh checks for. Downloaded,
+  # not bundled; warns (not aborts) when the network is unreachable.
+  if ! "$HERE/bin/fetch-voice.sh"; then
+    echo "warning: Piper voice not fetched — Hey Lain will say its voice model is not ready until the download succeeds." >&2
+  fi
 fi
 
 mkdir -p "${XDG_RUNTIME_DIR:-/tmp}/hey-lain" "$HERE/log"

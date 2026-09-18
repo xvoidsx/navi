@@ -580,8 +580,9 @@ setup_heylain() {
   # The venv is the slow part (faster-whisper + piper + whisper model), so
   # it survives redeploys: the marker stores a hash of requirements.txt,
   # and a matching hash means "scripts refresh, venv stays". A mismatch
-  # (or no marker) rebuilds from scratch.
-  local req_hash="" venv_ok=0
+  # (or no marker) rebuilds from scratch. The Piper voice (~60MB, downloaded
+  # not bundled) is preserved the same way so redeploys don't re-fetch it.
+  local req_hash="" venv_ok=0 voice_ok=0
   req_hash="$(sha256sum "$src/requirements.txt" 2>/dev/null | cut -d' ' -f1)"
   if [ -n "$req_hash" ] && [ -f "$dest/.venv-ready" ] \
       && [ "$(cat "$dest/.venv-ready" 2>/dev/null)" = "$req_hash" ] \
@@ -590,14 +591,39 @@ setup_heylain() {
     $DOAS rm -rf "$dest.venv-keep"
     $DOAS mv "$dest/venv" "$dest.venv-keep"
   fi
+  if ls "$dest/voices"/*.onnx >/dev/null 2>&1; then
+    voice_ok=1
+    $DOAS rm -rf "$dest.voices-keep"
+    $DOAS mv "$dest/voices" "$dest.voices-keep"
+  fi
   $DOAS rm -rf "$dest"
   $DOAS cp -a "$src" "$dest"
   $DOAS find "$dest" -name '*.sh' -exec chmod 0755 {} +
   ok "hey-lain deployed"
+  if [ "$voice_ok" -eq 1 ]; then
+    $DOAS rm -rf "$dest/voices"
+    $DOAS mv "$dest.voices-keep" "$dest/voices"
+    ok "hey-lain voice kept (not re-downloaded)"
+  else
+    $DOAS rm -rf "$dest.voices-keep" 2>/dev/null || true
+  fi
   if [ "$venv_ok" -eq 1 ]; then
     $DOAS mv "$dest.venv-keep" "$dest/venv"
     echo "$req_hash" | $DOAS tee "$dest/.venv-ready" >/dev/null
     ok "hey-lain venv kept (requirements unchanged)"
+    # Voice predates the venv-keep path on early installs: fetch it now so
+    # tts-ready.sh stops reporting "voice model is not ready".
+    if [ "$voice_ok" -eq 0 ]; then
+      if host_up https://huggingface.co; then
+        if $DOAS "$dest/bin/fetch-voice.sh" </dev/null; then
+          ok "hey-lain voice fetched"
+        else
+          warn "hey-lain voice download failed — Alt+V will warn until it succeeds (re-run install.sh)"
+        fi
+      else
+        warn "huggingface.co unreachable — hey-lain voice skipped (re-run install.sh later)"
+      fi
+    fi
     return 0
   fi
   rm -rf "$dest.venv-keep" 2>/dev/null

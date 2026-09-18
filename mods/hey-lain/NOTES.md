@@ -3,7 +3,7 @@
 ## Current defaults
 
 - Piper is the default and fastest TTS engine.
-- The bundled default voice is `voices/en_US-libritts_r-medium.onnx`.
+- The default voice is `voices/en_US-libritts_r-medium.onnx`, downloaded at install by `bin/fetch-voice.sh` (not bundled in the repo) and kept across redeploys.
 - Kokoro is retained as an optional fallback; it is not required for the normal install.
 - The default Sway entry point remains `bin/toggle.sh`.
 
