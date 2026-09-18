@@ -37,6 +37,13 @@ HOSTNAME="navi"            # hostname for the installed system
 TARGET="/mnt/navi"         # where the new system is assembled
 ISO_ROOT="/opt/navi-iso"   # navi payload shipped on the ISO
 MAPPER_NAME="cryptroot"    # dm-crypt name for the LUKS root
+# NAVI_CHANNEL: the release channel for this build, derived from the
+# staged wired/VERSION (2.0 "eiri" -> eiri). the experimental build
+# identity keys off this variable, never off hardcoded strings or which
+# directories happen to exist.
+ISO_VERSION="$(cat "$ISO_ROOT/wired/VERSION" 2>/dev/null || echo 'unknown')"
+NAVI_CHANNEL="$(printf '%s' "$ISO_VERSION" | awk '{print $2}' | tr -d '"')"
+IS_EIRI=0; [ "$NAVI_CHANNEL" = "eiri" ] && IS_EIRI=1
 # =====================================================================
 
 # ---------------------------------------------------------------- ui
@@ -175,10 +182,9 @@ _ui_draw() {
   _now=$(date +%s)
   if [ "$_t0" -gt 0 ]; then _el="  ${N_DIM}T+$(fmt_dur $(( _now - _t0 )))"; else _el=""; fi
   # eiri: version from the staged payload, never hardcoded; the ✦eiri
-  # marker shows when the mods/ tree is present.
-  _ver="$(cat "$ISO_ROOT/wired/VERSION" 2>/dev/null || echo 'unknown')"
-  _eiri=""; [ -d "$ISO_ROOT/mods/navi-audio" ] && _eiri=" ${N_MAGENTA}✦eiri${N_CYAN}"
-  printf '%s%s\n' "${N_CYAN}           ${_ver}${_eiri}${_el}${N_OFF}" "$el"
+  # marker shows when NAVI_CHANNEL is eiri.
+  _eiri=""; [ "$IS_EIRI" -eq 1 ] && _eiri=" ${N_MAGENTA}✦eiri${N_CYAN}"
+  printf '%s%s\n' "${N_CYAN}           ${ISO_VERSION}${_eiri}${_el}${N_OFF}" "$el"
   printf '  %s %s%3d%%%s%s\n' \
     "$(_ui_bar "$n" "$PHASE_TOTAL" 30)" "$N_DIM" "$(( n * 100 / PHASE_TOTAL ))" "$N_OFF" "$el"
   # phase changes shimmer: the phase line flashes green for a few seconds,
@@ -1033,8 +1039,7 @@ main() {
 
   # eiri: the version is read from the staged payload, never hardcoded —
   # hardcoded version strings go stale silently (1.3 survived into 1.4).
-  # the mods/ tree marks an experimental eiri build.
-  iso_ver="$(cat "$ISO_ROOT/wired/VERSION" 2>/dev/null || echo 'unknown')"
+  # the experimental identity keys off NAVI_CHANNEL (from wired/VERSION).
   box_line() { printf '  ║   %-59s║\n' "$1"; }
 
   cat <<EOF
@@ -1044,8 +1049,8 @@ ${N_MAGENTA}                       ∅${N_OFF}
   ╔══════════════════════════════════════════════════════════════╗
   ║                                                              ║
 EOF
-  box_line "✓  navi $iso_ver is installed."
-  if [ -d "$ISO_ROOT/mods/navi-audio" ]; then
+  box_line "✓  navi $ISO_VERSION is installed."
+  if [ "$IS_EIRI" -eq 1 ]; then
     printf '  ║   %s%-59s%s║\n' "$N_MAGENTA" "✦  experimental eiri build — the cohesion release" "$N_OFF"
   fi
   cat <<EOF
@@ -1057,7 +1062,7 @@ EOF
   ║   3. you land in the wired. welcome home.                    ║
   ║                                                              ║
 EOF
-  if [ -d "$ISO_ROOT/mods/navi-audio" ]; then
+  if [ "$IS_EIRI" -eq 1 ]; then
     box_line "new in this build: panel mods — right-click volume"
     box_line "for navi-audio, click network for navi-networking."
     box_line ""

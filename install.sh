@@ -39,6 +39,10 @@ DEPLOY_ONLY=0
 # (e.g. 1.3 "mika"). the banner, the deploy manifest, and
 # /etc/navi/version all derive from it — never hardcode it elsewhere.
 NAVI_VERSION="$(cat "$WIRED_DIR/VERSION" 2>/dev/null || echo "unknown")"
+# NAVI_CHANNEL: the release channel for this build, derived from
+# wired/VERSION — e.g. 2.0 "eiri" -> eiri. the experimental build identity
+# keys off this variable, never off which directories happen to exist.
+NAVI_CHANNEL="$(printf '%s' "$NAVI_VERSION" | awk '{print $2}' | tr -d '"')"
 # update mode (set by --deploy-only): deploy_config will not overwrite a
 # config the user has modified — manifest checksums are the baseline.
 NAVI_UPDATE_MODE=0
@@ -123,10 +127,10 @@ EOF
   # the version line is spaced out for the aesthetic; wired/VERSION is the
   # single source of truth, so this never goes stale.
   printf '\n       n a v i   %s\n' "$(printf '%s' "$NAVI_VERSION" | sed 's/./& /g; s/ $//')"
-  # eiri: the mods/ tree marks an experimental eiri build. wired/VERSION
-  # stays the release version until release integration — the channel
-  # stamp is deliberately separate from the version number.
-  if [ -d "$REPO_DIR/mods/navi-audio" ]; then
+  # eiri: the experimental channel stamp. wired/VERSION stays the single
+  # source of truth — the stamp keys off NAVI_CHANNEL, not the version
+  # number and not which directories happen to exist.
+  if [ "$NAVI_CHANNEL" = "eiri" ]; then
     printf '\n       ✦  e x p e r i m e n t a l   e i r i   b u i l d  ✦\n'
   fi
   cat <<'EOF'
@@ -1192,13 +1196,17 @@ install_identity() {
   $DOAS sed -i -e "s/navi [0-9][0-9.]* \"[^\"]*\"/navi $iver \"$iname\"/" \
     /etc/issue /etc/issue.net
   ok "/etc/os-release stamped navi $iver ($iname)"
-  # release channel + version: navi-update reads these to decide what
-  # "newer" means. never clobber an existing channel — the user may have
-  # opted into a different one (e.g. eiri).
+  # release channel: navi-update reads this to decide what "newer" means.
+  # eiri builds follow eiri, everything else follows stable. never clobber
+  # an existing channel — the user may have opted into a different one.
   $DOAS mkdir -p /etc/navi
   if [ ! -f /etc/navi/channel ]; then
-    echo "stable" | $DOAS tee /etc/navi/channel >/dev/null
-    ok "release channel: stable"
+    if [ "$NAVI_CHANNEL" = "eiri" ]; then
+      echo "eiri" | $DOAS tee /etc/navi/channel >/dev/null
+    else
+      echo "stable" | $DOAS tee /etc/navi/channel >/dev/null
+    fi
+    ok "release channel: $(cat /etc/navi/channel 2>/dev/null || echo "$NAVI_CHANNEL")"
   fi
   $DOAS install -m 644 "$WIRED_DIR/VERSION" /etc/navi/version
   ok "/etc/navi/version stamped ($NAVI_VERSION)"
