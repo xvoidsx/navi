@@ -1,0 +1,133 @@
+# navi ISO builder — 2.0 "eiri" EXPERIMENTAL.
+#
+# Same pipeline as iso.yml, but builds the eiri branch for bench testing.
+# Triggered manually only (workflow_dispatch) — eiri ISOs are cut on
+# demand, never on push. The artifact is a bench ISO, not a release.
+#
+# The container route (instead of ubuntu-latest + sudo) keeps the whole
+# build on real Debian tooling: live-build, debootstrap, and friends from
+# trixie itself.
+
+name: navi ISO (2.0 "eiri" experimental)
+
+# === EIRI CHECKLIST ===
+# eiri ISOs are DATE-STAMPED snapshots of the rolling branch, not versions:
+# "navi 2 eiri — 18 September 2026". For every fresh ISO, set ISO_BASENAME
+# to navi-2.0-eiri-YYYY-MM-DD and bump EIRI_BUILD (disambiguates same-day
+# rebuilds). Everything downstream derives the image name, volume label,
+# and artifact name from ISO_BASENAME. The push trigger watches this file,
+# so pushing the bump is what cuts the ISO.
+#
+# Human-facing version strings derive from wired/VERSION (single source of
+# truth) — install.sh and navi-install read it, never hardcode it. The
+# experimental identity keys off NAVI_CHANNEL (from wired/VERSION).
+# Double-check after any version bump:
+#   - wired/VERSION                     (install.sh reads this)
+#   - wired/identity/*                    (os-release, lsb-release, issue, issue.net)
+#   - iso/installer/navi-install        (live header + "is installed" box)
+#   - iso/stage.sh payload              (install.sh, wired/, scripts/, mods/,
+#                                        iso/installer — mods/ holds the eiri panel
+#                                        mod binaries; leaving it out silently drops
+#                                        navi-networking/calendar/audio)
+env:
+  RELEASE: 2.0
+  ISO_BASENAME: navi-2.0-eiri-2026-09-18
+  # bump to cut a fresh ISO (push trigger watches this file)
+  EIRI_BUILD: 5
+
+on:
+  # NOTE: workflow_dispatch requires the workflow file to exist on the
+  # default branch, so on-demand dispatch from the Actions tab is NOT
+  # available while this file lives on eiri only. To cut an ISO, bump
+  # EIRI_BUILD below and push — the push trigger below fires the build.
+  # (When eiri eventually merges, dispatch starts working as-is.)
+  workflow_dispatch:
+  push:
+    branches: [eiri]
+    paths:
+      - '.github/workflows/iso-eiri.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-24.04
+    container:
+      image: debian:trixie
+      options: --privileged
+    steps:
+      - name: Branch guard
+        run: |
+          # eiri ISOs are cut from the eiri branch only. this workflow must
+          # never run on main — the releases page is the stable download
+          # surface and must stay unmistakably mika.
+          [ "${{ github.ref }}" = "refs/heads/eiri" ] \
+            || { echo "refusing: iso-eiri.yml runs on eiri only (got ${{ github.ref }})"; exit 1; }
+
+      # NOTE: actions/checkout needs node, which debian:trixie-slim lacks,
+      # so the repo is cloned with plain git instead.
+      - name: Clone navi (eiri)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl
+          # curl: iso/stage.sh fetches the NaviVim repo + neovim tarball
+          git clone --depth 1 --branch eiri \
+            "https://x-access-token:${GH_TOKEN}@github.com/xvoidsx/navi.git" src
+          cd src && git rev-parse --short HEAD
+          # guard: never ship a mislabeled ISO — the branch must carry the
+          # eiri version string. (we're cd'd into src/ here.)
+          grep -q 'eiri' wired/VERSION \
+            || { echo "wired/VERSION does not say eiri — refusing to build"; exit 1; }
+          cat wired/VERSION
+
+      # nodejs: JS actions (upload-artifact) run inside the container and
+      # need node; trixie ships node 20, which actions/*@v4 require.
+      - name: Install live-build
+        run: |
+          set -euo pipefail
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq live-build nodejs
+
+      - name: Stage the live-build tree
+        run: |
+          set -euo pipefail
+          cd src && ./iso/stage.sh
+
+      - name: Build the ISO
+        run: |
+          set -euo pipefail
+          cd src/iso/build
+          # NOTE: the lb config flags are inline here on purpose. live-build
+          # auto-executes an executable auto/config script — and ours has to
+          # call `lb config` itself, which recursed forever and red-lit the
+          # first build. With no auto/config in the tree, `lb config` below
+          # just configures.
+          lb config \
+            --distribution trixie \
+            --archive-areas "main contrib non-free non-free-firmware" \
+            --bootloaders "syslinux grub-efi" \
+            --binary-images iso-hybrid \
+            --debian-installer false \
+            --memtest none \
+            --iso-application "navi" \
+            --iso-publisher "xvoidsx" \
+            --iso-volume "navi 2.0 eiri 2026-09-18" \
+            --image-name "$ISO_BASENAME"
+          lb build
+
+      - name: Collect the ISO
+        run: |
+          set -euo pipefail
+          iso_path="$(ls src/iso/build/${ISO_BASENAME}-*.hybrid.iso | head -n 1)"
+          cp "$iso_path" "/tmp/${ISO_BASENAME}.iso"
+          ls -lh "/tmp/${ISO_BASENAME}.iso"
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ISO_BASENAME }}.iso
+          path: /tmp/${{ env.ISO_BASENAME }}.iso
+          if-no-files-found: error

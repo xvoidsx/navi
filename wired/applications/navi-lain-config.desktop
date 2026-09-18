@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-lain-config
+Comment=Hey Lain brain settings: pick a local or cloud model, manage API keys
+Exec=alacritty -e navi-lain-config
+Icon=audio-input-microphone
+Terminal=false
+Categories=System;Settings;
+NoDisplay=false

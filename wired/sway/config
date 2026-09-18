@@ -46,6 +46,10 @@ exec_always --no-startup-id systemctl --user set-environment PATH="/usr/games:$H
 # set wallpaper — animated-first, static fallback handled inside
 exec /usr/bin/navi-wallpaper
 
+# Hey Lain: warm the voice pipeline at login (~30s, background) so the
+# first Alt+V tap answers fast instead of cold-starting STT+TTS.
+exec /usr/share/navi/hey-lain/bin/warmup.sh
+
 # setting mouse theme
 # we have two options to choose from: Yaru and Adwaita. 
 # both look nice - simply uncomment the one you want to use (yaru is default)
@@ -101,6 +105,10 @@ bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT
 bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -10% && $refresh_i3status && notify-send "wired helper" "volume -10"
 bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && $refresh_i3status && notify-send "wired helper" "volume muted"
 bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && $refresh_i3status
+
+# Hey Lain: tap Alt+V to start listening, tap again to stop + transcribe + reply.
+# --no-repeat is load-bearing: without it, holding the key flaps the toggle.
+bindsym --no-repeat Alt+v exec /usr/share/navi/hey-lain/bin/toggle.sh
 
 floating_modifier $mod
 

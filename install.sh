@@ -39,6 +39,10 @@ DEPLOY_ONLY=0
 # (e.g. 1.3 "mika"). the banner, the deploy manifest, and
 # /etc/navi/version all derive from it — never hardcode it elsewhere.
 NAVI_VERSION="$(cat "$WIRED_DIR/VERSION" 2>/dev/null || echo "unknown")"
+# NAVI_CHANNEL: the release channel for this build, derived from
+# wired/VERSION — e.g. 2.0 "eiri" -> eiri. the experimental build identity
+# keys off this variable, never off which directories happen to exist.
+NAVI_CHANNEL="$(printf '%s' "$NAVI_VERSION" | awk '{print $2}' | tr -d '"')"
 # update mode (set by --deploy-only): deploy_config will not overwrite a
 # config the user has modified — manifest checksums are the baseline.
 NAVI_UPDATE_MODE=0
@@ -73,7 +77,7 @@ PKGS=(
   # minimal installs don't pull them in on their own, and without them the
   # greeter falls back to the default theme with a module-not-installed error.
   qml6-module-qtquick-controls qml6-module-qtquick-layouts
-  fonts-jetbrains-mono fonts-firacode fonts-noto fonts-cascadia-code wdisplays papirus-icon-theme
+  fonts-jetbrains-mono fonts-firacode fonts-noto fonts-cascadia-code wdisplays papirus-icon-theme moka-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak dconf-cli
   chromium firefox-esr
@@ -87,6 +91,9 @@ PKGS=(
   # python3 dev conveniences, pandora radio, firewall (+ graphical frontend),
   # node runtime, graphical sftp/ssh file transfer.
   zip unzip bzip2 lolcat python-dev-is-python3 pianobar ufw gufw nodejs npm filezilla imv
+  # Hey Lain voice assistant (eiri): venv tooling + audio capture libs.
+  # The venv itself (faster-whisper, piper) is built by setup_heylain.
+  python3-venv python3-pip pipewire-audio-client-libraries alsa-utils
   # NaviVim (default terminal IDE): telescope needs ripgrep + fd
   # (Debian calls it fd-find), treesitter parsers and fzf-native compile
   # at first launch (build-essential), shellcheck for config linting.
@@ -123,6 +130,12 @@ EOF
   # the version line is spaced out for the aesthetic; wired/VERSION is the
   # single source of truth, so this never goes stale.
   printf '\n       n a v i   %s\n' "$(printf '%s' "$NAVI_VERSION" | sed 's/./& /g; s/ $//')"
+  # eiri: the experimental channel stamp. wired/VERSION stays the single
+  # source of truth — the stamp keys off NAVI_CHANNEL, not the version
+  # number and not which directories happen to exist.
+  if [ "$NAVI_CHANNEL" = "eiri" ]; then
+    printf '\n       ✦  e x p e r i m e n t a l   e i r i   b u i l d  ✦\n'
+  fi
   cat <<'EOF'
 
        ナビ — everybody has already entered the wired
@@ -526,6 +539,125 @@ setup_navivim() {
   fi
 }
 
+# ---------------------------------------------------------------- system: navi mods (eiri)
+# the Go/Bubble Tea panel mods — prebuilt binaries committed in the repo,
+# so the installed system never needs a Go toolchain. deployed to /usr/bin
+# like the other navi commands; waybar opens them floating via mod-open.sh.
+
+setup_mods() {
+  step "navi mods -> /usr/bin"
+
+  install_mod() { # <mod-dir> <binary>
+    local src="$REPO_DIR/mods/$1/$2"
+    if [ ! -e "$src" ]; then
+      warn "missing mod binary: mods/$1/$2 — skipping"
+      return 0
+    fi
+    $DOAS install -m 0755 "$src" "/usr/bin/$2"
+    ok "$2"
+  }
+
+  install_mod "navi-networking" "navi-networking"
+  install_mod "navi-calendar"   "navi-calendar"
+  install_mod "navi-audio"      "navi-audio"
+  install_mod "navi-lain-config" "navi-lain-config"
+}
+
+# Hey Lain voice assistant (eiri): deploys mods/hey-lain to
+# /usr/share/navi/hey-lain and builds its STT/TTS venv in place. The venv
+# build (faster-whisper + piper + whisper model, a few hundred MB) is the
+# slow part, so it runs once: a .venv-ready marker skips rebuilds on
+# later deploys, and a dead PyPI degrades to a warning instead of wedging
+# the install. Logs go to the user's state dir (HEY_LAIN_LOG_DIR) because
+# the deploy tree is root-owned.
+setup_heylain() {
+  step "hey lain -> $SHARE_DIR/hey-lain"
+  local src="$REPO_DIR/mods/hey-lain" dest="$SHARE_DIR/hey-lain"
+  if [ ! -d "$src" ]; then
+    warn "mods/hey-lain missing — skipping voice assistant"
+    return 0
+  fi
+  # The venv is the slow part (faster-whisper + piper + whisper model), so
+  # it survives redeploys: the marker stores a hash of requirements.txt,
+  # and a matching hash means "scripts refresh, venv stays". A mismatch
+  # (or no marker) rebuilds from scratch. The Piper voice (~60MB, downloaded
+  # not bundled) is preserved the same way so redeploys don't re-fetch it.
+  local req_hash="" venv_ok=0 voice_ok=0
+  req_hash="$(sha256sum "$src/requirements.txt" 2>/dev/null | cut -d' ' -f1)"
+  if [ -n "$req_hash" ] && [ -f "$dest/.venv-ready" ] \
+      && [ "$(cat "$dest/.venv-ready" 2>/dev/null)" = "$req_hash" ] \
+      && [ -d "$dest/venv" ]; then
+    venv_ok=1
+    $DOAS rm -rf "$dest.venv-keep"
+    $DOAS mv "$dest/venv" "$dest.venv-keep"
+  fi
+  if ls "$dest/voices"/*.onnx >/dev/null 2>&1; then
+    voice_ok=1
+    $DOAS rm -rf "$dest.voices-keep"
+    $DOAS mv "$dest/voices" "$dest.voices-keep"
+  fi
+  $DOAS rm -rf "$dest"
+  $DOAS cp -a "$src" "$dest"
+  $DOAS find "$dest" -name '*.sh' -exec chmod 0755 {} +
+  ok "hey-lain deployed"
+  if [ "$voice_ok" -eq 1 ]; then
+    $DOAS rm -rf "$dest/voices"
+    $DOAS mv "$dest.voices-keep" "$dest/voices"
+    ok "hey-lain voice kept (not re-downloaded)"
+  else
+    $DOAS rm -rf "$dest.voices-keep" 2>/dev/null || true
+  fi
+  if [ "$venv_ok" -eq 1 ]; then
+    $DOAS mv "$dest.venv-keep" "$dest/venv"
+    echo "$req_hash" | $DOAS tee "$dest/.venv-ready" >/dev/null
+    ok "hey-lain venv kept (requirements unchanged)"
+    # Voice predates the venv-keep path on early installs: fetch it now so
+    # tts-ready.sh stops reporting "voice model is not ready".
+    if [ "$voice_ok" -eq 0 ]; then
+      if host_up https://huggingface.co; then
+        if $DOAS "$dest/bin/fetch-voice.sh" </dev/null; then
+          ok "hey-lain voice fetched"
+        else
+          warn "hey-lain voice download failed — Alt+V will warn until it succeeds (re-run install.sh)"
+        fi
+      else
+        warn "huggingface.co unreachable — hey-lain voice skipped (re-run install.sh later)"
+      fi
+    fi
+    return 0
+  fi
+  rm -rf "$dest.venv-keep" 2>/dev/null
+  if ! host_up https://pypi.org/simple/; then
+    warn "pypi unreachable — hey-lain voice backend skipped (re-run install.sh --yes later)"
+    return 0
+  fi
+  info "building hey-lain venv (faster-whisper + piper — a few minutes, one time)..."
+  if $DOAS "$dest/install.sh" --skip-apt </dev/null; then
+    echo "$req_hash" | $DOAS tee "$dest/.venv-ready" >/dev/null
+    ok "hey-lain ready — tap Alt+V to talk"
+  else
+    warn "hey-lain venv build failed — Alt+V will not work until install.sh is re-run"
+  fi
+  # Local brain: gemma3:270m is the default voice model — tiny enough for
+  # low-end hardware, no key or cloud needed. `ollama pull` talks to the
+  # local daemon, so the model lands where the ollama service sees it.
+  # Skipped (with a warning) when ollama or the network isn't there yet.
+  if ! command -v ollama >/dev/null 2>&1; then
+    warn "ollama not found — skipping gemma3:270m pull"
+  elif ollama list 2>/dev/null | grep -q "^gemma3:270m"; then
+    ok "ollama model gemma3:270m already present"
+  elif ! host_up https://ollama.com; then
+    warn "ollama.com unreachable — skipping gemma3:270m pull (run: ollama pull gemma3:270m)"
+  else
+    info "pulling gemma3:270m (local voice brain, one time)..."
+    if ollama pull gemma3:270m >/dev/null 2>&1; then
+      ok "gemma3:270m ready"
+    else
+      warn "could not pull gemma3:270m — Hey Lain falls back to its offline line until you run: ollama pull gemma3:270m"
+    fi
+  fi
+}
+
 # ---------------------------------------------------------------- deploy: /usr/share/navi
 
 deploy_share() {
@@ -917,8 +1049,8 @@ setup_flatpak() {
   if [ ! -f "$override_dir/global" ]; then
     cat > "$override_dir/global" <<'EOF'
 [Environment]
-GTK_THEME=Yaru-magenta-dark
-ICON_THEME=Papirus-Dark
+GTK_THEME=nightshadeNeon
+ICON_THEME=Moka
 EOF
     ok "flatpak theme overrides applied"
   else
@@ -1013,15 +1145,28 @@ setup_webapps() {
 # settings.ini covers plain GTK apps, but GSettings-aware apps (nemo and
 # friends) read org.gnome.desktop.interface — whose schema default is
 # Adwaita, which is why installs kept falling back to it. seed system-wide
-# dconf defaults so Yaru-magenta-dark wins from first boot. no locks: users
+# dconf defaults so nightshadeNeon wins from first boot. no locks: users
 # can still override per-account with gsettings or a theme tool.
 setup_gtk_theme() {
-  step "gtk theme defaults (yaru-magenta-dark)"
+  step "gtk theme defaults (nightshadeNeon + moka)"
+  # the house theme rides in wired/themes/, so it lands in the iron
+  # structure on every install and update; copy it into the system
+  # dir GTK actually reads.
+  local theme_src="$WIRED_SHARE/themes/nightshadeNeon"
+  [ -d "$theme_src" ] || theme_src="$WIRED_DIR/themes/nightshadeNeon"
+  if [ -d "$theme_src" ]; then
+    $DOAS mkdir -p /usr/share/themes
+    $DOAS rm -rf /usr/share/themes/nightshadeNeon
+    $DOAS cp -a "$theme_src" /usr/share/themes/nightshadeNeon
+    ok "nightshadeNeon installed to /usr/share/themes"
+  else
+    warn "wired/themes/nightshadeNeon not found — skipping theme install"
+  fi
   $DOAS install -d -m 755 /etc/dconf/db/local.d
   $DOAS tee /etc/dconf/db/local.d/00-navi-theme >/dev/null <<'EOF'
 [org/gnome/desktop/interface]
-gtk-theme='Yaru-magenta-dark'
-icon-theme='Papirus-Dark'
+gtk-theme='nightshadeNeon'
+icon-theme='Moka'
 color-scheme='prefer-dark'
 EOF
   # The profile is the piece RC20.x was missing: without
@@ -1032,7 +1177,7 @@ EOF
   printf '%s\n' 'user-db:user' 'system-db:local' 'system-db:site' 'system-db:distro' \
     | $DOAS tee /etc/dconf/profile/user >/dev/null
   $DOAS dconf update
-  ok "yaru-magenta-dark seeded as the gtk default (user-overridable)"
+  ok "nightshadeNeon seeded as the gtk default (user-overridable)"
 }
 
 # ---------------------------------------------------------------- login screen
@@ -1165,13 +1310,17 @@ install_identity() {
   $DOAS sed -i -e "s/navi [0-9][0-9.]* \"[^\"]*\"/navi $iver \"$iname\"/" \
     /etc/issue /etc/issue.net
   ok "/etc/os-release stamped navi $iver ($iname)"
-  # release channel + version: navi-update reads these to decide what
-  # "newer" means. never clobber an existing channel — the user may have
-  # opted into a different one (e.g. eiri).
+  # release channel: navi-update reads this to decide what "newer" means.
+  # eiri builds follow eiri, everything else follows stable. never clobber
+  # an existing channel — the user may have opted into a different one.
   $DOAS mkdir -p /etc/navi
   if [ ! -f /etc/navi/channel ]; then
-    echo "stable" | $DOAS tee /etc/navi/channel >/dev/null
-    ok "release channel: stable"
+    if [ "$NAVI_CHANNEL" = "eiri" ]; then
+      echo "eiri" | $DOAS tee /etc/navi/channel >/dev/null
+    else
+      echo "stable" | $DOAS tee /etc/navi/channel >/dev/null
+    fi
+    ok "release channel: $(cat /etc/navi/channel 2>/dev/null || echo "$NAVI_CHANNEL")"
   fi
   $DOAS install -m 644 "$WIRED_DIR/VERSION" /etc/navi/version
   ok "/etc/navi/version stamped ($NAVI_VERSION)"
@@ -1235,6 +1384,8 @@ main() {
     setup_sudo
     setup_agents
     setup_navivim
+    setup_mods
+    setup_heylain
     setup_environment
     setup_flatpak
     setup_flatpak_polkit
@@ -1268,6 +1419,8 @@ main() {
   setup_sudo
   setup_agents
   setup_navivim
+  setup_mods
+  setup_heylain
   setup_environment
   setup_flatpak
   setup_flatpak_polkit

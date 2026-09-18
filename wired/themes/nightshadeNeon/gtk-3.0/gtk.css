@@ -1,0 +1,398 @@
+/* nightshadeNeon — Navi's house GTK3 theme.
+ * Black glass, neon pink/green/cyan/red, white text.
+ * Palette (mirrors NaviVim colors/nightshadeNeon.lua):
+ *   pink #ff10f0 / green #39ff14 / cyan #00ffff /
+ *   red #ff3131 / white #ffffff / black #000000 */
+
+@define-color neon_pink #ff10f0;
+@define-color neon_green #39ff14;
+@define-color neon_cyan #00ffff;
+@define-color neon_red #ff3131;
+@define-color neon_white #ffffff;
+@define-color neon_black #000000;
+@define-color bg_alt #0d0d0d;
+@define-color bg_float #111111;
+@define-color bg_sel #2a0a28;
+@define-color gray_text #8a8a8a;
+@define-color gray_dark #3a3a3a;
+@define-color pink_dim #a00a9e;
+
+/* standard names so apps (and our gtk.css overrides) resolve */
+@define-color theme_bg_color @neon_black;
+@define-color theme_fg_color @neon_white;
+@define-color theme_base_color @bg_alt;
+@define-color theme_text_color @neon_white;
+@define-color theme_selected_bg_color @neon_pink;
+@define-color theme_selected_fg_color @neon_black;
+@define-color theme_unfocused_bg_color @neon_black;
+@define-color theme_unfocused_fg_color @gray_text;
+@define-color theme_unfocused_base_color @bg_alt;
+@define-color theme_unfocused_text_color @gray_text;
+@define-color theme_unfocused_selected_bg_color @pink_dim;
+@define-color theme_unfocused_selected_fg_color @neon_white;
+@define-color insensitive_bg_color @bg_float;
+@define-color insensitive_fg_color @gray_text;
+@define-color insensitive_base_color @bg_alt;
+@define-color borders @gray_dark;
+@define-color unfocused_borders #222222;
+@define-color link_color @neon_cyan;
+@define-color link_visited_color @neon_pink;
+@define-color error_color @neon_red;
+@define-color warning_color @neon_pink;
+@define-color success_color @neon_green;
+@define-color info_color @neon_cyan;
+@define-color theme_titlebar_background @neon_black;
+@define-color theme_titlebar_foreground @neon_white;
+@define-color theme_header_background @neon_black;
+@define-color theme_header_foreground @neon_white;
+
+/* ---- base ---- */
+* {
+    outline-color: @neon_green;
+    outline-style: solid;
+    outline-offset: -1px;
+}
+
+.background,
+window,
+dialog {
+    background-color: @neon_black;
+    color: @neon_white;
+}
+
+*:disabled {
+    color: @gray_text;
+}
+
+/* ---- selection ---- */
+*:selected,
+selection,
+entry selection,
+textview text selection,
+.view:selected,
+row:selected {
+    background-color: @neon_pink;
+    color: @neon_black;
+}
+
+/* ---- buttons ---- */
+button {
+    background-image: none;
+    background-color: @bg_float;
+    color: @neon_white;
+    border: 1px solid @gray_dark;
+    border-radius: 6px;
+    padding: 6px 12px;
+}
+
+button:hover {
+    border-color: @neon_green;
+}
+
+button:active,
+button:checked {
+    background-color: @bg_sel;
+    border-color: @neon_pink;
+    color: @neon_green;
+}
+
+button:disabled {
+    background-color: @bg_float;
+    color: @gray_text;
+    border-color: #222222;
+}
+
+button.suggested-action {
+    background-color: @neon_green;
+    color: @neon_black;
+    border-color: @neon_green;
+    font-weight: bold;
+}
+
+button.suggested-action:hover {
+    background-color: @neon_white;
+    border-color: @neon_white;
+}
+
+button.destructive-action {
+    background-color: @neon_red;
+    color: @neon_white;
+    border-color: @neon_red;
+    font-weight: bold;
+}
+
+/* ---- entries ---- */
+entry,
+spinbutton {
+    background-color: @bg_alt;
+    color: @neon_white;
+    border: 1px solid @gray_dark;
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+entry:focus {
+    border-color: @neon_pink;
+}
+
+entry:disabled {
+    background-color: @bg_float;
+    color: @gray_text;
+}
+
+/* ---- headerbar / titlebar ---- */
+headerbar,
+.titlebar {
+    background-image: none;
+    background-color: @neon_black;
+    color: @neon_white;
+    border-bottom: 1px solid @neon_pink;
+    padding: 6px;
+}
+
+headerbar:backdrop,
+.titlebar:backdrop {
+    border-bottom-color: @gray_dark;
+    color: @gray_text;
+}
+
+headerbar button {
+    border-color: transparent;
+    background-color: transparent;
+}
+
+headerbar button:hover {
+    border-color: @neon_green;
+    background-color: @bg_float;
+}
+
+/* ---- menus ---- */
+menu,
+.menu,
+.context-menu,
+popover {
+    background-color: @bg_float;
+    color: @neon_white;
+    border: 1px solid @neon_pink;
+    border-radius: 6px;
+    padding: 4px;
+}
+
+menuitem,
+.modelbutton {
+    color: @neon_white;
+    border-radius: 4px;
+    padding: 6px 10px;
+}
+
+menuitem:hover,
+.modelbutton:hover {
+    background-color: @bg_sel;
+    color: @neon_green;
+}
+
+menu separator,
+separator {
+    background-color: @gray_dark;
+    min-height: 1px;
+}
+
+menubar {
+    background-color: @neon_black;
+    color: @neon_white;
+}
+
+menubar > menuitem:hover {
+    background-color: @bg_float;
+    color: @neon_pink;
+}
+
+/* ---- notebook / tabs ---- */
+notebook {
+    background-color: @neon_black;
+}
+
+notebook header {
+    background-color: @bg_alt;
+    border-bottom: 1px solid @gray_dark;
+}
+
+notebook tab {
+    background-color: @bg_alt;
+    color: @gray_text;
+    border: 1px solid transparent;
+    border-radius: 6px 6px 0 0;
+    padding: 6px 14px;
+}
+
+notebook tab:checked {
+    background-color: @neon_black;
+    color: @neon_pink;
+    border-color: @neon_pink;
+    border-bottom-color: @neon_black;
+}
+
+/* ---- treeview / lists / sidebar ---- */
+treeview,
+.view,
+iconview {
+    background-color: @bg_alt;
+    color: @neon_white;
+}
+
+treeview:selected,
+row:selected {
+    background-color: @neon_pink;
+    color: @neon_black;
+}
+
+.cell {
+    padding: 4px;
+}
+
+placessidebar row:selected,
+.sidebar row:selected {
+    background-color: @bg_sel;
+    color: @neon_green;
+    border-left: 2px solid @neon_green;
+}
+
+/* ---- scrollbar ---- */
+scrollbar {
+    background-color: transparent;
+    border: none;
+}
+
+scrollbar slider {
+    background-color: @gray_dark;
+    border: none;
+    border-radius: 4px;
+    min-width: 8px;
+    min-height: 8px;
+}
+
+scrollbar slider:hover {
+    background-color: @neon_pink;
+}
+
+/* ---- scale / slider ---- */
+scale trough {
+    background-color: @gray_dark;
+    border-radius: 4px;
+    min-height: 4px;
+}
+
+scale highlight {
+    background-color: @neon_green;
+    border-radius: 4px;
+}
+
+scale slider {
+    background-color: @neon_green;
+    border: none;
+    border-radius: 50%;
+    min-width: 14px;
+    min-height: 14px;
+}
+
+/* ---- progress ---- */
+progressbar trough {
+    background-color: @gray_dark;
+    border-radius: 4px;
+    min-height: 6px;
+}
+
+progressbar progress {
+    background-color: @neon_pink;
+    border-radius: 4px;
+}
+
+/* ---- check / radio / switch ---- */
+check,
+radio {
+    color: @neon_white;
+    border: 1px solid @gray_dark;
+    background-color: @bg_alt;
+}
+
+check:checked,
+radio:checked {
+    background-color: @neon_pink;
+    border-color: @neon_pink;
+    color: @neon_black;
+}
+
+switch {
+    background-color: @gray_dark;
+    border-radius: 12px;
+    padding: 2px;
+}
+
+switch:checked {
+    background-color: @neon_green;
+}
+
+switch slider {
+    background-color: @neon_white;
+    border-radius: 50%;
+}
+
+/* ---- tooltip ---- */
+tooltip {
+    background-color: @neon_black;
+    color: @neon_white;
+    border: 1px solid @neon_green;
+    border-radius: 6px;
+    padding: 6px;
+}
+
+/* ---- infobar ---- */
+infobar {
+    background-color: @bg_float;
+    color: @neon_white;
+    border-bottom: 1px solid @gray_dark;
+}
+
+infobar.info { border-bottom-color: @neon_cyan; }
+infobar.question { border-bottom-color: @neon_pink; }
+infobar.warning { border-bottom-color: @neon_pink; }
+infobar.error { border-bottom-color: @neon_red; }
+
+/* ---- links ---- */
+link,
+button:link,
+*:link {
+    color: @neon_cyan;
+}
+
+link:visited,
+button:visited,
+*:link:visited {
+    color: @neon_pink;
+}
+
+/* ---- misc ---- */
+toolbar {
+    background-color: @neon_black;
+    color: @neon_white;
+}
+
+statusbar {
+    background-color: @neon_black;
+    color: @gray_text;
+    border-top: 1px solid @gray_dark;
+}
+
+spinner:checked {
+    color: @neon_green;
+}
+
+calendar {
+    background-color: @bg_alt;
+    color: @neon_white;
+}
+
+calendar:selected {
+    background-color: @neon_pink;
+    color: @neon_black;
+}

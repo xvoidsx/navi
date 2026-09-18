@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-calendar
+Comment=Calendar: month grid and agenda
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-calendar" navi-calendar
+Icon=x-office-calendar
+Terminal=false
+Categories=Office;Calendar;
+NoDisplay=false

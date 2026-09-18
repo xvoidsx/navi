@@ -1,5 +1,7 @@
-// navi - rofi (nightshadeNeon)
-( this file should live at $HOME/.config/rofi/config.rasi )
+// wired nightshade launcher
+// this is the default launcher used to launch apps and run commands in navi.
+// beautiful and drenched in nightshadeNeon.
+// this file should live at ( $HOME/.config/rofi/config.rasi )
 
 configuration {
     modi: "combi";

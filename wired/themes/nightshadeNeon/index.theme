@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=nightshadeNeon
+Comment=Navi's house GTK theme. Black glass, neon pink/green/cyan/red on white.
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=nightshadeNeon
+MetacityTheme=nightshadeNeon
+IconTheme=Moka
+CursorTheme=Adwaita
+ButtonLayout=icon:minimize,maximize,close
