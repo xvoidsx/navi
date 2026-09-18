@@ -11,8 +11,12 @@
 name: navi ISO (2.0 "eiri" experimental)
 
 # === EIRI CHECKLIST ===
-# Bump BOTH values below for every eiri ISO. Everything downstream derives
-# the image name, volume label, and artifact name from them.
+# eiri ISOs are DATE-STAMPED snapshots of the rolling branch, not versions:
+# "navi 2 eiri — 18 September 2026". For every fresh ISO, set ISO_BASENAME
+# to navi-2.0-eiri-YYYY-MM-DD and bump EIRI_BUILD (disambiguates same-day
+# rebuilds). Everything downstream derives the image name, volume label,
+# and artifact name from ISO_BASENAME. The push trigger watches this file,
+# so pushing the bump is what cuts the ISO.
 #
 # Human-facing version strings derive from wired/VERSION (single source of
 # truth) — install.sh and navi-install read it, never hardcode it. The
@@ -27,9 +31,9 @@ name: navi ISO (2.0 "eiri" experimental)
 #                                        navi-networking/calendar/audio)
 env:
   RELEASE: 2.0
-  ISO_BASENAME: navi-2.0-eiri
+  ISO_BASENAME: navi-2.0-eiri-2026-09-18
   # bump to cut a fresh ISO (push trigger watches this file)
-  EIRI_BUILD: 4
+  EIRI_BUILD: 5
 
 on:
   # NOTE: workflow_dispatch requires the workflow file to exist on the
@@ -110,7 +114,7 @@ jobs:
             --memtest none \
             --iso-application "navi" \
             --iso-publisher "xvoidsx" \
-            --iso-volume "navi 2.0 eiri" \
+            --iso-volume "navi 2.0 eiri 2026-09-18" \
             --image-name "$ISO_BASENAME"
           lb build
 
