@@ -28,9 +28,20 @@ name: navi ISO (2.0 "eiri" experimental)
 env:
   RELEASE: 2.0
   ISO_BASENAME: navi-2.0-eiri
+  # bump to cut a fresh ISO (push trigger watches this file)
+  EIRI_BUILD: 1
 
 on:
+  # NOTE: workflow_dispatch requires the workflow file to exist on the
+  # default branch, so on-demand dispatch from the Actions tab is NOT
+  # available while this file lives on eiri only. To cut an ISO, bump
+  # EIRI_BUILD below and push — the push trigger below fires the build.
+  # (When eiri eventually merges, dispatch starts working as-is.)
   workflow_dispatch:
+  push:
+    branches: [eiri]
+    paths:
+      - '.github/workflows/iso-eiri.yml'
 
 permissions:
   contents: read
