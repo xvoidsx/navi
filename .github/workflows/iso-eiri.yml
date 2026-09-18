@@ -33,7 +33,7 @@ env:
   RELEASE: 2.0
   ISO_BASENAME: navi-2.0-eiri-2026-09-18
   # bump to cut a fresh ISO (push trigger watches this file)
-  EIRI_BUILD: 5
+  EIRI_BUILD: 6
 
 on:
   # NOTE: workflow_dispatch requires the workflow file to exist on the
