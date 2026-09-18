@@ -4,7 +4,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$HERE/bin"
 RUNTIME="${XDG_RUNTIME_DIR:-/tmp}/hey-lain"
-LOG="$HERE/log/hey-lain.log"
+LOG="${HEY_LAIN_LOG_DIR:-$HERE/log}/hey-lain.log"
 PIDFILE="$RUNTIME/rec.pid"
 CURRENT="$RUNTIME/current"
 CFG="$HERE/config.json"

@@ -9,7 +9,13 @@ RUNTIME="${XDG_RUNTIME_DIR:-/tmp}/hey-lain"
 LOCK="$RUNTIME/processing.lock"
 DEBOUNCE="$RUNTIME/last-toggle"
 mkdir -p "$RUNTIME"
-LOG="$HERE/log/hey-lain.log"
+# Logs live in the user's state dir: the install deploys hey-lain root-owned
+# under /usr/share/navi, so $HERE/log isn't writable at runtime. Children
+# (hey-lain.sh, record-start.sh, ...) inherit this via the environment.
+HEY_LAIN_LOG_DIR="${HEY_LAIN_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/share}/hey-lain/log}"
+mkdir -p "$HEY_LAIN_LOG_DIR" 2>/dev/null || HEY_LAIN_LOG_DIR="$HERE/log"
+export HEY_LAIN_LOG_DIR
+LOG="${HEY_LAIN_LOG_DIR:-$HERE/log}/hey-lain.log"
 log() { echo "$(date '+%F %T') toggle: $*" >> "$LOG"; }
 
 now=$(date +%s)

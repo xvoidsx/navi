@@ -6,7 +6,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 RUNTIME="${XDG_RUNTIME_DIR:-/tmp}/hey-lain"
 PIDFILE="$RUNTIME/kokoro-serve.pid"
-LOG="$HERE/log/kokoro-serve.log"
+LOG="${HEY_LAIN_LOG_DIR:-$HERE/log}/kokoro-serve.log"
 PORT="${KOKORO_SERVICE_PORT:-8765}"
 KOKORO="${KOKORO_BIN:-$(command -v kokoro || true)}"
 mkdir -p "$RUNTIME" "$(dirname "$LOG")"

@@ -122,6 +122,15 @@ system via `--deploy-only` (this is what `navi-update` runs after pulling).
   to abort the whole install under `set -e`. They're deployed to
   `/usr/share/navi/installers/` and offered through the **`navi-extras`**
   post-install menu instead (`/usr/bin/navi-extras`, rofi-visible).
+- **Hey Lain** (eiri): `setup_heylain` deploys `mods/hey-lain/` to
+  `/usr/share/navi/hey-lain` and builds its STT/TTS venv in place
+  (faster-whisper + piper + whisper model). The venv survives redeploys —
+  the `.venv-ready` marker stores a hash of `requirements.txt`, so
+  unchanged requirements mean "refresh scripts, keep venv"; a PyPI outage
+  warns and continues instead of wedging the install. Logs go to
+  `$XDG_STATE_HOME/hey-lain/log` (`HEY_LAIN_LOG_DIR`) because the deploy
+  tree is root-owned. Alt+V is bound in the shipped sway config;
+  `warmup.sh` runs at login.
 
 ## The self-maintenance layer
 

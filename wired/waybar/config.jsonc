@@ -66,7 +66,7 @@
         //"format": "{:%Y/%m/%d}",
         "format": "{:%d %B}",
 	"tooltip": false, 
-        "on-click": "gsimplecal"
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-calendar\" navi-calendar"
     },
 
     "pulseaudio": {

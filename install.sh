@@ -91,6 +91,9 @@ PKGS=(
   # python3 dev conveniences, pandora radio, firewall (+ graphical frontend),
   # node runtime, graphical sftp/ssh file transfer.
   zip unzip bzip2 lolcat python-dev-is-python3 pianobar ufw gufw nodejs npm filezilla imv
+  # Hey Lain voice assistant (eiri): venv tooling + audio capture libs.
+  # The venv itself (faster-whisper, piper) is built by setup_heylain.
+  python3-venv python3-pip pipewire-audio-client-libraries alsa-utils
   # NaviVim (default terminal IDE): telescope needs ripgrep + fd
   # (Debian calls it fd-find), treesitter parsers and fzf-native compile
   # at first launch (build-essential), shellcheck for config linting.
@@ -557,6 +560,57 @@ setup_mods() {
   install_mod "navi-networking" "navi-networking"
   install_mod "navi-calendar"   "navi-calendar"
   install_mod "navi-audio"      "navi-audio"
+}
+
+# Hey Lain voice assistant (eiri): deploys mods/hey-lain to
+# /usr/share/navi/hey-lain and builds its STT/TTS venv in place. The venv
+# build (faster-whisper + piper + whisper model, a few hundred MB) is the
+# slow part, so it runs once: a .venv-ready marker skips rebuilds on
+# later deploys, and a dead PyPI degrades to a warning instead of wedging
+# the install. Logs go to the user's state dir (HEY_LAIN_LOG_DIR) because
+# the deploy tree is root-owned.
+setup_heylain() {
+  step "hey lain -> $SHARE_DIR/hey-lain"
+  local src="$REPO_DIR/mods/hey-lain" dest="$SHARE_DIR/hey-lain"
+  if [ ! -d "$src" ]; then
+    warn "mods/hey-lain missing — skipping voice assistant"
+    return 0
+  fi
+  # The venv is the slow part (faster-whisper + piper + whisper model), so
+  # it survives redeploys: the marker stores a hash of requirements.txt,
+  # and a matching hash means "scripts refresh, venv stays". A mismatch
+  # (or no marker) rebuilds from scratch.
+  local req_hash="" venv_ok=0
+  req_hash="$(sha256sum "$src/requirements.txt" 2>/dev/null | cut -d' ' -f1)"
+  if [ -n "$req_hash" ] && [ -f "$dest/.venv-ready" ] \
+      && [ "$(cat "$dest/.venv-ready" 2>/dev/null)" = "$req_hash" ] \
+      && [ -d "$dest/venv" ]; then
+    venv_ok=1
+    $DOAS rm -rf "$dest.venv-keep"
+    $DOAS mv "$dest/venv" "$dest.venv-keep"
+  fi
+  $DOAS rm -rf "$dest"
+  $DOAS cp -a "$src" "$dest"
+  $DOAS find "$dest" -name '*.sh' -exec chmod 0755 {} +
+  ok "hey-lain deployed"
+  if [ "$venv_ok" -eq 1 ]; then
+    $DOAS mv "$dest.venv-keep" "$dest/venv"
+    echo "$req_hash" | $DOAS tee "$dest/.venv-ready" >/dev/null
+    ok "hey-lain venv kept (requirements unchanged)"
+    return 0
+  fi
+  rm -rf "$dest.venv-keep" 2>/dev/null
+  if ! host_up https://pypi.org/simple/; then
+    warn "pypi unreachable — hey-lain voice backend skipped (re-run install.sh --yes later)"
+    return 0
+  fi
+  info "building hey-lain venv (faster-whisper + piper — a few minutes, one time)..."
+  if $DOAS "$dest/install.sh" --skip-apt </dev/null; then
+    echo "$req_hash" | $DOAS tee "$dest/.venv-ready" >/dev/null
+    ok "hey-lain ready — tap Alt+V to talk"
+  else
+    warn "hey-lain venv build failed — Alt+V will not work until install.sh is re-run"
+  fi
 }
 
 # ---------------------------------------------------------------- deploy: /usr/share/navi
@@ -1272,6 +1326,8 @@ main() {
     setup_agents
     setup_navivim
     setup_mods
+    setup_heylain
+    setup_heylain
     setup_environment
     setup_flatpak
     setup_flatpak_polkit
@@ -1306,6 +1362,7 @@ main() {
   setup_agents
   setup_navivim
   setup_mods
+  setup_heylain
   setup_environment
   setup_flatpak
   setup_flatpak_polkit

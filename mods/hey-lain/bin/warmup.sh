@@ -6,7 +6,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$HERE/bin"
-LOG="$HERE/log/hey-lain.log"
+LOG="${HEY_LAIN_LOG_DIR:-$HERE/log}/hey-lain.log"
 RUNTIME="${XDG_RUNTIME_DIR:-/tmp}/hey-lain"
 log() { echo "$(date '+%F %T') warmup: $*" >> "$LOG"; }
 

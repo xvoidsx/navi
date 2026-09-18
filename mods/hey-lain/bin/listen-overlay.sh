@@ -11,7 +11,7 @@ PIDFILE="$RUNTIME/overlay.pid"
 STATEFILE="$RUNTIME/overlay-state"
 TEXTFILE="$RUNTIME/overlay-text"
 TIMEFILE="$RUNTIME/overlay-state-time"
-LOG="$HERE/log/hey-lain.log"
+LOG="${HEY_LAIN_LOG_DIR:-$HERE/log}/hey-lain.log"
 mkdir -p "$RUNTIME"
 
 log() { mkdir -p "$(dirname "$LOG")" 2>/dev/null; echo "$(date '+%F %T') overlay: $* (pid $$)" >> "$LOG"; }

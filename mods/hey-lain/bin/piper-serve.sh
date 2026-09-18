@@ -5,7 +5,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 RUNTIME="${XDG_RUNTIME_DIR:-/tmp}/hey-lain"
 PIDFILE="$RUNTIME/piper-serve.pid"
-LOG="$HERE/log/piper-serve.log"
+LOG="${HEY_LAIN_LOG_DIR:-$HERE/log}/piper-serve.log"
 PORT="${PIPER_SERVICE_PORT:-8766}"
 mkdir -p "$RUNTIME" "$(dirname "$LOG")"
 

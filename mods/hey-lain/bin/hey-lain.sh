@@ -7,7 +7,7 @@ BIN="$HERE/bin"
 VENV_PY="$HERE/venv/bin/python"
 TTS_PY="${HEY_LAIN_TTS_PYTHON:-$VENV_PY}"
 RUNTIME="${XDG_RUNTIME_DIR:-/tmp}/hey-lain"
-LOG="$HERE/log/hey-lain.log"
+LOG="${HEY_LAIN_LOG_DIR:-$HERE/log}/hey-lain.log"
 LOCK="$RUNTIME/processing.lock"
 mkdir -p "$RUNTIME"
 export HEY_LAIN_LOG="$LOG"  # speak.py appends its stage timings here
