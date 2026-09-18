@@ -1,4 +1,4 @@
-# hey-lain — voice assistant for Navi (Debian 13, sway-based wiered WM)
+# hey-lain — voice assistant for Navi (Debian 13, sway-based wired WM)
 
 Tap-to-talk desktop voice agent named **Lain**. `Alt+V` tap starts mic
 capture, second tap stops it; speech is transcribed locally, answered by a
@@ -78,6 +78,10 @@ no auth, no accounts.
   named) means switch workspaces — the app-named form ("move firefox to
   workspace 2") moves a window; bare "go to/take me to workspace N" also
   switches (the open-verb rule used to swallow "workspace N" as an app name).
+  "open <app> on workspace N" switches first, then opens there. "close
+  <app>" and "focus <app>" are deterministic too (close/focus this/that/it,
+  close yourself, and focus left/right/up/down keep their earlier, more
+  specific rules).
   Compound "X and Y" requests plan both halves recursively and only execute
   when BOTH halves produce action tags; anything else goes to the LLM —
   backend from `~/.config/hey-lain/brain.json` (`navi-lain-config` writes
@@ -99,6 +103,16 @@ no auth, no accounts.
   "couldn't find X" instead of a false "Opening…"). Actions:
   `notify|open|search|fetch-weather|fetch-news|volume|media|
   brightness|lock|screenshot|close`.
+  App-name resolution is STRICT (field bug 2026-09-18: substring/Exec-line
+  matching once routed "open chromium" to Discord, because every navi
+  webapp's Exec starts with `chromium --app=`): exact .desktop id, then
+  exact Name=, then the executable basename of Exec= — never a substring,
+  never the full Exec line. `open` focuses the app if it's already running
+  (exact app_id + title match preferred) instead of spawning a duplicate;
+  a single-word target that isn't installed gets a spoken "I don't have an
+  app called X" rather than a guessed web search. swaymsg / sway-control
+  failures degrade to spoken errors ("I couldn't switch workspaces: …"),
+  never silent success.
   `search` opens a DuckDuckGo query in `chromium --app=`. URL-shaped
   targets (contain `://` or a dot) open via
   `swaymsg exec "chromium --app=<url>"`; bare words launch as apps only if
@@ -184,7 +198,7 @@ no auth, no accounts.
 ## Environment (all verified on this machine)
 
 - Navi = Debian 13 (trixie), Wayland, sway IPC via `swaymsg`
-  (`wiered` is sway-compatible). Output `eDP-1` 1366x768. PipeWire/Pulse
+  (wired is sway-compatible). Output `eDP-1` 1366x768. PipeWire/Pulse
   (`pw-record`/`paplay`/`pactl` present), Intel HDA mic + analog out.
 - Sway config is ROOT-OWNED: all keybind edits go through the user via
   `sudoedit ~/.config/sway/config` + `swaymsg reload`. Current binding:
@@ -277,7 +291,9 @@ no auth, no accounts.
   Interpreter paths are no longer tied to `/home/rav3ndust`.
 - `bin/sway-control.py` is the allow-listed Sway tree/controller layer. New
   workspace, focus, move, floating, fullscreen, layout, scratchpad, and focus
-  direction intents route through it. Test with `HEY_LAIN_DRY_RUN=1`.
+  direction intents route through it, plus a `find` subcommand the `open`
+  action uses to focus an already-running app instead of duplicating it.
+  Test with `HEY_LAIN_DRY_RUN=1`.
 - The foot overlay now uses a dedicated `bin/overlay-visualizer.sh` in the
   terminal alternate screen. It is a text-free nightshadeNeon visualizer with
   state-specific bars, pulse motifs, and concise directions. States include

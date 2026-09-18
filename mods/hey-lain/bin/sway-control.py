@@ -20,7 +20,12 @@ def sway(*args: str, dry_run: bool = False) -> str:
     if dry_run:
         print("[dry-run] " + " ".join(cmd), file=sys.stderr)
         return ""
-    proc = subprocess.run(cmd, text=True, capture_output=True)
+    try:
+        proc = subprocess.run(cmd, text=True, capture_output=True, timeout=10)
+    except FileNotFoundError:
+        raise RuntimeError("swaymsg not found — is sway running?")
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("swaymsg timed out — is sway still responding?")
     if proc.returncode:
         raise RuntimeError(proc.stderr.strip() or "swaymsg failed")
     try:
@@ -77,11 +82,39 @@ def resolve_target(target: str, dry_run: bool = False) -> int:
     return int(matches[0]["id"])
 
 
+def find_best(target: str) -> int | None:
+    """con_id of the best window to focus for a spoken app name, or None.
+
+    Used by the `open` action: an already-running app gets focused instead
+    of spawning a duplicate. Exact app_id/class matches outrank substring
+    ones, a matching window title outranks a non-matching one (so
+    "chromium" prefers the browser over a chromium --app webapp), and the
+    focused window wins ties.
+    """
+    tree = json.loads(sway("-t", "get_tree") or "{}")
+    wanted = target.casefold()
+
+    def rank(node: dict[str, Any]) -> tuple[int, int, int]:
+        values = [v.casefold() for v in text_values(node) if v]
+        exact = any(wanted == v for v in values[:3])
+        titled = len(values) > 3 and wanted in values[3]
+        return (0 if exact else 1, 0 if titled else 1,
+                0 if node.get("focused") else 1)
+
+    matches = [n for n in children(tree) if n.get("id") and any(
+        wanted == v or wanted in v
+        for v in (x.casefold() for x in text_values(n)) if v)]
+    if not matches:
+        return None
+    return int(sorted(matches, key=rank)[0]["id"])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="safe Hey Lain Sway controller")
     parser.add_argument("--dry-run", action="store_true")
     sub = parser.add_subparsers(dest="op", required=True)
     sub.add_parser("tree")
+    sub.add_parser("find").add_argument("target")
     p = sub.add_parser("workspace"); p.add_argument("name")
     p = sub.add_parser("focus"); p.add_argument("target")
     p = sub.add_parser("move"); p.add_argument("target"); p.add_argument("workspace")
@@ -97,6 +130,15 @@ def main() -> int:
             out = sway("-t", "get_tree", dry_run=args.dry_run)
             if out:
                 print(out)
+        elif args.op == "find":
+            # Quiet by design: "not running" is the normal launch path for
+            # the caller, not an error worth logging every time.
+            if args.dry_run:
+                return 1
+            cid = find_best(args.target)
+            if cid is None:
+                return 1
+            print(cid)
         elif args.op == "workspace":
             sway("workspace", args.name, dry_run=args.dry_run)
         elif args.op == "focus-direction":
@@ -117,7 +159,7 @@ def main() -> int:
                 sway("floating", args.mode, dry_run=args.dry_run)
             elif args.op == "fullscreen":
                 sway("fullscreen", args.mode, dry_run=args.dry_run)
-    except (RuntimeError, json.JSONDecodeError) as exc:
+    except (RuntimeError, json.JSONDecodeError, OSError) as exc:
         print(f"sway-control: {exc}", file=sys.stderr)
         return 1
     return 0

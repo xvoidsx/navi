@@ -8,7 +8,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 PROMPT_FILE="$HERE/SYSTEM_PROMPT.txt"
 
-SYSTEM="You are Lain, a concise voice assistant on Navi Linux (Debian 13, sway-based wiered WM). Reply in 1-3 short spoken sentences, no markdown, no code blocks, plain speech. If the user asks to do a desktop action, start your reply with [ACTION: name args] on its own line, then the spoken reply. Supported actions: notify <msg> | open <app|url> | volume <up|down|mute> | lock | screenshot."
+SYSTEM="You are Lain, a concise voice assistant on Navi Linux (Debian 13, sway-based wired WM). Reply in 1-3 short spoken sentences, no markdown, no code blocks, plain speech. If the user asks to do a desktop action, start your reply with [ACTION: name args] on its own line, then the spoken reply. Supported actions: notify <msg> | open <app|url> | volume <up|down|mute> | lock | screenshot."
 
 [ -f "$PROMPT_FILE" ] && SYSTEM="$(cat "$PROMPT_FILE")"
 USER_TEXT="${*:-$(cat)}"
@@ -168,6 +168,19 @@ if [[ "$LOW" =~ ^(go\ to|take\ me\ to)\ workspace\ (.+)$ ]]; then
   case "$Q" in one) Q=1;; two) Q=2;; three) Q=3;; four) Q=4;; five) Q=5;; six) Q=6;; seven) Q=7;; eight) Q=8;; nine) Q=9;; ten) Q=10;; esac
   printf '[ACTION: workspace %s]\n%s\n' "$Q" "$(ack workspace "$Q")"; exit 0
 fi
+# "open <app> on workspace N": switch first, then open there. Runs before
+# the single-open rule so "on workspace N" isn't swallowed as an app name.
+if [[ "$LOW" =~ ^(open|launch|start)\ (.+)\ on\ workspace\ (.+)$ ]]; then
+  APP="${BASH_REMATCH[2]}"; WS="${BASH_REMATCH[3]}"
+  APP=$(echo "$APP" | sed -E 's/^(the|my) //; s/ (website|site|page|app)$//')
+  case "$WS" in one) WS=1;; two) WS=2;; three) WS=3;; four) WS=4;; five) WS=5;; six) WS=6;; seven) WS=7;; eight) WS=8;; nine) WS=9;; ten) WS=10;; esac
+  APP_REPLY=$("$0" "open $APP" 2>/dev/null || true)
+  APP_ACTION=$(printf '%s\n' "$APP_REPLY" | grep -E '^\[ACTION:[^]]+\]$' | head -n 1 || true)
+  if [ -n "$APP_ACTION" ]; then
+    printf '[ACTION: workspace %s]\n%s\n%s\n' "$WS" "$APP_ACTION" "$(ack action)"
+    exit 0
+  fi
+fi
 if [[ "$LOW" =~ ^(open|launch|start|go\ to|take\ me\ to)\ (.+)$ ]]; then
   TARGET="${BASH_REMATCH[2]}"
   TARGET=$(echo "$TARGET" | sed -E 's/^(the|my) //; s/ (website|site|page|app)$//')
@@ -237,6 +250,12 @@ case "$LOW" in
     printf '[ACTION: fetch-news %s]\n%s\n' "$Q" "$(ack news)"; exit 0 ;;
   *lock\ the\ screen*|*lock\ screen*|*lock\ up*) printf '[ACTION: lock]\nLocking up.\n'; exit 0 ;;
   *close\ this*|*close\ that\ window*|*close\ the\ window*|*close\ it*) printf '[ACTION: close]\nClosing it.\n'; exit 0 ;;
+  close\ *) # "close firefox": close a NAMED window (this/that/it handled above)
+    Q=$(echo "$LOW" | sed -E 's/^close (the )?//')
+    printf '[ACTION: close %s]\nClosing %s.\n' "$Q" "$Q"; exit 0 ;;
+  focus\ *) # "focus discord": focus a named window (focus left/right/… handled above)
+    Q=$(echo "$LOW" | sed -E 's/^focus (the )?//')
+    printf '[ACTION: sway-focus %s]\nFocusing %s.\n' "$Q" "$Q"; exit 0 ;;
   *what\ time\ is\ it*|*tell\ me\ the\ time*|*current\ time*|*what\'s\ the\ time*)
     printf 'It is %s.\n' "$(date +'%-I:%M %p')"; exit 0 ;;
   *what\ day\ is\ it*|*what\'s\ the\ date*|*what\ is\ today\'s\ date*|*tell\ me\ today\'s\ date*|*what\'s\ today\'s\ date*)
@@ -294,7 +313,7 @@ if [ -f "$MEM_FILE" ]; then
 fi
 CTX="It is $(date '+%A %-H:%M')."
 if command -v playerctl >/dev/null 2>&1; then
-  NOW_PLAYING="$(timeout 1 playerctl metadata --format '{{artist}} - {{title}}' 2>/dev/null || true)"
+  NOW_PLAYING="$(timeout 0.5 playerctl metadata --format '{{artist}} - {{title}}' 2>/dev/null || true)"
   [ -n "$NOW_PLAYING" ] && CTX="$CTX Now playing: $NOW_PLAYING."
 fi
 SYSTEM="$SYSTEM
