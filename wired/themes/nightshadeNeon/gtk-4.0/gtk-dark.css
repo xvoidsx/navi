@@ -1,0 +1,88 @@
+/* nightshadeNeon — Navi's house GTK4/libadwaita theme.
+ * Black glass, neon pink/green/cyan/red, white text. */
+
+@define-color neon_pink #ff10f0;
+@define-color neon_green #39ff14;
+@define-color neon_cyan #00ffff;
+@define-color neon_red #ff3131;
+@define-color neon_white #ffffff;
+@define-color neon_black #000000;
+@define-color bg_alt #0d0d0d;
+@define-color bg_float #111111;
+@define-color bg_sel #2a0a28;
+@define-color gray_text #8a8a8a;
+@define-color gray_dark #3a3a3a;
+@define-color pink_dim #a00a9e;
+
+@define-color accent_bg_color @neon_pink;
+@define-color accent_fg_color @neon_black;
+@define-color accent_color @neon_pink;
+@define-color destructive_bg_color @neon_red;
+@define-color destructive_fg_color @neon_white;
+@define-color destructive_color @neon_red;
+@define-color success_bg_color @neon_green;
+@define-color success_fg_color @neon_black;
+@define-color success_color @neon_green;
+@define-color warning_bg_color @neon_pink;
+@define-color warning_fg_color @neon_black;
+@define-color warning_color @neon_pink;
+@define-color error_bg_color @neon_red;
+@define-color error_fg_color @neon_white;
+@define-color error_color @neon_red;
+@define-color window_bg_color @neon_black;
+@define-color window_fg_color @neon_white;
+@define-color view_bg_color @bg_alt;
+@define-color view_fg_color @neon_white;
+@define-color headerbar_bg_color @neon_black;
+@define-color headerbar_fg_color @neon_white;
+@define-color headerbar_backdrop_color @neon_black;
+@define-color headerbar_shade_color rgba(255, 16, 240, 0.36);
+@define-color card_bg_color @bg_float;
+@define-color card_fg_color @neon_white;
+@define-color dialog_bg_color @neon_black;
+@define-color dialog_fg_color @neon_white;
+@define-color popover_bg_color @bg_float;
+@define-color popover_fg_color @neon_white;
+@define-color sidebar_bg_color @bg_alt;
+@define-color sidebar_fg_color @neon_white;
+@define-color sidebar_backdrop_color @bg_alt;
+@define-color secondary_sidebar_bg_color @bg_alt;
+@define-color thumbnail_bg_color @bg_float;
+@define-color thumbnail_fg_color @neon_white;
+@define-color shade_color rgba(0, 0, 0, 0.36);
+@define-color scrollbar_outline_color rgba(57, 255, 20, 0.5);
+@define-color borders @gray_dark;
+@define-color link_color @neon_cyan;
+@define-color link_visited_color @neon_pink;
+
+/* neon text selection */
+selection {
+    background-color: @neon_pink;
+    color: @neon_black;
+}
+
+/* neon focus ring */
+:focus {
+    outline-color: @neon_green;
+}
+
+/* suggested/destructive speak neon, not lavender */
+button.suggested-action {
+    background: @neon_green;
+    color: @neon_black;
+    font-weight: bold;
+}
+
+button.destructive-action {
+    background: @neon_red;
+    color: @neon_white;
+    font-weight: bold;
+}
+
+/* sidebar selection gets the green edge */
+.sidebar row:selected,
+navigation-sidebar row:selected {
+    background-color: @bg_sel;
+    color: @neon_green;
+    border-left: 2px solid @neon_green;
+}
