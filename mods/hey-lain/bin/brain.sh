@@ -237,20 +237,72 @@ case "$LOW" in
     exit 0 ;;
 esac
 
-# Cloud-first (Ollama Cloud proxy via localhost; needs no key handling here),
-# local fallback if the cloud is unreachable. Override with BRAIN_MODEL.
-MODEL="${BRAIN_MODEL:-gemma4:31b-cloud}"
-LOCAL_FALLBACK="gemma3:270m"
-URL="${BRAIN_URL:-http://127.0.0.1:11434/api/chat}"
+# Brain config: ~/.config/hey-lain/brain.json, written by navi-lain-config.
+# {backend: local|ollama-cloud|openai|openrouter, model, api_key, api_url}
+# Env overrides (BRAIN_MODEL, BRAIN_URL, BRAIN_TIMEOUT, HEY_LAIN_API_KEY)
+# always win over the file.
+BRAIN_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hey-lain/brain.json"
+BACKEND="local"
+MODEL="gemma3:270m"
+API_KEY=""
+API_URL="http://127.0.0.1:11434/api/chat"
+if [ -f "$BRAIN_CONF" ]; then
+  eval "$(python3 - "$BRAIN_CONF" <<'EOF'
+import json, shlex, sys
+try:
+    c = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+for k in ("backend", "model", "api_key", "api_url"):
+    v = c.get(k, "")
+    if v:
+        print(k.upper() + "=" + shlex.quote(str(v)))
+EOF
+)"
+fi
+MODEL="${BRAIN_MODEL:-$MODEL}"
+API_KEY="${HEY_LAIN_API_KEY:-$API_KEY}"
+URL="${BRAIN_URL:-$API_URL}"
 TIMEOUT="${BRAIN_TIMEOUT:-30}"
+LOCAL_FALLBACK="gemma3:270m"
+LOCAL_URL="http://127.0.0.1:11434/api/chat"
 
 ask() {
   local model="$1" payload resp out
-  payload=$(python3 - "$SYSTEM" "$USER_TEXT" "$model" <<'EOF'
+  # gpt-oss reasons: roomy cap or replies truncate. Others stop at EOS anyway.
+  local cap=150
+  case "$model" in *gpt-oss*) cap=400 ;; esac
+  if [ "$BACKEND" = "openai" ] || [ "$BACKEND" = "openrouter" ]; then
+    # OpenAI-compatible chat completions (OpenAI, OpenRouter).
+    payload=$(python3 - "$SYSTEM" "$USER_TEXT" "$model" "$cap" <<'EOF'
 import json, sys
-system, user, model = sys.argv[1], sys.argv[2], sys.argv[3]
-# gpt-oss reasons: roomy cap or replies truncate. Others stop at EOS anyway.
-cap = 400 if "gpt-oss" in model else 150
+system, user, model, cap = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
+print(json.dumps({
+    "model": model,
+    "max_tokens": cap,
+    "messages": [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ],
+}))
+EOF
+)
+    resp=$(curl -s --max-time "$TIMEOUT" "$URL" \
+      -H "Authorization: Bearer $API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "HTTP-Referer: https://navi.xvoidsx.org" \
+      -H "X-Title: Hey Lain" \
+      -d "$payload" 2>/dev/null || true)
+    out=$(python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(d['choices'][0]['message']['content'].strip())" <<<"$resp" 2>/dev/null || true)
+  else
+    # Ollama-native /api/chat (local models AND ollama-cloud *-cloud names
+    # proxied through the local daemon).
+    payload=$(python3 - "$SYSTEM" "$USER_TEXT" "$model" "$cap" <<'EOF'
+import json, sys
+system, user, model, cap = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
 print(json.dumps({
     "model": model,
     "stream": False,
@@ -263,14 +315,19 @@ print(json.dumps({
 }))
 EOF
 )
-  resp=$(curl -s --max-time "$TIMEOUT" "$URL" -d "$payload" 2>/dev/null || true)
-  out=$(python3 -c "import json,sys; print(json.load(sys.stdin).get('message',{}).get('content','').strip())" <<<"$resp" 2>/dev/null || true)
+    resp=$(curl -s --max-time "$TIMEOUT" "$URL" -d "$payload" 2>/dev/null || true)
+    out=$(python3 -c "import json,sys; print(json.load(sys.stdin).get('message',{}).get('content','').strip())" <<<"$resp" 2>/dev/null || true)
+  fi
   echo "$out"
 }
 
 OUT=$(ask "$MODEL")
-if [ -z "${OUT// }" ] && [ "$MODEL" != "$LOCAL_FALLBACK" ]; then
-  echo "brain: cloud model failed, falling back to $LOCAL_FALLBACK" >&2
+if [ -z "${OUT// }" ] && { [ "$BACKEND" != "local" ] || [ "$MODEL" != "$LOCAL_FALLBACK" ]; }; then
+  # Cloud backends (and a non-default local model) fall back to the tiny
+  # local brain before giving up to the offline line.
+  echo "brain: primary backend failed, falling back to $LOCAL_FALLBACK" >&2
+  BACKEND="local"
+  URL="$LOCAL_URL"
   OUT=$(ask "$LOCAL_FALLBACK")
 fi
 if [ -z "${OUT// }" ]; then

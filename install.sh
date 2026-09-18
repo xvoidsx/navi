@@ -560,6 +560,7 @@ setup_mods() {
   install_mod "navi-networking" "navi-networking"
   install_mod "navi-calendar"   "navi-calendar"
   install_mod "navi-audio"      "navi-audio"
+  install_mod "navi-lain-config" "navi-lain-config"
 }
 
 # Hey Lain voice assistant (eiri): deploys mods/hey-lain to
@@ -610,6 +611,24 @@ setup_heylain() {
     ok "hey-lain ready — tap Alt+V to talk"
   else
     warn "hey-lain venv build failed — Alt+V will not work until install.sh is re-run"
+  fi
+  # Local brain: gemma3:270m is the default voice model — tiny enough for
+  # low-end hardware, no key or cloud needed. `ollama pull` talks to the
+  # local daemon, so the model lands where the ollama service sees it.
+  # Skipped (with a warning) when ollama or the network isn't there yet.
+  if ! command -v ollama >/dev/null 2>&1; then
+    warn "ollama not found — skipping gemma3:270m pull"
+  elif ollama list 2>/dev/null | grep -q "^gemma3:270m"; then
+    ok "ollama model gemma3:270m already present"
+  elif ! host_up https://ollama.com; then
+    warn "ollama.com unreachable — skipping gemma3:270m pull (run: ollama pull gemma3:270m)"
+  else
+    info "pulling gemma3:270m (local voice brain, one time)..."
+    if ollama pull gemma3:270m >/dev/null 2>&1; then
+      ok "gemma3:270m ready"
+    else
+      warn "could not pull gemma3:270m — Hey Lain falls back to its offline line until you run: ollama pull gemma3:270m"
+    fi
   fi
 }
 
@@ -1326,7 +1345,6 @@ main() {
     setup_agents
     setup_navivim
     setup_mods
-    setup_heylain
     setup_heylain
     setup_environment
     setup_flatpak
