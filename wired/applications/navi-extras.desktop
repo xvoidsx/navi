@@ -2,8 +2,8 @@
 Type=Application
 Name=navi-extras
 Comment=Optional extras for navi: nightly browsers, ani-cli, charm tools, and more — install what you want, post-install
-Exec=navi-extras
+Exec=alacritty -e navi-extras
 Icon=application-x-addon
-Terminal=true
+Terminal=false
 Categories=System;Settings;
 NoDisplay=false
