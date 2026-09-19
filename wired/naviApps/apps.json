@@ -1057,17 +1057,18 @@
  {
   "id": "agent-omp",
   "name": "OMP",
-  "summary": "Pre-installed. oh my pi — xvoidsx's standalone fork of pi. Minimal, fast, yours.",
+  "summary": "Pre-installed. Can Bölük's maximalist fork of pi — batteries included: 60+ providers, LSP/DAP, subagents, Rust core.",
   "category": "agents",
   "source": "agent",
   "package": "omp",
   "install": "omp",
-  "icon": "🥧"
+  "icon": "🥧",
+  "homepage": "https://github.com/can1357/oh-my-pi"
  },
  {
   "id": "agent-goose",
   "name": "Goose",
-  "summary": "Pre-installed. Block's open-source agent — automates the boring parts of building software.",
+  "summary": "Pre-installed. Block's open-source agent — runs on-device and automates the boring parts of building software.",
   "category": "agents",
   "source": "agent",
   "package": "goose",
@@ -1088,7 +1089,7 @@
  {
   "id": "agent-hermes",
   "name": "Hermes",
-  "summary": "xvoidsx's own agent — landing as a navi default soon. Watch this space.",
+  "summary": "Nous Research's open-source agent with persistent memory — it learns your workflows instead of forgetting them. Landing as a navi default soon.",
   "category": "agents",
   "source": "agent",
   "package": "hermes",
@@ -1096,21 +1097,20 @@
   "icon": "🪽"
  },
  {
-  "id": "agent-claude-code",
+  "id": "agent-muse-code",
   "name": "Muse Code",
-  "summary": "Anthropic's official terminal coding agent — deep codebase work, plan mode, MCP.",
+  "summary": "Meta's terminal coding agent — persistent subagents, isolated git worktrees, powered by Muse Spark.",
   "category": "agents",
   "source": "agent",
-  "package": "claude",
-  "install": "npm install -g @anthropic-ai/claude-code",
-  "remove": "npm uninstall -g @anthropic-ai/claude-code",
-  "homepage": "https://github.com/anthropics/claude-code",
+  "package": "muse",
+  "install": "curl -fsSL https://dev.meta.ai/install.sh | bash",
+  "homepage": "https://dev.meta.ai/docs/muse-code",
   "icon": "🟠"
  },
  {
   "id": "agent-codex",
   "name": "Codex",
-  "summary": "OpenAI's terminal coding agent — cloud-powered software engineering in your shell.",
+  "summary": "OpenAI's open-source terminal coding agent — software engineering in your shell.",
   "category": "agents",
   "source": "agent",
   "package": "codex",
@@ -1133,7 +1133,7 @@
  {
   "id": "agent-aider",
   "name": "Aider",
-  "summary": "Terminal AI pair programmer — works with any model, commits to git as you go.",
+  "summary": "Terminal AI pair programmer — diff-based edits, strong git workflows, works with any model.",
   "category": "agents",
   "source": "agent",
   "package": "aider",
@@ -1169,7 +1169,7 @@
  {
   "id": "agent-openclaw",
   "name": "OpenClaw",
-  "summary": "Self-hosted AI agent that lives in your chats — WhatsApp, Telegram, Discord, and more.",
+  "summary": "Self-hosted, open-source AI agent that lives in your chats — WhatsApp, Telegram, Discord, and more.",
   "category": "agents",
   "source": "agent",
   "package": "openclaw",
@@ -1180,14 +1180,14 @@
  {
   "id": "agent-kilo-code",
   "name": "Kilo Code",
-  "summary": "Agentic coding for VS Code — modes, custom agents, and deep provider support.",
+  "summary": "Kilo's CLI — an OpenCode fork with 500+ models, headless runs, and platform integrations.",
   "category": "agents",
   "source": "agent",
   "package": "kilo",
   "install": "npm install -g @kilocode/cli",
   "remove": "npm uninstall -g @kilocode/cli",
   "homepage": "https://kilo.ai",
-  "icon": "🏋️"
+  "icon": "🚀"
  },
  {
   "id": "web-cloudflare",
@@ -1202,5 +1202,76 @@
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Cloudflare\nExec=chromium --force-dark-mode --app=https://dash.cloudflare.com\nComment=Cloudflare as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-cloudflare\nStartupNotify=true\nCategories=Network;",
   "homepage": "https://cloudflare.com",
   "icon": "☁️"
+ },
+ {
+  "id": "native-chrome",
+  "name": "Google Chrome",
+  "summary": "The browser half the planet uses — from Google's own apt repo.",
+  "category": "Internet",
+  "source": "native",
+  "package": "chrome",
+  "install": "navi-extras --install chrome",
+  "remove": "doas apt remove -y google-chrome-stable",
+  "homepage": "https://www.google.com/chrome",
+  "icon": "🌐"
+ },
+ {
+  "id": "native-firefox-nightly",
+  "name": "Firefox Nightly",
+  "summary": "Bleeding-edge Firefox, straight from Mozilla's apt repo.",
+  "category": "Internet",
+  "source": "native",
+  "package": "firefox-nightly",
+  "install": "navi-extras --install firefox-nightly",
+  "remove": "doas apt remove -y firefox-nightly",
+  "homepage": "https://www.mozilla.org/firefox/channel/desktop/",
+  "icon": "🦊"
+ },
+ {
+  "id": "native-brave-nightly",
+  "name": "Brave Nightly",
+  "summary": "Bleeding-edge Brave with built-in ad blocking.",
+  "category": "Internet",
+  "source": "native",
+  "package": "brave-nightly",
+  "install": "navi-extras --install brave-nightly",
+  "remove": "doas apt remove -y brave-browser-nightly",
+  "homepage": "https://brave.com/download-nightly/",
+  "icon": "🦁"
+ },
+ {
+  "id": "native-ani-cli",
+  "name": "ani-cli",
+  "summary": "Watch anime in the terminal — streams straight to mpv.",
+  "category": "Multimedia",
+  "source": "native",
+  "package": "ani-cli",
+  "install": "navi-extras --install ani-cli",
+  "remove": "doas rm -f /usr/local/bin/ani-cli",
+  "homepage": "https://github.com/pystardust/ani-cli",
+  "icon": "📺"
+ },
+ {
+  "id": "native-charm",
+  "name": "Charm toolkit",
+  "summary": "gum, glow, mods — shell superpowers from charm.sh.",
+  "category": "Productivity",
+  "source": "native",
+  "package": "charm",
+  "install": "navi-extras --install charm",
+  "remove": "doas apt remove -y gum glow mods",
+  "homepage": "https://charm.sh",
+  "icon": "✨"
+ },
+ {
+  "id": "native-cliamp",
+  "name": "cliamp",
+  "summary": "Terminal music player — your library in the shell.",
+  "category": "Multimedia",
+  "source": "native",
+  "package": "cliamp",
+  "install": "navi-extras --install cliamp",
+  "homepage": "https://github.com/bjarneo/cliamp",
+  "icon": "🎵"
  }
 ]
