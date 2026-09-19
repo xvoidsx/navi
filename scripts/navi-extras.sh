@@ -24,6 +24,8 @@ EXTRAS=(
   "ani-cli|ani-cli|Watch anime in the terminal|command -v ani-cli >/dev/null 2>&1 || [ -x /usr/local/bin/ani-cli ]|ani-cli-installer.sh|"
   "charm|Charm toolkit|gum, glow, mods — shell superpowers from charm.sh|command -v gum >/dev/null 2>&1|charm-installer.sh|"
   "cliamp|cliamp|Terminal music player|command -v cliamp >/dev/null 2>&1|cliamp-installer.sh|"
+  "telegram|Telegram|Fast, cloud-synced messaging — native desktop app|command -v telegram >/dev/null 2>&1|telegram-installer.sh|"
+  "element|Element|Decentralized chat over Matrix — native desktop app|command -v element-desktop >/dev/null 2>&1|element-installer.sh|"
 )
 
 # where do the installer scripts live?

@@ -655,17 +655,15 @@
   "icon": "🎨"
  },
  {
-  "id": "web-element",
+  "id": "native-element",
   "name": "Element",
-  "summary": "Decentralized chat over Matrix. Bridges to just about everything.",
+  "summary": "Decentralized chat over Matrix — the native desktop app, with real notifications. Bridges to just about everything.",
   "category": "Internet",
-  "source": "webapp",
+  "source": "native",
   "package": "element",
-  "url": "https://app.element.io",
-  "install": "navi-webapp element",
-  "downloadUrl": "webapps/element.desktop",
-  "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=Element\\nExec=chromium --app=https://app.element.io\\nComment=Decentralized chat over Matrix. Bridges to just about everything.\\nTerminal=false\\nType=Application\\nIcon=navi-element\\nStartupNotify=true\\nCategories=Network;",
-  "homepage": "https://app.element.io",
+  "install": "navi-extras --install element",
+  "remove": "doas apt remove -y element-desktop",
+  "homepage": "https://element.io",
   "logo": "icons/element.svg",
   "icon": "💬"
  },
@@ -782,17 +780,16 @@
   "icon": "⚒️"
  },
  {
-  "id": "web-telegram",
+  "id": "native-telegram",
   "name": "Telegram",
-  "summary": "Fast, cloud-synced messaging.",
+  "summary": "Fast, cloud-synced messaging — the native desktop app, with real notifications and voice calls.",
   "category": "Internet",
-  "source": "webapp",
+  "source": "native",
   "package": "telegram",
-  "url": "https://web.telegram.org",
-  "install": "navi-webapp telegram",
-  "downloadUrl": "webapps/telegram.desktop",
-  "desktopEntry": "[Desktop Entry]\\nVersion=1.0\\nName=Telegram\\nExec=chromium --app=https://web.telegram.org\\nComment=Fast, cloud-synced messaging.\\nTerminal=false\\nType=Application\\nIcon=navi-telegram\\nStartupNotify=true\\nCategories=Network;\\n",
-  "homepage": "https://web.telegram.org",
+  "install": "navi-extras --install telegram",
+  "remove": "doas rm -rf /opt/telegram /usr/local/bin/telegram /usr/share/applications/telegram.desktop /usr/share/pixmaps/telegram.png",
+  "homepage": "https://telegram.org",
+  "logo": "icons/telegram.svg",
   "icon": "✈️"
  },
  {

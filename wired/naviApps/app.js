@@ -4,7 +4,9 @@
 // Runs offline from the deployed tree; install via `navi-webapp <name>`.
 const grid = document.getElementById("grid");
 const naviGrid = document.getElementById("naviGrid");
+const nativeGrid = document.getElementById("nativeGrid");
 const naviSection = document.getElementById("naviSection");
+const nativeSection = document.getElementById("nativeSection");
 const appsSection = document.getElementById("appsSection");
 const statusEl = document.getElementById("status");
 const searchEl = document.getElementById("search");
@@ -36,12 +38,14 @@ function buildCategories() {
   }
 }
 
-function badgeFor() {
+function badgeFor(a) {
+  if (a.source === "native") return '<span class="badge native">native</span>';
   return '<span class="badge webapp">webapp</span>';
 }
 
 function matches(a, q, cat) {
   if (activeSource === "navi" && a.category !== "navi") return false;
+  if (activeSource === "native" && a.source !== "native") return false;
   if (cat && a.category !== cat) return false;
   if (!q) return true;
   const hay = `${a.name} ${a.summary} ${a.package} ${a.category}`.toLowerCase();
@@ -76,19 +80,25 @@ function render() {
   const q = searchEl.value.trim();
   const cat = catEl.value;
   const isNavi = (a) => a.category === "navi";
+  const isNative = (a) => a.source === "native" && a.category !== "navi";
   const naviApps = curated.filter((a) => isNavi(a) && matches(a, q, cat));
-  const rest = curated.filter((a) => !isNavi(a) && matches(a, q, cat));
+  const nativeApps = curated.filter((a) => isNative(a) && matches(a, q, cat));
+  const rest = curated.filter((a) => !isNavi(a) && !isNative(a) && matches(a, q, cat));
 
-  // the "navi" filter spotlights first-party apps; "all" shows both sections
+  // the "navi" filter spotlights first-party apps, "native" spotlights
+  // native packages; "all" shows every section
   const showNavi = activeSource === "" || activeSource === "navi";
+  const showNative = activeSource === "" || activeSource === "native";
   const showRest = activeSource === "";
 
   naviSection.hidden = !(showNavi && naviApps.length);
+  nativeSection.hidden = !(showNative && nativeApps.length);
   appsSection.hidden = !(showRest && rest.length);
   if (!naviSection.hidden) paintGrid(naviGrid, naviApps);
+  if (!nativeSection.hidden) paintGrid(nativeGrid, nativeApps);
   if (!appsSection.hidden) paintGrid(grid, rest);
 
-  const total = (showNavi ? naviApps.length : 0) + (showRest ? rest.length : 0);
+  const total = (showNavi ? naviApps.length : 0) + (showNative ? nativeApps.length : 0) + (showRest ? rest.length : 0);
   statusEl.textContent = total
     ? `${total} app${total === 1 ? "" : "s"}`
     : "no apps found. try another search.";
@@ -96,7 +106,7 @@ function render() {
 }
 
 function wireButtons() {
-  for (const root of [grid, naviGrid]) {
+  for (const root of [grid, naviGrid, nativeGrid]) {
     root.querySelectorAll("[data-details]").forEach((b) =>
       b.addEventListener("click", () => openModal(findApp(b.dataset.details)))
     );
@@ -129,7 +139,7 @@ const mDesktop = document.getElementById("mDesktop");
 function openModal(a, highlightCopy = false) {
   if (!a) return;
   mName.innerHTML = `${artFor(a, 28)} ${escapeHTML(a.name)}`;
-  mMeta.textContent = `webapp · ${a.package} · ${a.category}`;
+  mMeta.textContent = `${a.source === "native" ? "native app" : "webapp"} · ${a.package} · ${a.category}`;
   mSummary.textContent = a.summary;
   mCmd.textContent = a.install;
   if (a.homepage) {
@@ -147,7 +157,7 @@ function openModal(a, highlightCopy = false) {
   }
   const mRemoveWrap = document.getElementById("mRemoveWrap");
   mRemoveWrap.hidden = false;
-  document.getElementById("mRemove").textContent = `navi-webapp --uninstall ${a.package}`;
+  document.getElementById("mRemove").textContent = a.remove || `navi-webapp --uninstall ${a.package}`;
   if (a.desktopEntry) {
     mDesktopWrap.hidden = false;
     mDesktop.textContent = a.desktopEntry;
