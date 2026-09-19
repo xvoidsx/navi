@@ -25,6 +25,7 @@
     "modules-right": [
         //"custom/media",
 	"custom/update",
+	"custom/weather",
 	"pulseaudio",
         "network",
         "battery",
@@ -180,6 +181,15 @@
         "interval": 300,
         "exec": "/usr/share/navi/wired/waybar/update-check.sh",
         "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-update\" navi-update",
+        "tooltip": true
+    },
+    "custom/weather": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 600,
+        "exec": "/usr/share/navi/wired/waybar/weather.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi weather\" navi-weather",
         "tooltip": true
     },
     "custom/bell": {

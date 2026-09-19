@@ -13,6 +13,7 @@ We include 3 default **navi mods**:
 - `navi-networks`: A utility allowing you to connect to networks, check your internet speed, set DNS, and share the network with a QR code.
 - `navi-calendar`: A utility allowing you to view the calendar.
 - `navi-audio`: A utility allowing you to control the volume of attached devices such as speakers, output sources, and more.
+- `navi-weather`: A utility for checking the weather — current conditions, the next 12 hours, and a 3-day forecast, with saved locations and an imperial/metric toggle (wttr.in backend, no API key).
 
 ### mods design
 

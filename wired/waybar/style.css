@@ -84,6 +84,7 @@ window#waybar > box {
 #custom-wired-launcher,
 #custom-power,
 #custom-update,
+#custom-weather,
 #custom-bell,
 #memory,
 #cpu,
@@ -128,6 +129,7 @@ window#waybar > box {
 #custom-wired-launcher:hover,
 #custom-power:hover,
 #custom-update:hover,
+#custom-weather:hover,
 #custom-bell:hover {
     background:
         linear-gradient(115deg, rgba(255, 255, 255, 0.15), transparent 25%, transparent 72%, rgba(57, 255, 20, 0.07)),

@@ -561,6 +561,7 @@ setup_mods() {
   install_mod "navi-calendar"   "navi-calendar"
   install_mod "navi-audio"      "navi-audio"
   install_mod "navi-lain-config" "navi-lain-config"
+  install_mod "navi-weather"    "navi-weather"
 }
 
 # Hey Lain voice assistant (eiri): deploys mods/hey-lain to
