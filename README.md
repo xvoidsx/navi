@@ -3,9 +3,9 @@
 
 ###### welcome to the wired
 
-> **navi 1.5.1 "mika" is stable and available now — the NaviVim update, plus an installer fix.**
+> **navi 1.6 "mika" is stable and available now — the cohesion update: xvoidsx’s own nightshadeNeon GTK theme, Moka icons, and one design language across the whole desktop.**
 >
-> Download it from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page: `navi-1.5.1-mika.iso` plus `SHA256SUMS.txt` so you can verify your download. Boots on legacy BIOS and UEFI, x86_64.
+> Download it from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page: `navi-1.6-mika.iso` plus `SHA256SUMS.txt` so you can verify your download. Boots on legacy BIOS and UEFI, x86_64.
 
 **navi** is a new GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx).
 
@@ -55,7 +55,7 @@ A cozy computing environment is one that you look forward to using when you sit 
 
 ### notes
 
-**navi 1.5.1 "mika"** is the current stable release. It ships **NaviVim** as the default terminal IDE. If you're new, grab the ISO from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page and give it a spin in a VM or on a spare machine — it was validated on hardware as old as a 2015 Acer Cloudbook, so it'll run just about anywhere.
+**navi 1.6 "mika"** is the current stable release. It ships **NaviVim** as the default terminal IDE, plus the cohesion update — nightshadeNeon GTK, Moka icons, and a unified look from terminal to toolkit. If you're new, grab the ISO from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page and give it a spin in a VM or on a spare machine — it was validated on hardware as old as a 2015 Acer Cloudbook, so it'll run just about anywhere.
 
 Documentation lives in the built-in manual: press `Super+Shift+H` anywhere in **navi** to open it, or browse the `wired/manual` folder in this repo.
 
