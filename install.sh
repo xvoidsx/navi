@@ -107,8 +107,10 @@ PKGS=(
 # `navi-webapp install`. Names must match .desktop filenames in
 # wired/naviApps/webapps/ exactly. Tweak freely — users can always
 # add/remove more from the naviApps store.
+# (telegram and element graduated to native apps — telegram installs via
+# setup_telegram below, element via `navi-extras --install element`.)
 DEFAULT_WEBAPPS=(
-  navi-radio neighborli glyyph telegram element pandora
+  navi-radio neighborli glyyph pandora
   github youtube yomi twitch discord perplexity dropbox
 )
 
@@ -1141,6 +1143,31 @@ setup_webapps() {
   fi
 }
 
+# ---------------------------------------------------------------- telegram (native)
+# Telegram ships as a native app out of the box — its webapp left the
+# catalog, so this runs scripts/installers/telegram-installer.sh once per
+# machine. Afterwards the official binary self-updates, so re-runs are a
+# cheap no-op (the guard below). Non-fatal by design: a failed download
+# must never wedge an install or an update.
+setup_telegram() {
+  step "telegram (native)"
+  if command -v telegram >/dev/null 2>&1; then
+    ok "telegram already installed — skipping"
+    return 0
+  fi
+  local installer="$REPO_DIR/scripts/installers/telegram-installer.sh"
+  [ -x "$installer" ] || installer="/usr/share/navi/installers/telegram-installer.sh"
+  if [ ! -x "$installer" ]; then
+    warn "telegram installer not found — skipping (later: navi-extras --install telegram)"
+    return 0
+  fi
+  if bash "$installer"; then
+    ok "telegram installed natively"
+  else
+    warn "telegram installer failed — retry later with: navi-extras --install telegram"
+  fi
+}
+
 # ---------------------------------------------------------------- gtk theme cohesion
 # settings.ini covers plain GTK apps, but GSettings-aware apps (nemo and
 # friends) read org.gnome.desktop.interface — whose schema default is
@@ -1395,6 +1422,7 @@ main() {
     setup_chromium
     setup_fonts
     setup_webapps
+    setup_telegram
     ok "deploy-only refresh complete (navi $NAVI_VERSION)"
     exit 0
   fi
@@ -1430,6 +1458,7 @@ main() {
   setup_chromium
   setup_fonts
   setup_webapps
+  setup_telegram
   tighten_sudo
   done_banner
 }
