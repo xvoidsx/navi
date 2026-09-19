@@ -238,6 +238,14 @@ ships **inlined** as `wired/naviApps/catalog.js`, generated from
 `apps.json` by `wired/naviApps/build-catalog.sh`. **Re-run the script and
 push BOTH files whenever `apps.json` changes.**
 
+- **Pass the app object to every card helper.** A bare `${badgeFor()}`
+  threw on `a.source` and stuck the whole store on "loading curated apps"
+  — one uncaught TypeError kills the first render.
+- **Attribute third-party agents honestly.** omp is Can Bölük's fork of
+  pi, hermes is Nous Research's, herdr is Can Celik's, Muse Code is Meta's
+  harness for Muse models. navi ships and themes them; it doesn't own
+  them. Never claim others' work as xvoidsx's.
+
 ## Seamless GIF loops
 
 Modulo-wrapping a position does NOT make a loop seamless. Every translating
