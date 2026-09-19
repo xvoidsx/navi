@@ -98,7 +98,6 @@ exec swayidle \
 
 exec --no-startup-id sh -c "sleep 1 && blueman-applet &"
 exec --no-startup-id dunst
-exec_always --no-startup-id sh -c "sleep 1 && meteo-qt &"
 exec --no-startup-id lxpolkit
 
 # Use pactl to adjust volume
