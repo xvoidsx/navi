@@ -198,6 +198,8 @@ main { max-width: 1100px; margin: 0 auto; padding: 1rem 1rem 3rem; }
 
 .sec-native { color: var(--green); text-shadow: 0 0 14px rgba(57, 255, 20, 0.4); }
 
+.sec-agents { color: #ffffff; text-shadow: 0 0 14px rgba(0, 255, 255, 0.5); }
+
 /* first-party cards get the gradient-border treatment */
 .grid.featured .card {
   border: 2px solid transparent;
@@ -255,6 +257,8 @@ main { max-width: 1100px; margin: 0 auto; padding: 1rem 1rem 3rem; }
 .badge.webapp { color: var(--pink); border-color: var(--pink); }
 
 .badge.native { color: var(--green); border-color: var(--green); }
+
+.badge.agent { color: var(--cyan); border-color: var(--cyan); }
 
 .card p { color: var(--muted); font-size: 0.92rem; flex: 1; }
 

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Cloudflare
+Exec=chromium --force-dark-mode --app=https://dash.cloudflare.com
+Comment=Cloudflare as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-cloudflare
+StartupNotify=true
+Categories=Network;

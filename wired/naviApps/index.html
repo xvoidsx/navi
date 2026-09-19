@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>naviApps — the app store for navi</title>
-  <meta name="description" content="naviApps: the app store for navi — browse and install webapps and native apps." />
+  <meta name="description" content="naviApps: the app store for navi — browse and install webapps, native apps, and AI agents." />
   <link rel="stylesheet" href="style.css?v=glass2" />
 </head>
 <body>
@@ -26,6 +26,7 @@
   <button data-source="" class="active">all</button>
   <button data-source="navi">navi</button>
   <button data-source="native">native</button>
+  <button data-source="agents">agents</button>
 </nav>
 
 <main>
@@ -37,6 +38,10 @@
   <section class="store-section" id="nativeSection">
     <h2 class="section-title"><span class="sec-native">native apps</span></h2>
     <div class="grid" id="nativeGrid"></div>
+  </section>
+  <section class="store-section" id="agentsSection">
+    <h2 class="section-title"><span class="sec-agents">agents</span></h2>
+    <div class="grid" id="agentsGrid"></div>
   </section>
   <section class="store-section" id="appsSection">
     <h2 class="section-title"><span class="sec-webapps">webapps</span></h2>
@@ -77,6 +82,7 @@
   <p>~ ~ <a href="https://rav3ndust.xyz/wiki/nightshadeNeon.html">nightshadeNeon</a> themed · naviApps for navi · <a href="apps.json">apps.json</a> ~ ~</p>
   <p>webapps = site-specific browsers, installed with <code>navi-webapp</code></p>
   <p>native apps = real desktop apps, installed with <code>navi-extras --install</code></p>
+  <p>agents = AI agents &amp; harnesses — navi is unapologetically agent-native</p>
 </footer>
 
 <script src="catalog.js"></script>

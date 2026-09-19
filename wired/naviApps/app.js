@@ -5,8 +5,10 @@
 const grid = document.getElementById("grid");
 const naviGrid = document.getElementById("naviGrid");
 const nativeGrid = document.getElementById("nativeGrid");
+const agentsGrid = document.getElementById("agentsGrid");
 const naviSection = document.getElementById("naviSection");
 const nativeSection = document.getElementById("nativeSection");
+const agentsSection = document.getElementById("agentsSection");
 const appsSection = document.getElementById("appsSection");
 const statusEl = document.getElementById("status");
 const searchEl = document.getElementById("search");
@@ -39,6 +41,7 @@ function buildCategories() {
 }
 
 function badgeFor(a) {
+  if (a.source === "agent") return '<span class="badge agent">agent</span>';
   if (a.source === "native") return '<span class="badge native">native</span>';
   return '<span class="badge webapp">webapp</span>';
 }
@@ -63,7 +66,7 @@ function cardHTML(a, i) {
   return `<article class="card" style="--d:${Math.min(i, 20) * 35}ms">
     <div class="top">${artFor(a, 32)}
     <h2>${escapeHTML(a.name)}</h2></div>
-    <div class="badges">${badgeFor()}</div>
+    <div class="badges">${badgeFor(a)}</div>
     <p>${escapeHTML(a.summary)}</p>
     <div class="row">
       <button class="btn primary" data-install="${a.id}">install</button>
@@ -81,24 +84,29 @@ function render() {
   const cat = catEl.value;
   const isNavi = (a) => a.category === "navi";
   const isNative = (a) => a.source === "native" && a.category !== "navi";
+  const isAgent = (a) => a.source === "agent";
   const naviApps = curated.filter((a) => isNavi(a) && matches(a, q, cat));
   const nativeApps = curated.filter((a) => isNative(a) && matches(a, q, cat));
-  const rest = curated.filter((a) => !isNavi(a) && !isNative(a) && matches(a, q, cat));
+  const agentApps = curated.filter((a) => isAgent(a) && matches(a, q, cat));
+  const rest = curated.filter((a) => !isNavi(a) && !isNative(a) && !isAgent(a) && matches(a, q, cat));
 
   // the "navi" filter spotlights first-party apps, "native" spotlights
-  // native packages; "all" shows every section
+  // native packages, "agents" spotlights AI agents; "all" shows every section
   const showNavi = activeSource === "" || activeSource === "navi";
   const showNative = activeSource === "" || activeSource === "native";
+  const showAgents = activeSource === "" || activeSource === "agents";
   const showRest = activeSource === "";
 
   naviSection.hidden = !(showNavi && naviApps.length);
   nativeSection.hidden = !(showNative && nativeApps.length);
+  agentsSection.hidden = !(showAgents && agentApps.length);
   appsSection.hidden = !(showRest && rest.length);
   if (!naviSection.hidden) paintGrid(naviGrid, naviApps);
   if (!nativeSection.hidden) paintGrid(nativeGrid, nativeApps);
+  if (!agentsSection.hidden) paintGrid(agentsGrid, agentApps);
   if (!appsSection.hidden) paintGrid(grid, rest);
 
-  const total = (showNavi ? naviApps.length : 0) + (showNative ? nativeApps.length : 0) + (showRest ? rest.length : 0);
+  const total = (showNavi ? naviApps.length : 0) + (showNative ? nativeApps.length : 0) + (showAgents ? agentApps.length : 0) + (showRest ? rest.length : 0);
   statusEl.textContent = total
     ? `${total} app${total === 1 ? "" : "s"}`
     : "no apps found. try another search.";
@@ -106,7 +114,7 @@ function render() {
 }
 
 function wireButtons() {
-  for (const root of [grid, naviGrid, nativeGrid]) {
+  for (const root of [grid, naviGrid, nativeGrid, agentsGrid]) {
     root.querySelectorAll("[data-details]").forEach((b) =>
       b.addEventListener("click", () => openModal(findApp(b.dataset.details)))
     );
@@ -139,7 +147,7 @@ const mDesktop = document.getElementById("mDesktop");
 function openModal(a, highlightCopy = false) {
   if (!a) return;
   mName.innerHTML = `${artFor(a, 28)} ${escapeHTML(a.name)}`;
-  mMeta.textContent = `${a.source === "native" ? "native app" : "webapp"} · ${a.package} · ${a.category}`;
+  mMeta.textContent = `${a.source === "agent" ? "agent" : a.source === "native" ? "native app" : "webapp"} · ${a.package} · ${a.category}`;
   mSummary.textContent = a.summary;
   mCmd.textContent = a.install;
   if (a.homepage) {
@@ -156,8 +164,14 @@ function openModal(a, highlightCopy = false) {
     mDownload.hidden = true;
   }
   const mRemoveWrap = document.getElementById("mRemoveWrap");
-  mRemoveWrap.hidden = false;
-  document.getElementById("mRemove").textContent = a.remove || `navi-webapp --uninstall ${a.package}`;
+  if (a.remove) {
+    mRemoveWrap.hidden = false;
+    document.getElementById("mRemove").textContent = a.remove;
+  } else {
+    // no remove command (e.g. pre-installed agents) — hide the box
+    // rather than showing a bogus default.
+    mRemoveWrap.hidden = true;
+  }
   if (a.desktopEntry) {
     mDesktopWrap.hidden = false;
     mDesktop.textContent = a.desktopEntry;
