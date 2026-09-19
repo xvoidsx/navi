@@ -167,12 +167,12 @@ window#waybar > box {
  * brightens to hint it's clickable (opens navi-weather). */
 #custom-weather {
     margin: 3px 2px;
-    padding: 2px 4px;
+    padding: 2px 3px;
     background: transparent;
     border: none;
     border-radius: 0;
     box-shadow: none;
-    font-size: 9px;
+    font-size: 8px;
     color: rgba(184, 184, 184, 0.80);
     text-shadow: 0 0 6px rgba(0, 255, 255, 0.35);
     animation: none;

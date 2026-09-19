@@ -24,8 +24,8 @@
     ],
     "modules-right": [
         //"custom/media",
-	"custom/update",
 	"custom/weather",
+	"custom/update",
 	"pulseaudio",
         "network",
         "battery",
