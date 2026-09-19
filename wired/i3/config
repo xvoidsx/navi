@@ -59,8 +59,10 @@ exec --no-startup-id "gnome-keyring-daemon --components=secrets"
 for_window [class="^.*"] border pixel 2
 
 # Gaps
-gaps inner 3
-gaps outer 3
+# inner 6 / outer 9 — the woodstock '69. gifpapers get their frame,
+# windows keep their breathing room.
+gaps inner 6
+gaps outer 9
 
 # nightshadeNeon
 client.focused          #ff10f0 #000000 #39ff14 #39ff14 #ff10f0
@@ -167,7 +169,7 @@ bindsym $mod+Shift+q kill
 # GAPS
 ################################################################
 
-bindsym $mod+g exec --no-startup-id "i3-msg 'gaps inner 3; gaps outer 3' && notify-send 'wired helper' 'Gaps enabled.'"
+bindsym $mod+g exec --no-startup-id "i3-msg 'gaps inner 6; gaps outer 9' && notify-send 'wired helper' 'Gaps enabled.'"
 
 bindsym $mod+Shift+g exec --no-startup-id "i3-msg 'gaps inner 0; gaps outer 0' && notify-send 'wired helper' 'Gaps disabled.'"
 

@@ -66,8 +66,10 @@ for_window [title="navi-notifs"] floating enable
 for_window [class="^.*"] border pixel 2
 
 # - - for gaps - -
-gaps inner 3
-gaps outer 3
+# inner 6 / outer 9 — the woodstock '69. gifpapers get their frame,
+# windows keep their breathing room.
+gaps inner 6
+gaps outer 9
 
 # for border colors - nightshadeNeon theme
 client.focused          #ff10f0 #000000 #39ff14 #39ff14 #ff10f0
@@ -119,7 +121,7 @@ bindsym $mod+Return exec alacritty
 bindsym $mod+Shift+q kill
 
 # bindings for turning gaps on and off
-bindsym $mod+g exec --no-startup-id "swaymsg 'gaps inner 3; gaps outer 3' && notify-send 'wired helper' 'Gaps enabled.'"
+bindsym $mod+g exec --no-startup-id "swaymsg 'gaps inner 6; gaps outer 9' && notify-send 'wired helper' 'Gaps enabled.'"
 bindsym $mod+Shift+g exec --no-startup-id "swaymsg 'gaps inner 0; gaps outer 0' && notify-send 'wired helper' 'Gaps disabled.'"
 
 # navi launchers
