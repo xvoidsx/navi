@@ -18,7 +18,7 @@ const (
 	Red    = lipgloss.Color("#ff3131") // errors, destructive actions, off states
 
 	Dim   = lipgloss.Color("#5c4a5c") // hairlines, dimmed chrome (muted mauve, in the Ghost family — never neutral grey)
-	Gray  = lipgloss.Color("#666666") // secondary text
+	Gray  = lipgloss.Color("#8a6a8a") // secondary text — muted mauve in the Ghost family, never neutral grey
 	Faint = lipgloss.Color("#3a2f3d") // barely-there chrome (inactive footer keys)
 	Dark  = lipgloss.Color("#0f0f0f") // panel background
 )
