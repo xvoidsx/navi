@@ -86,3 +86,87 @@ navigation-sidebar row:selected {
     color: @neon_green;
     border-left: 2px solid @neon_green;
 }
+
+/* ---- plain GTK4 widgets (non-libadwaita apps like pavucontrol) ---- */
+window, dialog {
+    background-color: @neon_black;
+    color: @neon_white;
+}
+
+headerbar {
+    background-color: @neon_black;
+    color: @neon_white;
+    border-bottom: 1px solid @neon_pink;
+}
+
+button {
+    background-color: @bg_float;
+    color: @neon_white;
+    border: 1px solid @gray_dark;
+    border-radius: 6px;
+}
+
+button:hover {
+    border-color: @neon_green;
+}
+
+button:checked {
+    background-color: @bg_sel;
+    color: @neon_green;
+    border-color: @neon_pink;
+}
+
+/* notebook tabs (pavucontrol's Playback/Output/...) */
+notebook header {
+    background-color: @neon_black;
+    border-bottom: 1px solid @gray_dark;
+}
+
+notebook tab {
+    color: @gray_text;
+    padding: 6px 14px;
+}
+
+notebook tab:checked {
+    color: @neon_pink;
+    border-bottom: 2px solid @neon_green;
+}
+
+/* volume sliders */
+scale trough {
+    background-color: @gray_dark;
+    border-radius: 4px;
+    min-height: 4px;
+}
+
+scale highlight {
+    background-color: @neon_green;
+    border-radius: 4px;
+}
+
+scale slider {
+    background-color: @neon_green;
+    border-radius: 50%;
+}
+
+/* menus, popovers, tooltips */
+popover, menu {
+    background-color: @bg_float;
+    color: @neon_white;
+    border: 1px solid @neon_pink;
+    border-radius: 6px;
+}
+
+tooltip {
+    background-color: @neon_black;
+    color: @neon_white;
+    border: 1px solid @neon_green;
+    border-radius: 6px;
+}
+
+/* checkboxes / radios */
+check:checked, radio:checked {
+    background-color: @neon_pink;
+    color: @neon_black;
+    border-color: @neon_pink;
+}
