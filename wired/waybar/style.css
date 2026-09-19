@@ -187,6 +187,27 @@ window#waybar > box {
     animation: none;
 }
 
+/* Tray expander (CSS edition): the tray sits collapsed and invisible until
+ * the pointer is anywhere on the bar, then fades/slides out for
+ * interaction. The pill chrome is inherited from the shared module rule —
+ * only visibility and footprint are toggled here. */
+#tray {
+    opacity: 0;
+    min-width: 0;
+    margin: 3px 0;
+    padding: 0;
+    transition: opacity 350ms ease;
+}
+#tray > * {
+    min-width: 0;
+    min-height: 0;
+}
+window#waybar:hover #tray {
+    opacity: 1;
+    margin: 3px 4px;
+    padding: 2px 8px;
+}
+
 /* sway/window places its state class on the bar itself. Collapse every visual
  * contribution from the title module when the focused workspace is empty. */
 window#waybar.empty #window {
