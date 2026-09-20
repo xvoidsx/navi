@@ -98,6 +98,9 @@ PKGS=(
   # (Debian calls it fd-find), treesitter parsers and fzf-native compile
   # at first launch (build-essential), shellcheck for config linting.
   ripgrep fd-find shellcheck build-essential
+  # eiri QoL prototypes: Alt+Tab switcher (screenshot/crop/thumbnail) and
+  # the bottom-center volume OSD (GTK3 popup).
+  grim python3-pil python3-gi gir1.2-gtk-3.0
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -1488,3 +1491,4 @@ main() {
 }
 
 main "$@"
+
