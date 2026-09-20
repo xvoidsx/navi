@@ -73,7 +73,8 @@ no auth, no accounts.
   weather queries (→fetch-weather, location extracted from transcript,
   ask-back if empty), news/headlines (→fetch-news, topic or top stories),
   volume up/down/mute, media play-pause/next/prev,
-  brightness up/down,   screenshot, lock, close-window, dismiss/thanks (→overlay-hide), with "hey lain /
+  brightness up/down,   screenshot, lock, close-window, dismiss/thanks (→overlay-hide),
+  "what can you do"/"help" (spoken capability summary), with "hey lain /
   please / could you" prefix stripping. Bare "move to workspace N" (no app
   named) means switch workspaces — the app-named form ("move firefox to
   workspace 2") moves a window; bare "go to/take me to workspace N" also
@@ -258,7 +259,12 @@ no auth, no accounts.
   speech output — swaymsg's `[{"success": true}]` was once SPOKEN ALOUD.
   `hey-lain.sh` now also logs every brain REPLY for post-mortems.
 - Failure modes degrade to speech: no audio → "No audio captured";
-  empty transcript → "I didn't catch that"; LLM down → offline echo reply.
+  empty transcript → "I didn't catch that"; LLM failures speak a specific
+  line per cause (service unreachable / timeout / model missing / runner
+  error) and log the raw error to `~/.local/share/hey-lain/brain.log` —
+  the spoken line always notes the deterministic desktop commands still
+  work. `bin/hey-lain.sh --doctor` self-checks the whole pipeline (venv,
+  mic, TTS, ollama service/API/model, inference smoke test).
 
 ## Known limits / next steps
 

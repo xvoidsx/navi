@@ -236,6 +236,12 @@ case "$LOW" in
     TARGET="${Q%%|*}"; DEST="${Q#*|}"
     case "$DEST" in one) DEST=1;; two) DEST=2;; three) DEST=3;; four) DEST=4;; five) DEST=5;; six) DEST=6;; seven) DEST=7;; eight) DEST=8;; nine) DEST=9;; ten) DEST=10;; esac
     printf '[ACTION: sway-move %s]\nMoving %s to workspace %s.\n' "$TARGET|$DEST" "$TARGET" "$DEST"; exit 0 ;;
+  *what\ can\ you\ do*|*what\ do\ you\ do*|*list\ your\ commands*|*list\ commands*|*show\ me\ your\ commands*|*your\ capabilities*)
+    printf '%s\n' "I run the desktop by voice: I open apps and websites, move windows between workspaces, switch workspaces, handle volume, brightness and media keys, take screenshots, lock the screen, fetch weather and headlines, and chat about anything. Try: open youtube, move firefox to workspace two, or dim the screen."
+    exit 0 ;;
+  help)
+    printf '%s\n' "I run the desktop by voice: I open apps and websites, move windows between workspaces, switch workspaces, handle volume, brightness and media keys, take screenshots, lock the screen, fetch weather and headlines, and chat about anything. Try: open youtube, move firefox to workspace two, or dim the screen."
+    exit 0 ;;
   *fullscreen*|*full\ screen*) printf '[ACTION: sway-fullscreen toggle]\nToggling fullscreen.\n'; exit 0 ;;
   *floating*|*float*) printf '[ACTION: sway-float toggle]\nToggling floating mode.\n'; exit 0 ;;
   *scratchpad*) printf '[ACTION: sway-scratchpad toggle]\nToggling the scratchpad.\n'; exit 0 ;;
@@ -329,11 +335,26 @@ fi
 SYSTEM="$SYSTEM
 Local context: $CTX"
 
+# Brain failure log: every LLM-path failure lands here with a timestamp so
+# a dead brain is diagnosable without re-running anything. Only the
+# transport/API error is logged — never the utterance, the payload, or keys.
+BRAIN_LOG="${XDG_STATE_HOME:-$HOME/.local/share}/hey-lain/brain.log"
+brain_log() {
+  mkdir -p "$(dirname "$BRAIN_LOG")" 2>/dev/null || true
+  printf '%s brain: %s\n' "$(date '+%F %T')" "$*" >>"$BRAIN_LOG" 2>/dev/null || true
+}
+
+# ask <model> <failfile>: prints the reply on stdout on success. On any
+# failure prints nothing, writes a machine-readable reason
+# (unreachable|timeout|transport|model-missing|runner|api-error|empty) to
+# <failfile>, logs the real error, and returns non-zero. The old code
+# discarded curl's exit status and stderr, so every failure — dead daemon,
+# missing model, broken install — collapsed into one "brain is offline".
 ask() {
-  local model="$1" payload resp out
-  # gpt-oss reasons: roomy cap or replies truncate. Others stop at EOS anyway.
+  local model="$1" failfile="$2" payload resp out curl_rc curl_err errfile
   local cap=150
   case "$model" in *gpt-oss*) cap=400 ;; esac
+  # gpt-oss reasons: roomy cap or replies truncate. Others stop at EOS anyway.
   # One payload builder for both protocols: system + conversation history
   # + the current utterance, so follow-ups resolve against what was said.
   payload=$(python3 - "$SYSTEM" "$HISTORY_JSON" "$USER_TEXT" "$model" "$cap" "$BACKEND" <<'EOF'
@@ -359,14 +380,16 @@ else:
                       "options": {"num_predict": cap}, "messages": msgs}))
 EOF
 )
+  errfile="$(mktemp)" || errfile=/dev/null
+  curl_rc=0
   if [ "$BACKEND" = "openai" ] || [ "$BACKEND" = "openrouter" ]; then
     # OpenAI-compatible chat completions (OpenAI, OpenRouter).
-    resp=$(curl -s --max-time "$TIMEOUT" "$URL" \
+    resp=$(curl -sS --max-time "$TIMEOUT" "$URL" \
       -H "Authorization: Bearer $API_KEY" \
       -H "Content-Type: application/json" \
       -H "HTTP-Referer: https://navi.xvoidsx.org" \
       -H "X-Title: Hey Lain" \
-      -d "$payload" 2>/dev/null || true)
+      -d "$payload" 2>"$errfile") || curl_rc=$?
     out=$(python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -374,23 +397,86 @@ print(d['choices'][0]['message']['content'].strip())" <<<"$resp" 2>/dev/null || 
   else
     # Ollama-native /api/chat (local models AND ollama-cloud *-cloud names
     # proxied through the local daemon).
-    resp=$(curl -s --max-time "$TIMEOUT" "$URL" -d "$payload" 2>/dev/null || true)
+    resp=$(curl -sS --max-time "$TIMEOUT" "$URL" -d "$payload" 2>"$errfile") || curl_rc=$?
     out=$(python3 -c "import json,sys; print(json.load(sys.stdin).get('message',{}).get('content','').strip())" <<<"$resp" 2>/dev/null || true)
   fi
-  echo "$out"
+  curl_err="$(cat "$errfile" 2>/dev/null || true)"
+  [ "$errfile" != /dev/null ] && rm -f "$errfile"
+  # Transport failure: curl never got a usable HTTP response. Classify by
+  # exit code (7 = couldn't connect, 28 = timed out) — stderr text varies.
+  if [ "$curl_rc" -ne 0 ] || [ -z "${resp// }" ]; then
+    local reason="transport"
+    [ "$curl_rc" -eq 7 ] && reason="unreachable"
+    [ "$curl_rc" -eq 28 ] && reason="timeout"
+    brain_log "model=$model backend=$BACKEND url=$URL reason=$reason curl_rc=$curl_rc curl_err=$(printf '%s' "$curl_err" | head -c 200)"
+    printf '%s' "$reason" >"$failfile" 2>/dev/null || true
+    return 1
+  fi
+  if [ -n "${out// }" ]; then
+    echo "$out"
+    return 0
+  fi
+  # The daemon answered but with an error payload (or an empty 200). Pull
+  # the error text out and classify it. Runner errors are checked BEFORE
+  # "not found" — a broken install says "llama-server binary not found",
+  # which contains "not found" but is NOT a missing model (2026-09-20).
+  local api_err
+  api_err=$(python3 -c "
+import json,sys
+try:
+    e=json.load(sys.stdin).get('error','')
+    print(str(e)[:300])
+except Exception:
+    print('')" <<<"$resp" 2>/dev/null || true)
+  local reason="empty"
+  case "$api_err" in
+    *llama-server*|*runner*|*"could not load model"*|*"internal error"*)
+      reason="runner" ;;
+    *"not found"*|*"no such model"*|*"does not exist"*|*"try pulling"*)
+      reason="model-missing" ;;
+    *)
+      [ -n "${api_err// }" ] && reason="api-error" ;;
+  esac
+  brain_log "model=$model backend=$BACKEND url=$URL reason=$reason api_err=$api_err"
+  printf '%s' "$reason" >"$failfile" 2>/dev/null || true
+  return 1
 }
 
-OUT=$(ask "$MODEL")
+# Spoken failure lines: specific about WHAT broke, and always honest that
+# the deterministic desktop commands never needed the brain at all.
+brain_offline_line() {
+  local reason="${1:-unknown}"
+  case "$reason" in
+    unreachable)
+      echo "My local brain service isn't responding — is Ollama running? My window and workspace commands still work fine without it." ;;
+    timeout)
+      echo "My brain timed out thinking about that one. My window and workspace commands still work — try me again in a moment." ;;
+    model-missing)
+      echo "My language model $MODEL isn't downloaded yet. Run: ollama pull $MODEL — until then, my window and workspace commands still work fine." ;;
+    runner|api-error)
+      echo "My brain hit an internal error just now — I logged the details for later. My window and workspace commands still work." ;;
+    *)
+      echo "You said: $USER_TEXT. My brain is offline right now, but my ears and voice work — and my window and workspace commands don't need the brain at all." ;;
+  esac
+}
+
+FAILFILE="$(mktemp)"
+OUT=$(ask "$MODEL" "$FAILFILE") || true
+ASK_FAIL="$(cat "$FAILFILE" 2>/dev/null || true)"
+rm -f "$FAILFILE"
 if [ -z "${OUT// }" ] && { [ "$BACKEND" != "local" ] || [ "$MODEL" != "$LOCAL_FALLBACK" ]; }; then
   # Cloud backends (and a non-default local model) fall back to the tiny
   # local brain before giving up to the offline line.
-  echo "brain: primary backend failed, falling back to $LOCAL_FALLBACK" >&2
+  echo "brain: primary backend failed ($ASK_FAIL), falling back to $LOCAL_FALLBACK" >&2
   BACKEND="local"
   URL="$LOCAL_URL"
-  OUT=$(ask "$LOCAL_FALLBACK")
+  FAILFILE="$(mktemp)"
+  OUT=$(ask "$LOCAL_FALLBACK" "$FAILFILE") || true
+  ASK_FAIL="$(cat "$FAILFILE" 2>/dev/null || true)"
+  rm -f "$FAILFILE"
 fi
 if [ -z "${OUT// }" ]; then
-  echo "You said: $USER_TEXT. My brain is offline right now, but my ears and voice work."
+  brain_offline_line "$ASK_FAIL"
   exit 0
 fi
 echo "$OUT" | sed -e 's/\*\*//g' -e 's/`//g' | head -n 20
