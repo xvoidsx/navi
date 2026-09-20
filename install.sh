@@ -77,10 +77,6 @@ PKGS=(
   # minimal installs don't pull them in on their own, and without them the
   # greeter falls back to the default theme with a module-not-installed error.
   qml6-module-qtquick-controls qml6-module-qtquick-layouts
-  # System typefaces: Fira Sans is the UI font everywhere (waybar, sway, gtk,
-  # rofi, dunst, ...), JetBrains Mono the monospace (terminals, conky).
-  # Fira Sans is NOT in Debian — setup_fonts() fetches it from Mozilla's
-  # upstream tag; fonts-inter stays installed as its fallback.
   fonts-jetbrains-mono fonts-firacode fonts-noto fonts-cascadia-code wdisplays papirus-icon-theme moka-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak dconf-cli
@@ -1338,53 +1334,23 @@ setup_chromium() {
 # download it from the upstream release. Provides the PUA glyphs Waybar
 # and lsd need (brightness icons, devicons). Matches the already-shipped
 # JetBrains Mono.
-# Fira Sans: the UI typeface (waybar, sway, gtk, rofi, dunst, overlays).
-# Debian ships no Fira Sans package (requested 2013, never packaged), so
-# setup_fonts() fetches the static TTFs from Mozilla's upstream tag.
-# Inter (fonts-inter, already in PKGS) stays installed as the fallback —
-# every font stack lists it after Fira Sans, so a failed download
-# degrades gracefully instead of falling back to DejaVu.
 setup_fonts() {
   step "nerd fonts (JetBrainsMono Nerd Font)"
   local font_dir="/usr/share/fonts/truetype/jetbrainsmono-nerd"
   if [ -f "$font_dir/JetBrainsMonoNerdFont-Regular.ttf" ]; then
     ok "JetBrainsMono Nerd Font already installed"
-  else
-    $DOAS mkdir -p "$font_dir"
-    local tmp_zip="/tmp/JetBrainsMonoNerdFont.zip"
-    if wget -q -O "$tmp_zip" "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"; then
-      $DOAS unzip -o -q "$tmp_zip" -d "$font_dir"
-      rm -f "$tmp_zip"
-      $DOAS fc-cache -f >/dev/null 2>&1 || true
-      ok "JetBrainsMono Nerd Font installed"
-    else
-      warn "could not download JetBrainsMono Nerd Font — skipping"
-      rm -f "$tmp_zip"
-    fi
+    return 0
   fi
-
-  step "system fonts (Fira Sans)"
-  local fira_dir="/usr/share/fonts/truetype/fira-sans"
-  if [ -f "$fira_dir/FiraSans-Regular.ttf" ]; then
-    ok "Fira Sans already installed"
+  $DOAS mkdir -p "$font_dir"
+  local tmp_zip="/tmp/JetBrainsMonoNerdFont.zip"
+  if wget -q -O "$tmp_zip" "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"; then
+    $DOAS unzip -o -q "$tmp_zip" -d "$font_dir"
+    rm -f "$tmp_zip"
+    $DOAS fc-cache -f >/dev/null 2>&1 || true
+    ok "JetBrainsMono Nerd Font installed"
   else
-    $DOAS mkdir -p "$fira_dir"
-    local fira_zip="/tmp/FiraSans.zip"
-    if wget -q -O "$fira_zip" "https://github.com/mozilla/Fira/archive/refs/tags/4.202.zip"; then
-      local fira_tmp="/tmp/fira-sans-extract"
-      rm -rf "$fira_tmp"; mkdir -p "$fira_tmp"
-      if unzip -o -q "$fira_zip" "Fira-4.202/ttf/FiraSans-*.ttf" -d "$fira_tmp" \
-        && $DOAS cp "$fira_tmp"/Fira-4.202/ttf/FiraSans-*.ttf "$fira_dir"/; then
-        ok "Fira Sans installed"
-      else
-        warn "Fira Sans archive layout unexpected — skipping (Inter fallback stays)"
-      fi
-      rm -rf "$fira_tmp" "$fira_zip"
-      $DOAS fc-cache -f >/dev/null 2>&1 || true
-    else
-      warn "could not download Fira Sans — skipping (Inter fallback stays)"
-      rm -f "$fira_zip"
-    fi
+    warn "could not download JetBrainsMono Nerd Font — skipping"
+    rm -f "$tmp_zip"
   fi
 }
 

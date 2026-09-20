@@ -76,7 +76,7 @@ client.unfocused        #222222 #000000 #ff3131 #ffffff #222222
 
 ##############################################################################
 # Font for window titles.
-font pango:Fira Sans, Inter 10
+font pango:Noto Sans 10
 
 # enable mouse warping when changing windows with the keyboard.
 #mouse_warping container
@@ -250,7 +250,7 @@ bindsym $mod+r mode "resize"
 bar {
     position top
     swaybar_command waybar
-    font pango:Fira Sans, Inter 10
+    font pango:Noto Sans 10
     colors {
         focused_workspace #ff10f0 #000000e5 #39FF14
         inactive_workspace #000000 #000000e5 #ff3131

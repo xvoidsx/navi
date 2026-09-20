@@ -6,7 +6,7 @@
 configuration {
     modi: "combi";
     combi-modi: "window,drun,run";
-    font: "Fira Sans, Inter 12";
+    font: "Noto Sans 12";
     show-icons: true;
     icon-theme: "Papirus";
     display-window: "Windows";
