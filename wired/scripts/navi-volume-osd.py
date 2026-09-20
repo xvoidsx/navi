@@ -126,7 +126,7 @@ def run_server(vol, muted):
             border-radius: 14px;
         }
         #navi-volume-osd.muted { border-color: #5b5b66; }
-        #navi-volume-osd label { color: #f2ecf5; font-family: "Noto Sans"; }
+        #navi-volume-osd label { color: #f2ecf5; font-family: "Inter", "Noto Sans"; }
         #osd-icon { font-size: 30px; }
         #osd-name { font-size: 13px; font-weight: bold; }
         #osd-pct { font-size: 13px; color: #39ff14; }

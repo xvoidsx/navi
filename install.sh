@@ -77,6 +77,8 @@ PKGS=(
   # minimal installs don't pull them in on their own, and without them the
   # greeter falls back to the default theme with a module-not-installed error.
   qml6-module-qtquick-controls qml6-module-qtquick-layouts
+  # System typefaces: Inter is the UI font everywhere (waybar, sway, gtk,
+  # rofi, dunst, ...), JetBrains Mono the monospace (terminals, conky).
   fonts-jetbrains-mono fonts-firacode fonts-noto fonts-cascadia-code wdisplays papirus-icon-theme moka-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak dconf-cli
