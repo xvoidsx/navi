@@ -180,7 +180,7 @@
         "escape": true,
         "interval": 300,
         "exec": "/usr/share/navi/wired/waybar/update-check.sh",
-        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-update\" navi-update",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-update\" /usr/share/navi/wired/waybar/navi-update-click.sh",
         "tooltip": true
     },
     "custom/weather": {
