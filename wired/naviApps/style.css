@@ -21,7 +21,7 @@ body {
   margin: 0;
   background-color: var(--bg);
   color: var(--text);
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "Fira Sans", "Inter", system-ui, sans-serif;
   line-height: 1.6;
 }
 

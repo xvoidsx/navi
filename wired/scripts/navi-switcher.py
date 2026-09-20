@@ -237,9 +237,9 @@ def show(outdir):
                                padding: 8px; }
         #navi-switcher .tile.selected { border-color: #ff10f0;
                                         background-color: #1e1224; }
-        #navi-switcher .tile-title { color: #f2ecf5; font: 12px "Inter", "Noto Sans"; }
-        #navi-switcher .tile-ws { color: #8a8a96; font: 10px "Inter", "Noto Sans"; }
-        #navi-switcher .tile-app { color: #39ff14; font: 10px "Inter", "Noto Sans"; }
+        #navi-switcher .tile-title { color: #f2ecf5; font: 12px "Fira Sans", "Inter", "Noto Sans"; }
+        #navi-switcher .tile-ws { color: #8a8a96; font: 10px "Fira Sans", "Inter", "Noto Sans"; }
+        #navi-switcher .tile-app { color: #39ff14; font: 10px "Fira Sans", "Inter", "Noto Sans"; }
     """)
     Gtk.StyleContext.add_provider_for_screen(
         Gdk.Screen.get_default(), css,
