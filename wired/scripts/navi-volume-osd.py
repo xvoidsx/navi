@@ -8,6 +8,12 @@ place (and its hide timer reset); otherwise a detached server is spawned.
 The window floats itself via swaymsg (no shipped-config rule needed) and
 lands bottom-center of the focused output.
 
+The server is a persistent single-flight daemon, so replacing this file
+(navi-update) must also retire the running server: every client first
+checks the pidfile's code id against its own and SIGTERMs a stale
+server (pre-pidfile servers are found via /proc), so the fresh code
+always serves the next keypress. No manual pkill after updates.
+
 Why not dunst: dunst rules cannot override `origin` (verified against
 upstream docs), so a per-notification bottom-center meter is impossible with
 stock dunst. This owns the 80 lines instead.
@@ -15,12 +21,16 @@ stock dunst. This owns the 80 lines instead.
 import json
 import math
 import os
+import signal
 import socket
 import subprocess
 import sys
+import time
 
 SOCK = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"),
                     "navi-volume-osd.sock")
+PIDFILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"),
+                       "navi-volume-osd.pid")
 APP_ID = "navi-volume-osd"
 W, H = 380, 104
 HIDE_MS = 1200
@@ -50,6 +60,102 @@ def on_osd_draw(win, cr):
     return False
 
 
+def _code_id():
+    # Identifies this script's revision. After navi-update replaces the
+    # file, a server still holding the socket is stale when its id differs.
+    try:
+        return str(int(os.path.getmtime(__file__)))
+    except OSError:
+        return "0"
+
+
+def _is_osd_cmdline(cmdline):
+    # True when a /proc/<pid>/cmdline belongs to an OSD process: python
+    # executing navi-volume-osd.py. An editor merely viewing the file does
+    # not match (argv[0] wouldn't be python).
+    parts = cmdline.split()
+    return (len(parts) >= 2
+            and "python" in os.path.basename(parts[0])
+            and parts[1].endswith("navi-volume-osd.py"))
+
+
+def _osd_pids(exclude):
+    # Live PIDs currently executing this script (never the caller).
+    found = []
+    try:
+        for pid in os.listdir("/proc"):
+            if not pid.isdigit() or int(pid) == exclude:
+                continue
+            try:
+                with open(f"/proc/{pid}/cmdline", "rb") as f:
+                    cmd = f.read().replace(b"\0", b" ").decode(errors="replace")
+            except OSError:
+                continue
+            if _is_osd_cmdline(cmd):
+                found.append(int(pid))
+    except OSError:
+        pass
+    return found
+
+
+def ensure_fresh_server():
+    """Retire a stale OSD server before talking to the socket.
+
+    The OSD server persists across navi-update, so without this the old
+    code keeps serving from the old socket forever. Cases:
+      - pidfile code id matches ours and the pid is a live OSD: nothing.
+      - pidfile code id differs (stale): SIGTERM that exact pid, but only
+        after confirming via /proc it really is an OSD (pids get recycled).
+      - no pidfile (pre-pidfile server, or a crashed one): scan /proc for
+        OSD processes and retire those; never touch anything else.
+    Afterwards any leftover socket/pidfile is unlinked so the fresh server
+    can bind. A wedged server that ignores SIGTERM gets SIGKILL.
+    """
+    me = os.getpid()
+    my_code = _code_id()
+    live = set(_osd_pids(exclude=me))
+    stale_pid = None
+    try:
+        with open(PIDFILE) as f:
+            bits = f.read().strip().split()
+        if len(bits) == 2:
+            stale_pid = int(bits[0])
+            if bits[1] == my_code and stale_pid in live:
+                return  # current server confirmed alive; fast path
+    except (OSError, ValueError):
+        stale_pid = None
+    targets = []
+    if stale_pid is not None:
+        if stale_pid in live:
+            targets.append(stale_pid)  # stale code, confirmed OSD
+        # else: dead or recycled pid — clean up files, never kill it
+    else:
+        targets.extend(live)  # no pidfile: pre-pidfile server, if any
+    for p in targets:
+        try:
+            os.kill(p, signal.SIGTERM)
+        except OSError:
+            pass
+    deadline = time.time() + 1.0
+    while time.time() < deadline:
+        if not os.path.exists(SOCK) and not any(
+                str(p) in os.listdir("/proc") for p in targets):
+            break
+        time.sleep(0.1)
+    else:
+        for p in targets:  # wedged: ignored SIGTERM
+            try:
+                os.kill(p, signal.SIGKILL)
+            except OSError:
+                pass
+        time.sleep(0.2)
+    for p in (SOCK, PIDFILE):
+        try:
+            os.unlink(p)
+        except OSError:
+            pass
+
+
 def send_to_server(vol, muted):
     try:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -74,7 +180,16 @@ def run_server(vol, muted):
     except OSError:
         pass
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind(SOCK)
+    try:
+        srv.bind(SOCK)
+    except OSError:
+        # Lost a race with a concurrently spawning server: hand the
+        # request to whoever holds the socket instead of dying.
+        srv.close()
+        send_to_server(vol, muted)
+        return
+    with open(PIDFILE, "w") as f:
+        f.write(f"{os.getpid()} {_code_id()}\n")
     srv.listen(5)
     srv.setblocking(False)
 
@@ -213,13 +328,13 @@ def run_server(vol, muted):
     GLib.io_add_watch(srv.fileno(), GLib.IO_IN, on_msg)
 
     def cleanup(*_a):
-        try:
-            os.unlink(SOCK)
-        except OSError:
-            pass
+        for p in (SOCK, PIDFILE):
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
         Gtk.main_quit()
 
-    import signal
     signal.signal(signal.SIGTERM, cleanup)
     win.connect("destroy", cleanup)
 
@@ -234,6 +349,7 @@ def main(argv):
               file=sys.stderr)
         return 2
     vol, muted = argv[2], argv[3]
+    ensure_fresh_server()  # retire a stale daemon so the new code serves
     if send_to_server(vol, muted):
         return 0
     try:
