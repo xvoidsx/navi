@@ -441,8 +441,10 @@ func (m *model) deleteConfirmed() {
 // ---------------------------------------------------------------------------
 
 var (
-	todayStyle  = lipgloss.NewStyle().Foreground(theme.Green).Bold(true)
-	cursorStyle = lipgloss.NewStyle().Foreground(theme.Black).Background(theme.Pink).Bold(true)
+	todayStyle = lipgloss.NewStyle().Foreground(theme.Green).Bold(true)
+	// Cursor day: pink and bold, no background block — the frame is
+	// transparent, so a filled block would look pasted-on.
+	cursorStyle = lipgloss.NewStyle().Foreground(theme.Pink).Bold(true).Underline(true)
 	dotStyle    = lipgloss.NewStyle().Foreground(theme.Cyan)
 )
 
@@ -491,14 +493,20 @@ func (m model) monthGrid() string {
 				marker = dotStyle.Render("•")
 			}
 			num := fmt.Sprintf("%2d", day)
+			pad := strings.Repeat(" ", cellW-3)
 			var styled string
 			switch {
 			case sameDay(d, m.cursor):
-				styled = cursorStyle.Render(num + marker + strings.Repeat(" ", cellW-3))
+				// NB: marker is already ANSI-styled — never nest it
+				// inside another Render. lipgloss styles the inner
+				// ESC bytes rune-by-rune, detaching them from their
+				// "[", and the terminal then prints the sequence
+				// bodies as literal text ("[38;2;0;255;255m•[0m").
+				styled = cursorStyle.Render(num) + marker + cursorStyle.Render(pad)
 			case sameDay(d, m.today):
-				styled = todayStyle.Render(num) + marker + strings.Repeat(" ", cellW-3)
+				styled = todayStyle.Render(num) + marker + pad
 			default:
-				styled = theme.Normal.Render(num) + marker + strings.Repeat(" ", cellW-3)
+				styled = theme.Normal.Render(num) + marker + pad
 			}
 			cells = append(cells, styled)
 			day++
