@@ -4,6 +4,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func TestValidDate(t *testing.T) {
@@ -110,5 +113,30 @@ func TestViewsRender(t *testing.T) {
 	m.confirmEv = &ev
 	if got := m.View(); !strings.Contains(got, "doomed") {
 		t.Error("confirm view missing event title")
+	}
+}
+
+// Regression test: the event marker is a pre-styled string ("•" rendered
+// through dotStyle). Nesting it inside another style's Render made lipgloss
+// wrap the inner ESC bytes rune-by-rune, detaching them from their "[" —
+// the terminal then printed the sequence bodies as literal text, so the
+// cursor day showed "25[38;2;0;255;255m•[0m" instead of "25•".
+// See: "calendar event marker shows garbage" (2026-09-20).
+func TestGridEventMarkerSurvivesIntact(t *testing.T) {
+	// force real escape sequences: without a TTY lipgloss defaults to
+	// the Ascii profile and renders no sequences at all, which would
+	// make this test vacuously pass.
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	m := newModel()
+	m.viewYear, m.viewMonth = 2026, time.September
+	m.cursor = time.Date(2026, time.September, 25, 0, 0, 0, 0, time.Local)
+	m.today = time.Date(2026, time.September, 20, 0, 0, 0, 0, time.Local)
+	m.events = []event{{ID: "1", Title: "Joe's birthday", Date: "2026-09-25", Time: "00:00"}}
+
+	grid := m.monthGrid()
+	// the marker must appear with its escape sequences intact — nested
+	// Render calls shatter them into per-rune fragments.
+	if want := dotStyle.Render("•"); !strings.Contains(grid, want) {
+		t.Errorf("event marker not intact in grid; want %q present", want)
 	}
 }
