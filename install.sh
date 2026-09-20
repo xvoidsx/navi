@@ -68,7 +68,7 @@ PKGS=(
   flameshot meteo-qt pasystray ffmpeg mpv kitty stterm surf conky-all suckless-tools zathura zathura-pdf-poppler
   lxpolkit lxappearance vim nnn cmus cava amfora sway swaylock
   swayidle swaybg grimshot xdg-desktop-portal-wlr qt5ct tty-clock wf-recorder
-  brightnessctl sakura foot gsimplecal calcurse pavucontrol yaru-theme-gtk yaru-theme-icon
+  brightnessctl sakura foot gsimplecal calcurse pavucontrol yaru-theme-gtk yaru-theme-icon bibata-cursor-theme
   # sddm-theme-maldives is installed alongside sddm on purpose: it satisfies
   # sddm's "sddm-theme" requirement with a 1.3 MB theme, so apt never reaches
   # for sddm-theme-debian-breeze — which would drag in plasma-workspace.
@@ -569,6 +569,7 @@ setup_mods() {
   install_mod "navi-calendar"   "navi-calendar"
   install_mod "navi-audio"      "navi-audio"
   install_mod "navi-lain-config" "navi-lain-config"
+  install_mod "navi-agents-config" "navi-agents-config"
   install_mod "navi-weather"    "navi-weather"
 }
 
@@ -862,6 +863,12 @@ deploy_configs() {
   deploy_config "gtk-2.0/gtkrc"              "$HOME/.gtkrc-2.0"
   deploy_config "gtk-3.0/settings.ini"        "$HOME/.config/gtk-3.0/settings.ini"
   deploy_config "gtk-4.0/settings.ini"        "$HOME/.config/gtk-4.0/settings.ini"
+  # default cursor theme, file-based so it needs no xrdb: Xcursor falls back
+  # to ~/.icons/default/index.theme, covering the X11 session's root cursor
+  # and any client that doesn't read the GTK/Wayland settings.
+  mkdir -p "$HOME/.icons/default"
+  printf '[Icon Theme]\nInherits=Bibata-Modern-Ice\n' > "$HOME/.icons/default/index.theme"
+  ok "default cursor theme: Bibata-Modern-Ice"
   # tmux reads ~/.config/tmux/tmux.conf first (since 3.1) — the XDG path
   # is the real config. the old ~/.tmux.conf target is retired below so a
   # stale copy can never shadow it.

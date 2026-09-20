@@ -48,6 +48,14 @@ elif [ "$COMPOSITOR" = "i3" ]; then
   i3-msg "for_window [title=\"$TITLE\"] floating enable" >/dev/null 2>&1
 fi
 
+# Agent keys: panel/rofi-launched apps never see ~/.bashrc, so inject the
+# system-wide key store here - every mod (and anything else opened through
+# this launcher) inherits it. Managed by Navi Agent Configuration.
+AGENTS_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/navi/agents.env"
+if [ -f "$AGENTS_ENV" ]; then
+  set -a; . "$AGENTS_ENV" 2>/dev/null; set +a
+fi
+
 alacritty --title "$TITLE" -e "$@" &
 term_pid=$!
 

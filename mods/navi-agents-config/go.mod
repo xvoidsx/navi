@@ -1,4 +1,4 @@
-module github.com/rav3ndust/navi-lain-config
+module github.com/rav3ndust/navi-agents-config
 
 go 1.24.4
 

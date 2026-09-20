@@ -301,7 +301,10 @@ esac
 #                  endpoint, api_style picks the protocol (ollama|openai),
 #                  api_key optional (sent as Bearer only when set)
 # Env overrides (BRAIN_MODEL, BRAIN_URL, BRAIN_TIMEOUT, HEY_LAIN_API_KEY)
-# always win over the file. The key is NEVER logged or echoed anywhere.
+# always win over the file. Then, for non-local backends with no key yet,
+# ~/.config/navi/agents.env (the Navi Agent Configuration store) is
+# consulted: openai -> OPENAI_API_KEY, openrouter -> OPENROUTER_API_KEY,
+# ollama-cloud -> OLLAMA_API_KEY. The key is NEVER logged or echoed anywhere.
 BRAIN_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hey-lain/brain.json"
 BACKEND="local"
 MODEL="gemma3:270m"
@@ -326,6 +329,21 @@ MODEL="${BRAIN_MODEL:-$MODEL}"
 API_KEY="${HEY_LAIN_API_KEY:-$API_KEY}"
 URL="${BRAIN_URL:-$API_URL}"
 TIMEOUT="${BRAIN_TIMEOUT:-30}"
+# Agent key store: ~/.config/navi/agents.env, managed by the Navi Agent
+# Configuration app. For any non-local backend, a key from there fills in
+# when brain.json (and HEY_LAIN_API_KEY) has none — so keys are configured
+# once, system-wide, instead of per-app. Local needs no key by design.
+if [ "$BACKEND" != "local" ] && [ -z "$API_KEY" ]; then
+  AGENTS_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/navi/agents.env"
+  if [ -f "$AGENTS_ENV" ]; then
+    set -a; . "$AGENTS_ENV" 2>/dev/null; set +a
+  fi
+  case "$BACKEND" in
+    openai)       API_KEY="${OPENAI_API_KEY:-}" ;;
+    openrouter)   API_KEY="${OPENROUTER_API_KEY:-}" ;;
+    ollama-cloud) API_KEY="${OLLAMA_API_KEY:-}" ;;
+  esac
+fi
 # api_style: explicit config wins; otherwise derived from the backend
 # (openai/openrouter -> openai protocol, everything else -> ollama).
 if [ -z "${API_STYLE:-}" ]; then

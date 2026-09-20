@@ -66,8 +66,21 @@ BRAIN_API_STYLE="$(_brain_get api_style)"
 if [ -z "$BRAIN_API_STYLE" ]; then
   case "$BRAIN_BACKEND" in openai|openrouter) BRAIN_API_STYLE="openai";; *) BRAIN_API_STYLE="ollama";; esac
 fi
+# Agent key store fallback: Navi Agent Configuration writes
+# ~/.config/navi/agents.env; brain.sh consults it for non-local backends.
+AGENTS_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/navi/agents.env"
+if [ -f "$AGENTS_ENV" ]; then
+  set -a; . "$AGENTS_ENV" 2>/dev/null; set +a
+fi
+_brain_env_key() {
+  case "$BRAIN_BACKEND" in
+    openai) echo "$OPENAI_API_KEY" ;;
+    openrouter) echo "$OPENROUTER_API_KEY" ;;
+    ollama-cloud) echo "$OLLAMA_API_KEY" ;;
+  esac
+}
 BRAIN_KEY_SET="not set"
-if [ -n "$(_brain_get api_key)" ] || [ -n "${HEY_LAIN_API_KEY:-}" ]; then
+if [ -n "$(_brain_get api_key)" ] || [ -n "${HEY_LAIN_API_KEY:-}" ] || [ -n "$(_brain_env_key)" ]; then
   BRAIN_KEY_SET="set"
 fi
 # The key itself is NEVER printed — only whether one is configured.
@@ -80,7 +93,7 @@ case "$BRAIN_BACKEND" in
     if [ "$BRAIN_KEY_SET" = "set" ]; then
       ok "api key: set"
     else
-      bad "api key: not set" "run navi-lain-config (app launcher) and paste a key"
+      bad "api key: not set" "open Navi Agent Configuration from the app launcher and add a key"
     fi ;;
   custom) ok "api key: $BRAIN_KEY_SET (optional for custom endpoints)" ;;
   *)      ok "api key: $BRAIN_KEY_SET (not needed)" ;;
@@ -144,6 +157,7 @@ printf '\n9. inference smoke test ("say hi" via %s)\n' "$BRAIN_BACKEND"
 # is read for the request but never printed anywhere below.
 SMOKE_KEY="$(_brain_get api_key)"
 [ -n "${HEY_LAIN_API_KEY:-}" ] && SMOKE_KEY="$HEY_LAIN_API_KEY"
+[ -z "$SMOKE_KEY" ] && SMOKE_KEY="$(_brain_env_key)"
 SMOKE_URL="$BRAIN_API_URL"
 [ -n "$SMOKE_URL" ] || SMOKE_URL="http://127.0.0.1:11434/api/chat"
 SMOKE_TIMEOUT=60
@@ -153,7 +167,7 @@ SMOKE_T0=$SECONDS
 SMOKE_SKIP=0
 if [ "$BRAIN_API_STYLE" = "openai" ]; then
   if [ -z "$SMOKE_KEY" ]; then
-    bad "inference skipped — no API key configured" "run navi-lain-config (app launcher) and paste a key"
+    bad "inference skipped — no API key configured" "open Navi Agent Configuration from the app launcher and add a key"
     SMOKE_SKIP=1
   else
     SMOKE_RESP_CODE="$(curl -sS --max-time "$SMOKE_TIMEOUT" -w '\n%{http_code}' "$SMOKE_URL" \

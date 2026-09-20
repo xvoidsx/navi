@@ -21,6 +21,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	agentenv "github.com/rav3ndust/navi-agentenv"
 	theme "github.com/rav3ndust/navi-theme"
 )
 
@@ -328,6 +329,11 @@ type model struct {
 	chosenURL   string
 	chosenStyle string
 	keyOptional bool
+	// keyFromEnv tracks that the active key came from the environment
+	// (agents.env via the shell/mod-open.sh) rather than being typed:
+	// it is used for tests and display but never written to brain.json.
+	keyFromEnv  bool
+	keyEnvName  string
 	testResult  string
 	testLatency string
 	testing     bool
@@ -392,6 +398,37 @@ func initialModel() model {
 
 func (m model) Init() tea.Cmd { return nil }
 
+// keyEnvVar is the canonical environment variable for this backend's key,
+// from the shared agentenv provider table (""). local needs no key and
+// custom has no standard variable.
+func (b *backendDef) keyEnvVar() string {
+	if b == nil {
+		return ""
+	}
+	if p := agentenv.ByID(b.id); p != nil {
+		return p.EnvVar
+	}
+	return ""
+}
+
+// effectiveKey resolves the key for tests and display: a typed key wins,
+// otherwise the canonical environment variable (agents.env, sourced into
+// the environment by wired/bashrc and mod-open.sh).
+func (m model) effectiveKey() (key, envName string) {
+	if v := strings.TrimSpace(m.keyInput.Value()); v != "" {
+		return v, ""
+	}
+	if v := strings.TrimSpace(m.chosenKey); v != "" {
+		return v, ""
+	}
+	if env := m.backend.keyEnvVar(); env != "" {
+		if v := strings.TrimSpace(os.Getenv(env)); v != "" {
+			return v, env
+		}
+	}
+	return "", ""
+}
+
 // pendingConfig assembles the brainConfig from the current choices — used
 // by both the connection test and the final save.
 func (m model) pendingConfig() brainConfig {
@@ -403,10 +440,11 @@ func (m model) pendingConfig() brainConfig {
 	if url == "" && m.backend != nil {
 		url = m.backend.apiURL
 	}
+	key, _ := m.effectiveKey()
 	return brainConfig{
 		Backend:  m.backend.id,
 		Model:    m.chosenModel,
-		APIKey:   m.chosenKey,
+		APIKey:   key,
 		APIURL:   url,
 		APIStyle: style,
 	}
@@ -570,6 +608,8 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			m.chosenURL = ""
 			m.chosenStyle = ""
 			m.keyOptional = false
+			m.keyFromEnv = false
+			m.keyEnvName = ""
 			m.testResult = ""
 			if m.backend.styleChoice {
 				m.urlInput.SetValue("")
@@ -627,11 +667,25 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 		m.advanceFromModel()
 	case screenKey:
 		v := strings.TrimSpace(m.keyInput.Value())
-		if v == "" && !m.keyOptional {
-			m.errMsg = "paste an API key first (esc to go back)"
-			return m, nil
+		if v == "" {
+			// empty paste: fall back to the environment (agents.env).
+			// accepted for keyed backends; the key itself is never
+			// written to brain.json — brain.sh resolves it at runtime.
+			if env := m.backend.keyEnvVar(); env != "" && strings.TrimSpace(os.Getenv(env)) != "" {
+				m.chosenKey = ""
+				m.keyFromEnv = true
+				m.keyEnvName = env
+				m.screen = screenReview
+				return m, nil
+			}
+			if !m.keyOptional {
+				m.errMsg = "paste an API key first (esc to go back)"
+				return m, nil
+			}
 		}
 		m.chosenKey = v
+		m.keyFromEnv = false
+		m.keyEnvName = ""
 		m.screen = screenReview
 	case screenURL:
 		v := strings.TrimSpace(m.urlInput.Value())
@@ -643,6 +697,11 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 		m.screen = screenReview
 	case screenReview:
 		cfg := m.pendingConfig()
+		if m.keyFromEnv {
+			// env-sourced keys are never persisted to brain.json —
+			// brain.sh resolves them from agents.env at runtime.
+			cfg.APIKey = ""
+		}
 		if err := saveConfig(cfg); err != nil {
 			m.errMsg = "save failed: " + err.Error()
 			return m, nil
@@ -657,7 +716,13 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 func (m *model) advanceFromModel() {
 	if m.backend.needsKey {
 		m.keyInput.SetValue("")
-		m.keyInput.Placeholder = "paste API key"
+		// if agents.env (or the live environment) already has this
+		// backend's key, say so — enter keeps it, pasting overrides.
+		if env := m.backend.keyEnvVar(); env != "" && strings.TrimSpace(os.Getenv(env)) != "" {
+			m.keyInput.Placeholder = "key found in " + env + " — enter to keep, or paste to override"
+		} else {
+			m.keyInput.Placeholder = "paste API key"
+		}
 		m.keyInput.Focus()
 		m.screen = screenKey
 	} else if m.backend.styleChoice {
@@ -727,7 +792,9 @@ func (m model) View() string {
 		b.WriteString(fmt.Sprintf("  protocol  %s\n", theme.Normal.Render(cfg.APIStyle)))
 		if m.backend.needsKey || m.keyOptional {
 			keyNote := "•••••••• (set)"
-			if m.chosenKey == "" {
+			if m.keyFromEnv {
+				keyNote = "•••••••• (from " + m.keyEnvName + ")"
+			} else if m.chosenKey == "" {
 				keyNote = "(not set)"
 			}
 			b.WriteString(fmt.Sprintf("  api key   %s\n", theme.Normal.Render(keyNote)))

@@ -50,11 +50,9 @@ exec /usr/bin/navi-wallpaper
 # first Alt+V tap answers fast instead of cold-starting STT+TTS.
 exec /usr/share/navi/hey-lain/bin/warmup.sh
 
-# setting mouse theme
-# we have two options to choose from: Yaru and Adwaita. 
-# both look nice - simply uncomment the one you want to use (yaru is default)
-#seat * xcursor_theme Yaru
-seat * xcursor_theme Adwaita 
+# cursor theme: Bibata Modern Ice — glassy, sharp, very wired.
+# (size 24; every seat, so it applies across the whole session.)
+seat * xcursor_theme Bibata-Modern-Ice 24
 
 # make windows float or tile by default.
 #for_window [class="[.]*"] floating enable
