@@ -374,8 +374,12 @@ def show(outdir):
 
     def float_self(attempts=10):
         # Own the float: runtime rule, no shipped-config reliance.
-        wpx, wpx_h = 320 * cols + 60, 300 * rows + 60
-        cmd = (f'[app_id="{APP_ID}"] floating enable, '
+        # border none: the compositor must not draw its own frame around the
+        # switcher's CSS border. The geometry is a tight upper bound on the
+        # natural content size — oversizing leaves a dead band inside the
+        # border that reads as a huge frame.
+        wpx, wpx_h = 330 * cols + 30, 245 * rows + 30
+        cmd = (f'[app_id="{APP_ID}"] floating enable, border none, '
                f"resize set {wpx} {wpx_h}, move position center")
         try:
             p = subprocess.run(["swaymsg", cmd], capture_output=True,

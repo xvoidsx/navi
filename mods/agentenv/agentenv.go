@@ -41,6 +41,16 @@ type Provider struct {
 	Auth      AuthStyle `json:"auth"`
 	KeyHint   string    `json:"key_hint,omitempty"`
 	Custom    bool      `json:"custom,omitempty"`
+	// TestMethod/TestBody override the default "GET ModelsURL with no body"
+	// probe used by the connection test.
+	TestMethod string `json:"test_method,omitempty"`
+	TestBody   string `json:"test_body,omitempty"`
+	// TestSoftFail marks probes that answer with an error even for valid
+	// keys (by design): any response that is NOT 401/403 then counts as
+	// "key accepted". Used with a deliberately bogus model on a chat
+	// endpoint — auth is checked first, the model lookup fails, and no
+	// tokens are spent.
+	TestSoftFail bool `json:"test_soft_fail,omitempty"`
 }
 
 // Providers returns the built-in provider table.
@@ -51,9 +61,21 @@ func Providers() []Provider {
 		{ID: "anthropic", Name: "Anthropic", EnvVar: "ANTHROPIC_API_KEY",
 			ModelsURL: "https://api.anthropic.com/v1/models", Auth: AuthXAPIKey, KeyHint: "sk-ant-…"},
 		{ID: "openrouter", Name: "OpenRouter", EnvVar: "OPENROUTER_API_KEY",
-			ModelsURL: "https://openrouter.ai/api/v1/models", Auth: AuthBearer, KeyHint: "sk-or-…"},
+			// NOTE: /v1/models is public on OpenRouter — it 200s with any key
+			// (or none), so it can never validate a key. /auth/key is their
+			// key-info endpoint: 401 on bad keys, 200 on good ones.
+			ModelsURL: "https://openrouter.ai/api/v1/auth/key", Auth: AuthBearer, KeyHint: "sk-or-…"},
 		{ID: "ollama-cloud", Name: "Ollama Cloud", EnvVar: "OLLAMA_API_KEY",
-			ModelsURL: "https://ollama.com/v1/models", Auth: AuthBearer, KeyHint: "(from ollama.com settings)"},
+			// NOTE: /v1/models is public on ollama.com too. Probe the chat
+			// endpoint with a deliberately bogus model: auth is validated
+			// first (401/403 on bad keys), the model lookup then fails, and
+			// no tokens are spent. TestSoftFail treats that non-auth error
+			// as "key accepted".
+			ModelsURL: "https://ollama.com/v1/chat/completions", Auth: AuthBearer,
+			TestMethod:   "POST",
+			TestBody:     `{"model":"navi-keycheck-no-such-model","messages":[{"role":"user","content":"hi"}],"max_tokens":1}`,
+			TestSoftFail: true,
+			KeyHint:      "(from ollama.com settings)"},
 		{ID: "gemini", Name: "Google Gemini", EnvVar: "GEMINI_API_KEY",
 			ModelsURL: "https://generativelanguage.googleapis.com/v1beta/models", Auth: AuthGoogKey, KeyHint: "AIza…"},
 		{ID: "xai", Name: "xAI", EnvVar: "XAI_API_KEY",

@@ -8,6 +8,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -186,9 +187,20 @@ func testProvider(p agentenv.Provider, key string) tea.Cmd {
 		if strings.TrimSpace(p.ModelsURL) == "" {
 			return testDoneMsg{ok: false, detail: "no test URL for this provider"}
 		}
-		req, err := http.NewRequest("GET", p.ModelsURL, nil)
+		method := p.TestMethod
+		if method == "" {
+			method = "GET"
+		}
+		var body io.Reader
+		if p.TestBody != "" {
+			body = strings.NewReader(p.TestBody)
+		}
+		req, err := http.NewRequest(method, p.ModelsURL, body)
 		if err != nil {
 			return testDoneMsg{ok: false, detail: "bad test URL"}
+		}
+		if p.TestBody != "" {
+			req.Header.Set("Content-Type", "application/json")
 		}
 		switch p.Auth {
 		case agentenv.AuthBearer:
@@ -211,6 +223,11 @@ func testProvider(p agentenv.Provider, key string) tea.Cmd {
 			return testDoneMsg{ok: false, detail: fmt.Sprintf("rejected (HTTP %d) — key looks invalid", resp.StatusCode), lat: lat}
 		case resp.StatusCode >= 200 && resp.StatusCode < 300:
 			return testDoneMsg{ok: true, detail: "key accepted", lat: lat}
+		case p.TestSoftFail:
+			// Probe answers with an error even for valid keys by design
+			// (bogus-model chat probe): anything that isn't 401/403 means
+			// the key passed authentication.
+			return testDoneMsg{ok: true, detail: fmt.Sprintf("key accepted (probe HTTP %d)", resp.StatusCode), lat: lat}
 		default:
 			return testDoneMsg{ok: false, detail: fmt.Sprintf("HTTP %d", resp.StatusCode), lat: lat}
 		}

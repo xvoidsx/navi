@@ -13,6 +13,7 @@ upstream docs), so a per-notification bottom-center meter is impossible with
 stock dunst. This owns the 80 lines instead.
 """
 import json
+import math
 import os
 import socket
 import subprocess
@@ -23,6 +24,30 @@ SOCK = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"),
 APP_ID = "navi-volume-osd"
 W, H = 380, 104
 HIDE_MS = 1200
+
+
+def on_osd_draw(win, cr):
+    # Paint the window background ourselves: with set_app_paintable(True)
+    # the CSS background-color never fills, so without this the OSD is
+    # transparent and only the labels/bar show. Rounded near-black fill
+    # with a 1px neon-pink border (grey while muted).
+    w, h = win.get_allocated_width(), win.get_allocated_height()
+    r = 14
+    cr.new_sub_path()
+    cr.arc(w - r, r, r - 1, -math.pi / 2, 0)
+    cr.arc(w - r, h - r, r - 1, 0, math.pi / 2)
+    cr.arc(r, h - r, r - 1, math.pi / 2, math.pi)
+    cr.arc(r, r, r - 1, math.pi, 3 * math.pi / 2)
+    cr.close_path()
+    cr.set_source_rgba(0.047, 0.047, 0.067, 0.94)  # #0c0c11 @ 94%
+    cr.fill_preserve()
+    if win.get_style_context().has_class("muted"):
+        cr.set_source_rgb(0x5b / 255, 0x5b / 255, 0x66 / 255)
+    else:
+        cr.set_source_rgb(1.0, 0x10 / 255, 0xf0 / 255)
+    cr.set_line_width(1)
+    cr.stroke()
+    return False
 
 
 def send_to_server(vol, muted):
@@ -61,7 +86,14 @@ def run_server(vol, muted):
     win.set_skip_pager_hint(True)
     win.set_keep_above(True)
     win.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
+    # The CSS background cannot paint: set_app_paintable makes the window
+    # fully transparent and GTK CSS won't fill it. Request an RGBA visual
+    # and paint the rounded near-black background + 1px border ourselves.
+    rgba = Gdk.Screen.get_default().get_rgba_visual()
+    if rgba is not None:
+        win.set_visual(rgba)
     win.set_app_paintable(True)
+    win.connect("draw", on_osd_draw)
 
     box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
     box.set_border_width(16)
@@ -125,7 +157,7 @@ def run_server(vol, muted):
         except Exception:
             ow, oh = 1920, 1080
         x, y = (ow - W) // 2, oh - H - 64
-        cmd = (f'[app_id="{APP_ID}"] floating enable, '
+        cmd = (f'[app_id="{APP_ID}"] floating enable, border none, '
                f"resize set {W} {H}, move position {x} {y}")
         try:
             p = subprocess.run(["swaymsg", cmd], capture_output=True,
@@ -158,6 +190,7 @@ def run_server(vol, muted):
             style.add_class("muted")
         else:
             style.remove_class("muted")
+        win.queue_draw()  # repaint the Cairo background (border color follows mute)
         if not win.get_visible():
             win.show_all()
         win.present()

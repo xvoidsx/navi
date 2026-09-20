@@ -226,6 +226,13 @@ func testConnection(cfg brainConfig) (string, string) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		if style == "ollama" {
+			// No key problem to chase here: this backend talks to the
+			// local ollama daemon, and a 401 from it means the daemon
+			// refused — for *-cloud models that is almost always a
+			// missing `ollama signin`, not a bad API key.
+			return "fail: HTTP 401 from the local ollama daemon — for *-cloud models run `ollama signin` in a terminal, then retry", lat
+		}
 		return fmt.Sprintf("fail: rejected (HTTP %d) — check your API key", resp.StatusCode), lat
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
