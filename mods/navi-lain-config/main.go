@@ -371,10 +371,18 @@ func initialModel() model {
 	sl := newList(sitems, 64, 8)
 	sl.Title = "wire protocol"
 
+	// mlist is rebuilt by buildModelList() once a backend is chosen, but it
+	// must still be a valid list before then: bubbletea delivers a
+	// WindowSizeMsg on startup and Update calls mlist.SetSize, which
+	// dereferences the delegate — a zero-value list.Model panics here.
+	ml := newList(nil, 64, 12)
+	ml.Title = "model"
+
 	return model{
 		screen:     screenBackend,
 		current:    cur,
 		blist:      bl,
+		mlist:      ml,
 		slist:      sl,
 		modelInput: mi,
 		keyInput:   ki,
