@@ -442,7 +442,9 @@ func (m *model) deleteConfirmed() {
 
 var (
 	todayStyle  = lipgloss.NewStyle().Foreground(theme.Green).Bold(true)
-	cursorStyle = lipgloss.NewStyle().Foreground(theme.Black).Background(theme.Pink).Bold(true)
+	// Cursor day: pink and bold, no background block — the frame is
+	// transparent, so a filled block would look pasted-on.
+	cursorStyle = lipgloss.NewStyle().Foreground(theme.Pink).Bold(true).Underline(true)
 	dotStyle    = lipgloss.NewStyle().Foreground(theme.Cyan)
 )
 
