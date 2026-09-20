@@ -244,8 +244,11 @@ install_packages() {
   # ydotool's daemon only works for users in the input group
   # (see /usr/share/doc/ydotool/README.Debian). group membership takes
   # effect on the next login — i.e. the first SDDM login after install.
-  $DOAS groupadd -f input
-  $DOAS usermod -aG input "$USER"
+  # NB: absolute /usr/sbin paths — doas keeps the caller's PATH, and
+  # launchers (waybar/rofi) don't have sbin on it. bare `groupadd`
+  # dies here with "doas: groupadd: command not found".
+  $DOAS /usr/sbin/groupadd -f input
+  $DOAS /usr/sbin/usermod -aG input "$USER"
   ok "$USER added to the input group for ydotool"
 }
 
@@ -1018,7 +1021,7 @@ setup_sudo() {
   if id -nG "$USER" | tr ' ' '\n' | grep -qx sudo; then
     ok "$USER already in the sudo group"
   else
-    $DOAS usermod -aG sudo "$USER" \
+    $DOAS /usr/sbin/usermod -aG sudo "$USER" \
       && ok "$USER added to the sudo group (next login)" \
       || warn "could not add $USER to the sudo group"
   fi
@@ -1030,7 +1033,7 @@ setup_sudo() {
   # after navi-update, in the same session.
   printf '%s ALL=(ALL:ALL) ALL\n' "$USER" | $DOAS tee /etc/sudoers.d/10-navi-user >/dev/null
   $DOAS chmod 440 /etc/sudoers.d/10-navi-user
-  if $DOAS visudo -c -q 2>/dev/null; then
+  if $DOAS /usr/sbin/visudo -c -q 2>/dev/null; then
     ok "sudoers rule in place for $USER (effective immediately)"
   else
     warn "/etc/sudoers.d/10-navi-user failed visudo check — removing it"
@@ -1044,7 +1047,7 @@ setup_sudo() {
     # sorts after 10-navi-user, so its NOPASSWD wins while it exists.)
     printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$USER" | $DOAS tee /etc/sudoers.d/navi-provision >/dev/null
     $DOAS chmod 440 /etc/sudoers.d/navi-provision
-    $DOAS visudo -c -q 2>/dev/null \
+    $DOAS /usr/sbin/visudo -c -q 2>/dev/null \
       || warn "/etc/sudoers.d/navi-provision failed visudo check"
     ok "sudo passwordless during provisioning (tightened at end of install)"
   fi
