@@ -621,6 +621,21 @@ setup_heylain() {
     warn "mods/hey-lain missing — skipping voice assistant"
     return 0
   fi
+  # Brain config lives in the user's config dir (0600 — it can hold an API
+  # key). Written exactly once: an existing config (hand-made or via
+  # navi-lain-config) is never overwritten by installs or updates.
+  # install.sh refuses root, so $HOME is the user's home here.
+  local bl_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hey-lain"
+  local bl_conf="$bl_dir/brain.json"
+  mkdir -p "$bl_dir" 2>/dev/null && chmod 0700 "$bl_dir" 2>/dev/null
+  if [ ! -f "$bl_conf" ]; then
+    if printf '{\n  "backend": "local",\n  "model": "gemma3:270m",\n  "api_url": "http://127.0.0.1:11434/api/chat"\n}\n' \
+        >"$bl_conf" 2>/dev/null && chmod 0600 "$bl_conf" 2>/dev/null; then
+      ok "hey-lain brain config initialized (local gemma3:270m)"
+    else
+      warn "could not write $bl_conf"
+    fi
+  fi
   # The venv is the slow part (faster-whisper + piper + whisper model), so
   # it survives redeploys: the marker stores a hash of requirements.txt,
   # and a matching hash means "scripts refresh, venv stays". A mismatch

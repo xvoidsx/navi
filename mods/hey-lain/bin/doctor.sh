@@ -11,6 +11,7 @@ FAIL=0
 
 ok()  { PASS=$((PASS + 1)); printf '  [ok]   %s\n' "$1"; }
 bad() { FAIL=$((FAIL + 1)); printf '  [FAIL] %s\n         -> %s\n' "$1" "$2"; }
+info() { printf '  [..]   %s\n' "$1"; }
 
 printf 'hey-lain doctor — voice pipeline self-check\n'
 
@@ -53,61 +54,143 @@ else
   bad "piper-tts not importable in venv" "re-run the module installer: $HERE/install.sh --skip-apt"
 fi
 
-printf '\n5. ollama service\n'
+printf '\n5. brain backend (configured)\n'
+BRAIN_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hey-lain/brain.json"
+_brain_get() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get(sys.argv[2],""))' "$BRAIN_CONF" "$1" 2>/dev/null || true; }
+BRAIN_BACKEND="$(_brain_get backend)"
+[ -n "$BRAIN_BACKEND" ] || BRAIN_BACKEND="local"
+BRAIN_WANT_MODEL="$(_brain_get model)"
+[ -n "$BRAIN_WANT_MODEL" ] || BRAIN_WANT_MODEL="${BRAIN_MODEL:-gemma3:270m}"
+BRAIN_API_URL="$(_brain_get api_url)"
+BRAIN_API_STYLE="$(_brain_get api_style)"
+if [ -z "$BRAIN_API_STYLE" ]; then
+  case "$BRAIN_BACKEND" in openai|openrouter) BRAIN_API_STYLE="openai";; *) BRAIN_API_STYLE="ollama";; esac
+fi
+BRAIN_KEY_SET="not set"
+if [ -n "$(_brain_get api_key)" ] || [ -n "${HEY_LAIN_API_KEY:-}" ]; then
+  BRAIN_KEY_SET="set"
+fi
+# The key itself is NEVER printed — only whether one is configured.
+ok "provider: $BRAIN_BACKEND"
+ok "model: $BRAIN_WANT_MODEL"
+[ -n "$BRAIN_API_URL" ] && ok "api url: $BRAIN_API_URL"
+ok "protocol: $BRAIN_API_STYLE"
+case "$BRAIN_BACKEND" in
+  openai|openrouter)
+    if [ "$BRAIN_KEY_SET" = "set" ]; then
+      ok "api key: set"
+    else
+      bad "api key: not set" "run navi-lain-config (app launcher) and paste a key"
+    fi ;;
+  custom) ok "api key: $BRAIN_KEY_SET (optional for custom endpoints)" ;;
+  *)      ok "api key: $BRAIN_KEY_SET (not needed)" ;;
+esac
+# The local ollama daemon matters for local/ollama-cloud backends; for
+# pure-cloud backends it is only the fallback path, so its checks below
+# become informational instead of failures.
+NEEDS_LOCAL=0
+case "$BRAIN_BACKEND" in local|ollama-cloud) NEEDS_LOCAL=1 ;; esac
+case "$BRAIN_API_URL" in *127.0.0.1*|*localhost*) NEEDS_LOCAL=1 ;; esac
+# svc_ok/svc_bad: hard checks when the local daemon is the live path,
+# informational notes when it is only the fallback.
+svc_ok()  { if [ "$NEEDS_LOCAL" -eq 1 ]; then ok "$1"; else info "$1"; fi; }
+svc_bad() { if [ "$NEEDS_LOCAL" -eq 1 ]; then bad "$1" "$2"; else info "$1 — $2 (local fallback)"; fi; }
+
+printf '\n6. ollama service'
+if [ "$NEEDS_LOCAL" -eq 1 ]; then printf '\n'; else printf ' (local fallback — informational)\n'; fi
 if ! command -v systemctl >/dev/null 2>&1; then
-  bad "systemctl not found" "start ollama manually: ollama serve"
+  svc_bad "systemctl not found" "start ollama manually: ollama serve"
 elif ! systemctl is-active --quiet ollama 2>/dev/null; then
-  bad "ollama service not active" "run: sudo systemctl enable --now ollama"
+  svc_bad "ollama service not active" "run: sudo systemctl enable --now ollama"
 else
-  ok "ollama service active"
+  svc_ok "ollama service active"
   if systemctl is-enabled --quiet ollama 2>/dev/null; then
-    ok "ollama service enabled at boot"
+    svc_ok "ollama service enabled at boot"
   else
-    bad "ollama service not enabled at boot" "run: sudo systemctl enable ollama"
+    svc_bad "ollama service not enabled at boot" "run: sudo systemctl enable ollama"
   fi
 fi
 
-printf '\n6. ollama api (127.0.0.1:11434)\n'
+printf '\n7. ollama api (127.0.0.1:11434)'
+if [ "$NEEDS_LOCAL" -eq 1 ]; then printf '\n'; else printf ' (local fallback — informational)\n'; fi
 API_VER="$(curl -fsS --max-time 5 "http://127.0.0.1:11434/api/version" 2>/dev/null \
   | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version","?"))' 2>/dev/null || true)"
 if [ -n "$API_VER" ]; then
-  ok "api responding (ollama $API_VER)"
+  svc_ok "api responding (ollama $API_VER)"
 else
-  bad "api not responding on 127.0.0.1:11434" "check: sudo systemctl status ollama"
+  svc_bad "api not responding on 127.0.0.1:11434" "check: sudo systemctl status ollama"
 fi
 
-printf '\n7. brain model\n'
-BRAIN_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hey-lain/brain.json"
-WANT_MODEL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("model",""))' "$BRAIN_CONF" 2>/dev/null || true)"
-[ -n "$WANT_MODEL" ] || WANT_MODEL="${BRAIN_MODEL:-gemma3:270m}"
-HAVE_MODELS="$(curl -fsS --max-time 10 "http://127.0.0.1:11434/api/tags" 2>/dev/null \
-  | python3 -c 'import json,sys
+printf '\n8. brain model\n'
+if [ "$BRAIN_BACKEND" = "local" ]; then
+  HAVE_MODELS="$(curl -fsS --max-time 10 "http://127.0.0.1:11434/api/tags" 2>/dev/null \
+    | python3 -c 'import json,sys
 try:
     print("\n".join(m.get("name","") for m in json.load(sys.stdin).get("models",[])))
 except Exception:
     pass' 2>/dev/null || true)"
-if printf '%s\n' "$HAVE_MODELS" | grep -qx "$WANT_MODEL" \
-  || printf '%s\n' "$HAVE_MODELS" | grep -qx "$WANT_MODEL:latest"; then
-  ok "model present ($WANT_MODEL)"
+  if printf '%s\n' "$HAVE_MODELS" | grep -qx "$BRAIN_WANT_MODEL" \
+    || printf '%s\n' "$HAVE_MODELS" | grep -qx "$BRAIN_WANT_MODEL:latest"; then
+    ok "model present ($BRAIN_WANT_MODEL)"
+  else
+    bad "model '$BRAIN_WANT_MODEL' not pulled" "run: ollama pull $BRAIN_WANT_MODEL"
+  fi
 else
-  bad "model '$WANT_MODEL' not pulled" "run: ollama pull $WANT_MODEL"
+  info "remote model: $BRAIN_WANT_MODEL (liveness is verified by the smoke test below)"
 fi
 
-printf '\n8. inference smoke test ("say hi", 60s)\n'
+printf '\n9. inference smoke test ("say hi" via %s)\n' "$BRAIN_BACKEND"
+# Smoke-test the CONFIGURED provider, not just the local daemon. The key
+# is read for the request but never printed anywhere below.
+SMOKE_KEY="$(_brain_get api_key)"
+[ -n "${HEY_LAIN_API_KEY:-}" ] && SMOKE_KEY="$HEY_LAIN_API_KEY"
+SMOKE_URL="$BRAIN_API_URL"
+[ -n "$SMOKE_URL" ] || SMOKE_URL="http://127.0.0.1:11434/api/chat"
+SMOKE_TIMEOUT=60
+case "$BRAIN_BACKEND" in local|ollama-cloud) SMOKE_URL="http://127.0.0.1:11434/api/chat" ;; esac
 SMOKE_ERR="$(mktemp)"
-SMOKE_RESP="$(curl -sS --max-time 60 "http://127.0.0.1:11434/api/chat" \
-  -H 'Content-Type: application/json' \
-  -d "$(python3 -c 'import json,sys; print(json.dumps({"model": sys.argv[1], "stream": False, "messages": [{"role": "user", "content": "say hi"}]}))' "$WANT_MODEL")" \
-  2>"$SMOKE_ERR" || true)"
-SMOKE_SAID="$(printf '%s' "$SMOKE_RESP" \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin).get("message",{}).get("content","").strip())' 2>/dev/null || true)"
-if [ -n "$SMOKE_SAID" ]; then
-  ok "inference works (replied: $(printf '%s' "$SMOKE_SAID" | head -c 60))"
+SMOKE_T0=$SECONDS
+SMOKE_SKIP=0
+if [ "$BRAIN_API_STYLE" = "openai" ]; then
+  if [ -z "$SMOKE_KEY" ]; then
+    bad "inference skipped — no API key configured" "run navi-lain-config (app launcher) and paste a key"
+    SMOKE_SKIP=1
+  else
+    SMOKE_RESP_CODE="$(curl -sS --max-time "$SMOKE_TIMEOUT" -w '\n%{http_code}' "$SMOKE_URL" \
+      -H "Authorization: Bearer $SMOKE_KEY" \
+      -H 'Content-Type: application/json' \
+      -d "$(python3 -c 'import json,sys; print(json.dumps({"model": sys.argv[1], "max_tokens": 16, "messages": [{"role": "user", "content": "say hi"}]}))' "$BRAIN_WANT_MODEL")" \
+      2>"$SMOKE_ERR" || true)"
+    SMOKE_CODE="$(printf '%s' "$SMOKE_RESP_CODE" | tail -n 1)"
+    SMOKE_RESP="$(printf '%s' "$SMOKE_RESP_CODE" | sed '$d')"
+    SMOKE_SAID="$(printf '%s' "$SMOKE_RESP" \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["choices"][0]["message"]["content"].strip())' 2>/dev/null || true)"
+  fi
 else
-  SMOKE_API_ERR="$(printf '%s' "$SMOKE_RESP" \
-    | python3 -c 'import json,sys; print(str(json.load(sys.stdin).get("error",""))[:200])' 2>/dev/null || true)"
-  [ -n "$SMOKE_API_ERR" ] || SMOKE_API_ERR="$(head -c 200 "$SMOKE_ERR" 2>/dev/null)"
-  bad "inference failed" "raw error: ${SMOKE_API_ERR:-<empty response>} — then: sudo systemctl status ollama"
+  if [ -n "$SMOKE_KEY" ]; then SMOKE_AUTH=(-H "Authorization: Bearer $SMOKE_KEY"); else SMOKE_AUTH=(); fi
+  SMOKE_RESP_CODE="$(curl -sS --max-time "$SMOKE_TIMEOUT" -w '\n%{http_code}' "$SMOKE_URL" \
+    -H 'Content-Type: application/json' "${SMOKE_AUTH[@]}" \
+    -d "$(python3 -c 'import json,sys; print(json.dumps({"model": sys.argv[1], "stream": False, "messages": [{"role": "user", "content": "say hi"}]}))' "$BRAIN_WANT_MODEL")" \
+    2>"$SMOKE_ERR" || true)"
+  SMOKE_CODE="$(printf '%s' "$SMOKE_RESP_CODE" | tail -n 1)"
+  SMOKE_RESP="$(printf '%s' "$SMOKE_RESP_CODE" | sed '$d')"
+  SMOKE_SAID="$(printf '%s' "$SMOKE_RESP" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("message",{}).get("content","").strip())' 2>/dev/null || true)"
+fi
+SMOKE_DT=$((SECONDS - SMOKE_T0))
+if [ "$SMOKE_SKIP" -eq 1 ]; then
+  : # already reported above
+elif [ -n "${SMOKE_SAID// }" ]; then
+  ok "inference works via $BRAIN_BACKEND (${SMOKE_DT}s — replied: $(printf '%s' "$SMOKE_SAID" | head -c 60))"
+else
+  if [ "$SMOKE_CODE" = "401" ] || [ "$SMOKE_CODE" = "403" ]; then
+    bad "API key rejected by $BRAIN_BACKEND (HTTP $SMOKE_CODE)" "check it in navi-lain-config (app launcher)"
+  else
+    SMOKE_API_ERR="$(printf '%s' "$SMOKE_RESP" \
+      | python3 -c 'import json,sys; print(str(json.load(sys.stdin).get("error",""))[:200])' 2>/dev/null || true)"
+    [ -n "$SMOKE_API_ERR" ] || SMOKE_API_ERR="$(head -c 200 "$SMOKE_ERR" 2>/dev/null)"
+    bad "inference via $BRAIN_BACKEND failed" "raw error: ${SMOKE_API_ERR:-<empty response>}"
+  fi
 fi
 rm -f "$SMOKE_ERR"
 

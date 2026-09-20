@@ -290,14 +290,24 @@ case "$LOW" in
 esac
 
 # Brain config: ~/.config/hey-lain/brain.json, written by navi-lain-config.
-# {backend: local|ollama-cloud|openai|openrouter, model, api_key, api_url}
+# {backend: local|ollama-cloud|openai|openrouter|custom, model, api_key,
+#  api_url, api_style}. backends:
+#   local        — this machine's ollama daemon, no key (the default)
+#   ollama-cloud — *-cloud models proxied through the local daemon
+#                  (sign in once with `ollama signin`; no key stored here)
+#   openai       — OpenAI-compatible /chat/completions + Bearer <redacted>
+#   openrouter   — OpenAI-compatible /chat/completions + Bearer <redacted>
+#   custom       — any endpoint you supply: api_url is the full chat
+#                  endpoint, api_style picks the protocol (ollama|openai),
+#                  api_key optional (sent as Bearer only when set)
 # Env overrides (BRAIN_MODEL, BRAIN_URL, BRAIN_TIMEOUT, HEY_LAIN_API_KEY)
-# always win over the file.
+# always win over the file. The key is NEVER logged or echoed anywhere.
 BRAIN_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hey-lain/brain.json"
 BACKEND="local"
 MODEL="gemma3:270m"
 API_KEY=""
 API_URL="http://127.0.0.1:11434/api/chat"
+API_STYLE=""
 if [ -f "$BRAIN_CONF" ]; then
   eval "$(python3 - "$BRAIN_CONF" <<'EOF'
 import json, shlex, sys
@@ -305,7 +315,7 @@ try:
     c = json.load(open(sys.argv[1]))
 except Exception:
     sys.exit(0)
-for k in ("backend", "model", "api_key", "api_url"):
+for k in ("backend", "model", "api_key", "api_url", "api_style"):
     v = c.get(k, "")
     if v:
         print(k.upper() + "=" + shlex.quote(str(v)))
@@ -316,6 +326,23 @@ MODEL="${BRAIN_MODEL:-$MODEL}"
 API_KEY="${HEY_LAIN_API_KEY:-$API_KEY}"
 URL="${BRAIN_URL:-$API_URL}"
 TIMEOUT="${BRAIN_TIMEOUT:-30}"
+# api_style: explicit config wins; otherwise derived from the backend
+# (openai/openrouter -> openai protocol, everything else -> ollama).
+if [ -z "${API_STYLE:-}" ]; then
+  case "$BACKEND" in
+    openai|openrouter) API_STYLE="openai" ;;
+    *) API_STYLE="ollama" ;;
+  esac
+fi
+# Human name for the backend, used in spoken + logged error lines.
+case "$BACKEND" in
+  local) PROVIDER_NAME="my local brain" ;;
+  ollama-cloud) PROVIDER_NAME="Ollama Cloud" ;;
+  openai) PROVIDER_NAME="OpenAI" ;;
+  openrouter) PROVIDER_NAME="OpenRouter" ;;
+  custom) PROVIDER_NAME="your custom brain endpoint" ;;
+  *) PROVIDER_NAME="my brain" ;;
+esac
 LOCAL_FALLBACK="gemma3:270m"
 LOCAL_URL="http://127.0.0.1:11434/api/chat"
 
@@ -357,9 +384,9 @@ ask() {
   # gpt-oss reasons: roomy cap or replies truncate. Others stop at EOS anyway.
   # One payload builder for both protocols: system + conversation history
   # + the current utterance, so follow-ups resolve against what was said.
-  payload=$(python3 - "$SYSTEM" "$HISTORY_JSON" "$USER_TEXT" "$model" "$cap" "$BACKEND" <<'EOF'
+  payload=$(python3 - "$SYSTEM" "$HISTORY_JSON" "$USER_TEXT" "$model" "$cap" "$API_STYLE" <<'EOF'
 import json, sys
-system, history_json, user, model, cap, backend = \
+system, history_json, user, model, cap, api_style = \
     sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), sys.argv[6]
 msgs = [{"role": "system", "content": system}]
 try:
@@ -373,7 +400,7 @@ for h in hist[-8:]:
         if h.get("lain"):
             msgs.append({"role": "assistant", "content": h["lain"]})
 msgs.append({"role": "user", "content": user})
-if backend in ("openai", "openrouter"):
+if api_style == "openai":
     print(json.dumps({"model": model, "max_tokens": cap, "messages": msgs}))
 else:
     print(json.dumps({"model": model, "stream": False, "keep_alive": "30m",
@@ -382,24 +409,46 @@ EOF
 )
   errfile="$(mktemp)" || errfile=/dev/null
   curl_rc=0
-  if [ "$BACKEND" = "openai" ] || [ "$BACKEND" = "openrouter" ]; then
-    # OpenAI-compatible chat completions (OpenAI, OpenRouter).
-    resp=$(curl -sS --max-time "$TIMEOUT" "$URL" \
+  http_code=""
+  if [ "$API_STYLE" = "openai" ]; then
+    # OpenAI-compatible chat completions (OpenAI, OpenRouter, custom).
+    # No key, no request: fail fast with a clear reason instead of
+    # eating a 401 round-trip.
+    if [ -z "$API_KEY" ]; then
+      brain_log "model=$model backend=$BACKEND url=$URL reason=auth api_err=no-api-key-configured"
+      printf 'auth' >"$failfile" 2>/dev/null || true
+      [ "$errfile" != /dev/null ] && rm -f "$errfile"
+      return 1
+    fi
+    resp_and_code=$(curl -sS --max-time "$TIMEOUT" -w '\n%{http_code}' "$URL" \
       -H "Authorization: Bearer $API_KEY" \
       -H "Content-Type: application/json" \
       -H "HTTP-Referer: https://navi.xvoidsx.org" \
       -H "X-Title: Hey Lain" \
       -d "$payload" 2>"$errfile") || curl_rc=$?
+    http_code="$(printf '%s' "$resp_and_code" | tail -n 1)"
+    resp="$(printf '%s' "$resp_and_code" | sed '$d')"
     out=$(python3 -c "
 import json,sys
 d=json.load(sys.stdin)
 print(d['choices'][0]['message']['content'].strip())" <<<"$resp" 2>/dev/null || true)
   else
-    # Ollama-native /api/chat (local models AND ollama-cloud *-cloud names
-    # proxied through the local daemon).
-    resp=$(curl -sS --max-time "$TIMEOUT" "$URL" -d "$payload" 2>"$errfile") || curl_rc=$?
+    # Ollama-native /api/chat (local daemon, ollama-cloud *-cloud names
+    # proxied through it, custom ollama-style endpoints). The Bearer
+    # header goes out only when a key is actually configured.
+    if [ -n "$API_KEY" ]; then
+      auth_hdr=(-H "Authorization: Bearer $API_KEY")
+    else
+      auth_hdr=()
+    fi
+    resp_and_code=$(curl -sS --max-time "$TIMEOUT" -w '\n%{http_code}' "$URL" \
+      "${auth_hdr[@]}" -d "$payload" 2>"$errfile") || curl_rc=$?
+    http_code="$(printf '%s' "$resp_and_code" | tail -n 1)"
+    resp="$(printf '%s' "$resp_and_code" | sed '$d')"
     out=$(python3 -c "import json,sys; print(json.load(sys.stdin).get('message',{}).get('content','').strip())" <<<"$resp" 2>/dev/null || true)
   fi
+  # When curl itself failed, resp may hold a partial body — the transport
+  # check below classifies by exit code before any parsing matters.
   curl_err="$(cat "$errfile" 2>/dev/null || true)"
   [ "$errfile" != /dev/null ] && rm -f "$errfile"
   # Transport failure: curl never got a usable HTTP response. Classify by
@@ -415,6 +464,14 @@ print(d['choices'][0]['message']['content'].strip())" <<<"$resp" 2>/dev/null || 
   if [ -n "${out// }" ]; then
     echo "$out"
     return 0
+  fi
+  # HTTP 401/403: the endpoint is up but rejected our credentials. This
+  # gets its own reason (and its own spoken line) so a bad key never
+  # masquerades as a dead brain.
+  if [ "$http_code" = "401" ] || [ "$http_code" = "403" ]; then
+    brain_log "model=$model backend=$BACKEND url=$URL reason=auth http=$http_code"
+    printf 'auth' >"$failfile" 2>/dev/null || true
+    return 1
   fi
   # The daemon answered but with an error payload (or an empty 200). Pull
   # the error text out and classify it. Runner errors are checked BEFORE
@@ -437,38 +494,63 @@ except Exception:
     *)
       [ -n "${api_err// }" ] && reason="api-error" ;;
   esac
-  brain_log "model=$model backend=$BACKEND url=$URL reason=$reason api_err=$api_err"
+  brain_log "model=$model backend=$BACKEND url=$URL reason=$reason http=$http_code api_err=$api_err"
   printf '%s' "$reason" >"$failfile" 2>/dev/null || true
   return 1
 }
 
 # Spoken failure lines: specific about WHAT broke, and always honest that
 # the deterministic desktop commands never needed the brain at all.
+# Provider-aware: a cloud key rejection sounds different from a dead
+# local daemon.
 brain_offline_line() {
   local reason="${1:-unknown}"
   case "$reason" in
     unreachable)
-      echo "My local brain service isn't responding — is Ollama running? My window and workspace commands still work fine without it." ;;
+      if [ "$BACKEND" = "local" ]; then
+        echo "My local brain service isn't responding — is Ollama running? My window and workspace commands still work fine without it."
+      else
+        echo "$PROVIDER_NAME isn't responding — check the connection, or pick another brain in navi-lain-config. My window and workspace commands still work fine without it."
+      fi ;;
     timeout)
-      echo "My brain timed out thinking about that one. My window and workspace commands still work — try me again in a moment." ;;
+      echo "$PROVIDER_NAME timed out thinking about that one. My window and workspace commands still work — try me again in a moment." ;;
+    auth)
+      echo "$PROVIDER_NAME rejected my API key — check it in navi-lain-config, in the app launcher. My window and workspace commands still work without it." ;;
     model-missing)
-      echo "My language model $MODEL isn't downloaded yet. Run: ollama pull $MODEL — until then, my window and workspace commands still work fine." ;;
+      if [ "$BACKEND" = "local" ]; then
+        echo "My language model $MODEL isn't downloaded yet. Run: ollama pull $MODEL — until then, my window and workspace commands still work fine."
+      else
+        echo "$MODEL isn't available on $PROVIDER_NAME right now — check the model name in navi-lain-config. Until then, my window and workspace commands still work fine."
+      fi ;;
+    config)
+      echo "My custom brain endpoint has no URL configured — set one in navi-lain-config, in the app launcher. My window and workspace commands still work without it." ;;
     runner|api-error)
-      echo "My brain hit an internal error just now — I logged the details for later. My window and workspace commands still work." ;;
+      echo "$PROVIDER_NAME hit an internal error just now — I logged the details for later. My window and workspace commands still work." ;;
     *)
       echo "You said: $USER_TEXT. My brain is offline right now, but my ears and voice work — and my window and workspace commands don't need the brain at all." ;;
   esac
 }
 
 FAILFILE="$(mktemp)"
+# A custom backend without a URL can't work — say so plainly instead of
+# curl-ing an empty string into a confusing transport error.
+if [ "$BACKEND" = "custom" ] && [ -z "${URL// }" ]; then
+  brain_log "backend=custom reason=config api_err=no-api-url-configured"
+  brain_offline_line "config"
+  exit 0
+fi
 OUT=$(ask "$MODEL" "$FAILFILE") || true
 ASK_FAIL="$(cat "$FAILFILE" 2>/dev/null || true)"
 rm -f "$FAILFILE"
-if [ -z "${OUT// }" ] && { [ "$BACKEND" != "local" ] || [ "$MODEL" != "$LOCAL_FALLBACK" ]; }; then
+if [ -z "${OUT// }" ] && [ "$ASK_FAIL" != "auth" ] && { [ "$BACKEND" != "local" ] || [ "$MODEL" != "$LOCAL_FALLBACK" ]; }; then
   # Cloud backends (and a non-default local model) fall back to the tiny
-  # local brain before giving up to the offline line.
-  echo "brain: primary backend failed ($ASK_FAIL), falling back to $LOCAL_FALLBACK" >&2
+  # local brain before giving up to the offline line. Auth failures skip
+  # the fallback: a bad/missing key is actionable, and burying it under a
+  # local-daemon message would hide the real problem.
+  echo "brain: primary backend failed ($BACKEND: $ASK_FAIL), falling back to $LOCAL_FALLBACK" >&2
   BACKEND="local"
+  API_STYLE="ollama"
+  PROVIDER_NAME="my local brain"
   URL="$LOCAL_URL"
   FAILFILE="$(mktemp)"
   OUT=$(ask "$LOCAL_FALLBACK" "$FAILFILE") || true

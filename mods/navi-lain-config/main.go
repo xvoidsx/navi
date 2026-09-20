@@ -1,19 +1,22 @@
 // navi-lain-config — a bubble tea TUI for choosing Hey Lain's brain.
 //
 // Lets the user pick a backend (local Ollama, Ollama Cloud, OpenAI,
-// OpenRouter), a model, and (for key-based backends) an API key, then
-// writes ~/.config/hey-lain/brain.json (0600), which bin/brain.sh reads.
-// Compositor-agnostic: runs in any terminal, launched via rofi as
-// `alacritty -e navi-lain-config`.
+// OpenRouter, or a custom endpoint), a model, and (for key-based backends)
+// an API key, then writes ~/.config/hey-lain/brain.json (0600), which
+// bin/brain.sh reads. Compositor-agnostic: runs in any terminal, launched
+// via rofi as `alacritty -e navi-lain-config`.
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -30,6 +33,8 @@ type backendDef struct {
 	name         string
 	desc         string
 	needsKey     bool
+	styleChoice  bool // custom: the user picks the wire protocol
+	apiStyle     string
 	defaultModel string
 	modelHint    string
 	apiURL       string
@@ -41,6 +46,7 @@ var backends = []backendDef{
 		id:           "local",
 		name:         "Local Ollama",
 		desc:         "tiny + private — runs on this machine, no keys, no cloud",
+		apiStyle:     "ollama",
 		defaultModel: "gemma3:270m",
 		modelHint:    "any model your local ollama knows",
 		apiURL:       "http://127.0.0.1:11434/api/chat",
@@ -49,6 +55,7 @@ var backends = []backendDef{
 		id:           "ollama-cloud",
 		name:         "Ollama Cloud",
 		desc:         "bigger brains through your local ollama daemon — no key handling here",
+		apiStyle:     "ollama",
 		defaultModel: "gemma4:31b-cloud",
 		modelHint:    "a *-cloud model name, e.g. gemma4:31b-cloud",
 		apiURL:       "http://127.0.0.1:11434/api/chat",
@@ -58,6 +65,7 @@ var backends = []backendDef{
 		name:         "OpenAI",
 		desc:         "your own API key, billed by OpenAI",
 		needsKey:     true,
+		apiStyle:     "openai",
 		defaultModel: "gpt-4o-mini",
 		modelHint:    "e.g. gpt-4o-mini",
 		apiURL:       "https://api.openai.com/v1/chat/completions",
@@ -68,10 +76,19 @@ var backends = []backendDef{
 		name:         "OpenRouter",
 		desc:         "your own API key — any model on the router",
 		needsKey:     true,
+		apiStyle:     "openai",
 		defaultModel: "openai/gpt-oss-20b",
 		modelHint:    "e.g. openai/gpt-oss-20b",
 		apiURL:       "https://openrouter.ai/api/v1/chat/completions",
 		keyEnv:       "sk-or-…",
+	},
+	{
+		id:          "custom",
+		name:        "Custom endpoint",
+		desc:        "any OpenAI- or Ollama-compatible chat endpoint — you bring the URL",
+		styleChoice: true,
+		modelHint:   "the model name your endpoint expects",
+		apiURL:      "",
 	},
 }
 
@@ -86,10 +103,11 @@ var suggestedCloud = []string{"gemma4:31b-cloud", "gpt-oss:120b-cloud", "qwen3:2
 // ---------------------------------------------------------------------------
 
 type brainConfig struct {
-	Backend string `json:"backend"`
-	Model   string `json:"model"`
-	APIKey  string `json:"api_key,omitempty"`
-	APIURL  string `json:"api_url"`
+	Backend  string `json:"backend"`
+	Model    string `json:"model"`
+	APIKey   string `json:"api_key,omitempty"`
+	APIURL   string `json:"api_url"`
+	APIStyle string `json:"api_style,omitempty"`
 }
 
 func configPath() string {
@@ -102,7 +120,7 @@ func configPath() string {
 }
 
 func loadConfig() brainConfig {
-	cfg := brainConfig{Backend: "local", Model: "gemma3:270m", APIURL: backends[0].apiURL}
+	cfg := brainConfig{Backend: "local", Model: "gemma3:270m", APIURL: backends[0].apiURL, APIStyle: "ollama"}
 	data, err := os.ReadFile(configPath())
 	if err != nil {
 		return cfg
@@ -153,6 +171,107 @@ func modelInstalled(name string) bool {
 }
 
 // ---------------------------------------------------------------------------
+// connection test — one tiny inference against the pending config.
+// never includes the key in any returned string.
+// ---------------------------------------------------------------------------
+
+type testDoneMsg struct {
+	result  string
+	latency string
+}
+
+func testConnection(cfg brainConfig) (string, string) {
+	start := time.Now()
+	style := cfg.APIStyle
+	if style == "" {
+		style = "openai"
+	}
+	msgs := []map[string]string{{"role": "user", "content": "say hi"}}
+	var payload map[string]any
+	if style == "ollama" {
+		payload = map[string]any{
+			"model": cfg.Model, "stream": false, "messages": msgs,
+			"options": map[string]any{"num_predict": 8},
+		}
+	} else {
+		if cfg.APIKey == "" {
+			return "fail: no API key set", ""
+		}
+		payload = map[string]any{
+			"model": cfg.Model, "max_tokens": 8, "messages": msgs,
+		}
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "fail: " + err.Error(), ""
+	}
+	req, err := http.NewRequest("POST", cfg.APIURL, bytes.NewReader(body))
+	if err != nil {
+		return "fail: bad url — " + err.Error(), ""
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if cfg.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	}
+	if style == "openai" {
+		req.Header.Set("HTTP-Referer", "https://navi.xvoidsx.org")
+		req.Header.Set("X-Title", "Hey Lain")
+	}
+	client := &http.Client{Timeout: 25 * time.Second}
+	resp, err := client.Do(req)
+	lat := time.Since(start).Round(100 * time.Millisecond).String()
+	if err != nil {
+		return "fail: unreachable — " + firstLine(err.Error()), lat
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		return fmt.Sprintf("fail: rejected (HTTP %d) — check your API key", resp.StatusCode), lat
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Sprintf("fail: HTTP %d", resp.StatusCode), lat
+	}
+	var parsed map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return "fail: unreadable reply", lat
+	}
+	var said string
+	if style == "ollama" {
+		if m, ok := parsed["message"].(map[string]any); ok {
+			said, _ = m["content"].(string)
+		}
+	} else {
+		if ch, ok := parsed["choices"].([]any); ok && len(ch) > 0 {
+			if c0, ok := ch[0].(map[string]any); ok {
+				if m, ok := c0["message"].(map[string]any); ok {
+					said, _ = m["content"].(string)
+				}
+			}
+		}
+	}
+	if strings.TrimSpace(said) == "" {
+		return "fail: empty reply", lat
+	}
+	return "ok", lat
+}
+
+func firstLine(s string) string {
+	if i := strings.Index(s, "\n"); i >= 0 {
+		return s[:i]
+	}
+	if len(s) > 120 {
+		return s[:120] + "…"
+	}
+	return s
+}
+
+func runTest(cfg brainConfig) tea.Cmd {
+	return func() tea.Msg {
+		r, l := testConnection(cfg)
+		return testDoneMsg{result: r, latency: l}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // list items
 // ---------------------------------------------------------------------------
 
@@ -186,23 +305,34 @@ const (
 	screenModel
 	screenModelCustom
 	screenKey
+	screenCustomURL
+	screenCustomStyle
+	screenURL // advanced: override the backend's API URL
 	screenReview
 	screenDone
 )
 
 type model struct {
-	screen     int
-	current    brainConfig
-	backend    *backendDef
-	backendIdx int
-	blist      list.Model
-	mlist      list.Model
-	modelInput textinput.Model
-	keyInput   textinput.Model
+	screen      int
+	current     brainConfig
+	backend     *backendDef
+	backendIdx  int
+	blist       list.Model
+	mlist       list.Model
+	slist       list.Model
+	modelInput  textinput.Model
+	keyInput    textinput.Model
+	urlInput    textinput.Model
 	chosenModel string
 	chosenKey   string
-	errMsg     string
-	width      int
+	chosenURL   string
+	chosenStyle string
+	keyOptional bool
+	testResult  string
+	testLatency string
+	testing     bool
+	errMsg      string
+	width       int
 }
 
 func initialModel() model {
@@ -215,7 +345,7 @@ func initialModel() model {
 		}
 		bitems[i] = item{title: b.name + cur2, desc: b.desc}
 	}
-	bl := newList(bitems, 64, 10)
+	bl := newList(bitems, 64, 12)
 	bl.Title = "hey lain — choose a brain backend"
 
 	mi := textinput.New()
@@ -229,16 +359,50 @@ func initialModel() model {
 	ki.CharLimit = 200
 	ki.Width = 48
 
+	ui := textinput.New()
+	ui.Placeholder = "https://…"
+	ui.CharLimit = 300
+	ui.Width = 48
+
+	sitems := []list.Item{
+		item{title: "OpenAI-compatible", desc: "/chat/completions style — OpenAI, OpenRouter, most gateways"},
+		item{title: "Ollama-native", desc: "/api/chat style — ollama, llama.cpp server, LM Studio"},
+	}
+	sl := newList(sitems, 64, 8)
+	sl.Title = "wire protocol"
+
 	return model{
 		screen:     screenBackend,
 		current:    cur,
 		blist:      bl,
+		slist:      sl,
 		modelInput: mi,
 		keyInput:   ki,
+		urlInput:   ui,
 	}
 }
 
 func (m model) Init() tea.Cmd { return nil }
+
+// pendingConfig assembles the brainConfig from the current choices — used
+// by both the connection test and the final save.
+func (m model) pendingConfig() brainConfig {
+	style := m.chosenStyle
+	if style == "" && m.backend != nil {
+		style = m.backend.apiStyle
+	}
+	url := m.chosenURL
+	if url == "" && m.backend != nil {
+		url = m.backend.apiURL
+	}
+	return brainConfig{
+		Backend:  m.backend.id,
+		Model:    m.chosenModel,
+		APIKey:   m.chosenKey,
+		APIURL:   url,
+		APIStyle: style,
+	}
+}
 
 // ---------------------------------------------------------------------------
 // update
@@ -272,10 +436,16 @@ func (m model) buildModelList() list.Model {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case testDoneMsg:
+		m.testing = false
+		m.testResult = msg.result
+		m.testLatency = msg.latency
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		m.blist.SetSize(64, 10)
+		m.blist.SetSize(64, 12)
 		m.mlist.SetSize(64, 12)
+		m.slist.SetSize(64, 8)
 		return m, nil
 	case tea.KeyMsg:
 		if m.screen == screenDone {
@@ -286,24 +456,50 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "q":
 			// typed as text inside inputs; quits (no save) everywhere else
-			if m.screen != screenModelCustom && m.screen != screenKey {
+			if m.screen != screenModelCustom && m.screen != screenKey &&
+				m.screen != screenCustomURL && m.screen != screenURL {
 				return m, tea.Quit
 			}
+		case "t":
+			if m.screen == screenReview && !m.testing {
+				m.testing = true
+				m.testResult = ""
+				return m, runTest(m.pendingConfig())
+			}
+		case "u":
+			if m.screen == screenReview && !m.testing {
+				m.urlInput.SetValue(m.pendingConfig().APIURL)
+				m.urlInput.Focus()
+				m.testResult = ""
+				m.screen = screenURL
+				return m, nil
+			}
 		case "esc":
+			m.testing = false
+			m.testResult = ""
 			switch m.screen {
 			case screenModel:
 				m.screen = screenBackend
 			case screenModelCustom:
-				// openai/openrouter came from backend; local/cloud from model list
+				// openai/openrouter came from backend; custom from style picker;
+				// local/cloud from the model list
 				if m.backend.id == "openai" || m.backend.id == "openrouter" {
 					m.screen = screenBackend
+				} else if m.backend.styleChoice {
+					m.screen = screenCustomStyle
 				} else {
 					m.screen = screenModel
 				}
+			case screenCustomURL:
+				m.screen = screenBackend
+			case screenCustomStyle:
+				m.screen = screenCustomURL
+			case screenURL:
+				m.screen = screenReview
 			case screenKey:
 				m.screen = screenModelCustom
 			case screenReview:
-				if m.backend.needsKey {
+				if m.backend.needsKey || m.keyOptional {
 					m.screen = screenKey
 				} else {
 					m.screen = screenModel
@@ -325,6 +521,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.mlist, cmd = m.mlist.Update(msg)
 		return m, cmd
+	case screenCustomStyle:
+		var cmd tea.Cmd
+		m.slist, cmd = m.slist.Update(msg)
+		return m, cmd
 	case screenModelCustom:
 		var cmd tea.Cmd
 		m.modelInput, cmd = m.modelInput.Update(msg)
@@ -333,8 +533,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.keyInput, cmd = m.keyInput.Update(msg)
 		return m, cmd
+	case screenCustomURL, screenURL:
+		var cmd tea.Cmd
+		m.urlInput, cmd = m.urlInput.Update(msg)
+		return m, cmd
 	}
 	return m, nil
+}
+
+func validURL(v string) bool {
+	return strings.HasPrefix(v, "http://") || strings.HasPrefix(v, "https://")
 }
 
 func (m model) handleEnter() (tea.Model, tea.Cmd) {
@@ -351,7 +559,16 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			m.backend = &backends[m.backendIdx]
 			m.chosenModel = ""
 			m.chosenKey = ""
-			if m.backend.id == "openai" || m.backend.id == "openrouter" {
+			m.chosenURL = ""
+			m.chosenStyle = ""
+			m.keyOptional = false
+			m.testResult = ""
+			if m.backend.styleChoice {
+				m.urlInput.SetValue("")
+				m.urlInput.Placeholder = "https://your-host/v1/chat/completions  (full chat endpoint)"
+				m.urlInput.Focus()
+				m.screen = screenCustomURL
+			} else if m.backend.id == "openai" || m.backend.id == "openrouter" {
 				m.modelInput.SetValue(m.backend.defaultModel)
 				m.modelInput.Focus()
 				m.screen = screenModelCustom
@@ -359,6 +576,26 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 				m.mlist = m.buildModelList()
 				m.screen = screenModel
 			}
+		}
+	case screenCustomURL:
+		v := strings.TrimSpace(m.urlInput.Value())
+		if !validURL(v) {
+			m.errMsg = "that doesn't look like a URL — it should start with http:// or https://"
+			return m, nil
+		}
+		m.chosenURL = v
+		m.screen = screenCustomStyle
+	case screenCustomStyle:
+		if it, ok := m.slist.SelectedItem().(item); ok {
+			if strings.HasPrefix(it.title, "OpenAI") {
+				m.chosenStyle = "openai"
+			} else {
+				m.chosenStyle = "ollama"
+			}
+			m.modelInput.SetValue("")
+			m.modelInput.Placeholder = m.backend.modelHint
+			m.modelInput.Focus()
+			m.screen = screenModelCustom
 		}
 	case screenModel:
 		if it, ok := m.mlist.SelectedItem().(item); ok {
@@ -382,19 +619,22 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 		m.advanceFromModel()
 	case screenKey:
 		v := strings.TrimSpace(m.keyInput.Value())
-		if v == "" {
+		if v == "" && !m.keyOptional {
 			m.errMsg = "paste an API key first (esc to go back)"
 			return m, nil
 		}
 		m.chosenKey = v
 		m.screen = screenReview
-	case screenReview:
-		cfg := brainConfig{
-			Backend: m.backend.id,
-			Model:   m.chosenModel,
-			APIKey:  m.chosenKey,
-			APIURL:  m.backend.apiURL,
+	case screenURL:
+		v := strings.TrimSpace(m.urlInput.Value())
+		if !validURL(v) {
+			m.errMsg = "that doesn't look like a URL — it should start with http:// or https://"
+			return m, nil
 		}
+		m.chosenURL = v
+		m.screen = screenReview
+	case screenReview:
+		cfg := m.pendingConfig()
 		if err := saveConfig(cfg); err != nil {
 			m.errMsg = "save failed: " + err.Error()
 			return m, nil
@@ -409,6 +649,14 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 func (m *model) advanceFromModel() {
 	if m.backend.needsKey {
 		m.keyInput.SetValue("")
+		m.keyInput.Placeholder = "paste API key"
+		m.keyInput.Focus()
+		m.screen = screenKey
+	} else if m.backend.styleChoice {
+		// custom endpoints may or may not want a key
+		m.keyOptional = true
+		m.keyInput.SetValue("")
+		m.keyInput.Placeholder = "paste API key (enter to skip)"
 		m.keyInput.Focus()
 		m.screen = screenKey
 	} else {
@@ -439,26 +687,64 @@ func (m model) View() string {
 		b.WriteString(m.blist.View() + "\n")
 	case screenModel:
 		b.WriteString(m.mlist.View() + "\n")
+	case screenCustomURL:
+		b.WriteString(theme.Header.Render("endpoint URL for Custom endpoint") + "\n")
+		b.WriteString(theme.Dimmed.Render("the full chat endpoint — e.g. https://your-host/v1/chat/completions") + "\n\n")
+		b.WriteString(m.urlInput.View() + "\n")
+	case screenCustomStyle:
+		b.WriteString(m.slist.View() + "\n")
 	case screenModelCustom:
 		b.WriteString(theme.Header.Render("model for "+m.backend.name) + "\n")
 		b.WriteString(theme.Dimmed.Render(m.backend.modelHint) + "\n\n")
 		b.WriteString(m.modelInput.View() + "\n")
 	case screenKey:
-		b.WriteString(theme.Header.Render("API key for "+m.backend.name) + "\n")
-		b.WriteString(theme.Dimmed.Render("stored in ~/.config/hey-lain/brain.json (mode 0600) — never leaves this machine except to "+m.backend.name) + "\n\n")
+		if m.keyOptional {
+			b.WriteString(theme.Header.Render("API key (optional) for "+m.backend.name) + "\n")
+			b.WriteString(theme.Dimmed.Render("enter to skip — no key will be sent") + "\n\n")
+		} else {
+			b.WriteString(theme.Header.Render("API key for "+m.backend.name) + "\n")
+			b.WriteString(theme.Dimmed.Render("stored in ~/.config/hey-lain/brain.json (mode 0600) — never leaves this machine except to "+m.backend.name) + "\n\n")
+		}
 		b.WriteString(m.keyInput.View() + "\n")
+	case screenURL:
+		b.WriteString(theme.Header.Render("API URL override") + "\n")
+		b.WriteString(theme.Dimmed.Render("advanced: replace the default endpoint for "+m.backend.name) + "\n\n")
+		b.WriteString(m.urlInput.View() + "\n")
 	case screenReview:
+		cfg := m.pendingConfig()
 		b.WriteString(theme.Header.Render("review") + "\n\n")
-		b.WriteString(fmt.Sprintf("  backend  %s\n", theme.Normal.Render(m.backend.name)))
-		b.WriteString(fmt.Sprintf("  model    %s\n", theme.Selected.Render(m.chosenModel)))
-		if m.backend.needsKey {
-			b.WriteString(fmt.Sprintf("  api key  %s\n", theme.Normal.Render("•••••••• (set)")))
+		b.WriteString(fmt.Sprintf("  backend   %s\n", theme.Normal.Render(m.backend.name)))
+		b.WriteString(fmt.Sprintf("  model     %s\n", theme.Selected.Render(m.chosenModel)))
+		b.WriteString(fmt.Sprintf("  api url   %s\n", theme.Normal.Render(cfg.APIURL)))
+		b.WriteString(fmt.Sprintf("  protocol  %s\n", theme.Normal.Render(cfg.APIStyle)))
+		if m.backend.needsKey || m.keyOptional {
+			keyNote := "•••••••• (set)"
+			if m.chosenKey == "" {
+				keyNote = "(not set)"
+			}
+			b.WriteString(fmt.Sprintf("  api key   %s\n", theme.Normal.Render(keyNote)))
 		}
 		b.WriteString("\n")
+		if m.backend.id != "local" {
+			b.WriteString(theme.Error.Render("  ⚠ transcripts leave this machine — your words go to "+m.backend.name) + "\n\n")
+		}
 		if m.backend.id == "local" && !modelInstalled(m.chosenModel) {
 			b.WriteString(theme.Error.Render("  ! "+m.chosenModel+" isn't installed — run: ollama pull "+m.chosenModel) + "\n\n")
 		}
-		b.WriteString(theme.Dimmed.Render("  enter to save   esc to go back") + "\n")
+		if m.testing {
+			b.WriteString(theme.Dimmed.Render("  testing connection…") + "\n\n")
+		} else if m.testResult != "" {
+			style := theme.Selected
+			if !strings.HasPrefix(m.testResult, "ok") {
+				style = theme.Error
+			}
+			line := "  test: " + m.testResult
+			if m.testLatency != "" {
+				line += " (" + m.testLatency + ")"
+			}
+			b.WriteString(style.Render(line) + "\n\n")
+		}
+		b.WriteString(theme.Dimmed.Render("  enter save · t test connection · u override api url · esc back") + "\n")
 	case screenDone:
 		b.WriteString(theme.Header.Render("saved ✓") + "\n\n")
 		b.WriteString(theme.Normal.Render("  ~/.config/hey-lain/brain.json") + "\n")
