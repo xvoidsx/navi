@@ -104,16 +104,32 @@ window#waybar > box {
         inset 0 1px 0 rgba(255, 255, 255, 0.10),
         inset 0 -1px 6px rgba(0, 0, 0, 0.64);
     text-shadow: 0 0 6px currentColor;
-    animation: signal-drift 7s ease-in-out infinite;
+    animation: neon-cycle 7s ease-in-out infinite;
     transition: background 550ms ease-out, border-color 800ms ease-out, box-shadow 1500ms ease-out, color 500ms ease-out;
 }
 
-@keyframes signal-drift {
-    0% { border-color: rgba(255, 16, 240, 0.36); }
-    85% { border-color: rgba(255, 16, 240, 0.36); }
-    90% { border-color: rgba(57, 255, 20, 0.58); }
-    94% { border-color: rgba(0, 255, 255, 0.42); }
-    100% { border-color: rgba(255, 16, 240, 0.36); }
+/* The signature nightshadeNeon cycle: module glyphs and pill borders drift
+ * together through cyan, pink, and green — the glitchText spirit of the old
+ * bar, restated in the obsidian-glass language. The glow follows the text via
+ * currentColor, so every module shines in whatever color it is wearing.
+ * Single selector per keyframe rule: GTK CSS rejects comma selectors here. */
+@keyframes neon-cycle {
+    0% {
+        color: #00ffff;
+        border-color: rgba(0, 255, 255, 0.42);
+    }
+    33% {
+        color: #ff10f0;
+        border-color: rgba(255, 16, 240, 0.42);
+    }
+    66% {
+        color: #39ff14;
+        border-color: rgba(57, 255, 20, 0.50);
+    }
+    100% {
+        color: #00ffff;
+        border-color: rgba(0, 255, 255, 0.42);
+    }
 }
 
 #workspaces:hover,
@@ -247,7 +263,10 @@ window#waybar.empty #window {
     box-shadow: 0 0 14px rgba(255, 49, 49, 0.50);
 }
 
-/* Stable color roles from the NightshadeNeon specification. */
+/* Stable color roles from the NightshadeNeon specification. These are each
+ * module's resting color — the neon-cycle animation paints over them while it
+ * runs, and they show through on hover (glass-hover) and in state overrides,
+ * so every module keeps a signature hue. */
 #custom-wired-launcher,
 #custom-power,
 #clock,
@@ -288,6 +307,7 @@ window#waybar.empty #window {
 #battery.warning {
     color: @neon-pink;
     border-color: rgba(255, 16, 240, 0.72);
+    animation: none;
 }
 
 @keyframes alert-pulse {
@@ -331,6 +351,7 @@ window#waybar.empty #window {
 #custom-bell.has-notifs {
     color: @neon-cyan;
     border-color: rgba(0, 255, 255, 0.66);
+    animation: none;
     box-shadow:
         0 3px 10px rgba(0, 0, 0, 0.62),
         0 0 16px rgba(0, 255, 255, 0.45),
@@ -366,12 +387,14 @@ window#waybar.empty #window {
     border-color: rgba(255, 255, 255, 0.20);
     box-shadow: 0 2px 7px rgba(0, 0, 0, 0.50), inset 0 1px 0 rgba(255, 255, 255, 0.05);
     text-shadow: none;
+    animation: none;
 }
 
 #idle_inhibitor.activated {
     color: @neon-green;
     border-color: rgba(57, 255, 20, 0.66);
     box-shadow: 0 0 14px rgba(57, 255, 20, 0.42), inset 0 0 9px rgba(57, 255, 20, 0.10);
+    animation: none;
 }
 
 #custom-power:hover {
