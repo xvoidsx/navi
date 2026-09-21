@@ -26,6 +26,7 @@ EXTRAS=(
   "cliamp|cliamp|Terminal music player|command -v cliamp >/dev/null 2>&1|cliamp-installer.sh|"
   "telegram|Telegram|Fast, cloud-synced messaging — native desktop app|command -v telegram >/dev/null 2>&1|telegram-installer.sh|"
   "element|Element|Decentralized chat over Matrix — native desktop app|command -v element-desktop >/dev/null 2>&1|element-installer.sh|"
+  "tailscale|Tailscale|Zero-config mesh VPN — your own private network across every device|command -v tailscale >/dev/null 2>&1|tailscale-installer.sh|"
 )
 
 # where do the installer scripts live?
