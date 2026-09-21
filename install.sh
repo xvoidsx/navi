@@ -1246,6 +1246,7 @@ setup_gtk_theme() {
 [org/gnome/desktop/interface]
 gtk-theme='nightshadeNeon'
 icon-theme='Moka'
+cursor-theme='Bibata-Modern-Ice'
 color-scheme='prefer-dark'
 EOF
   # The profile is the piece RC20.x was missing: without
@@ -1279,6 +1280,17 @@ setup_sddm() {
   $DOAS install -m 644 "$WIRED_DIR/sessions/navi.desktop" \
     /usr/share/wayland-sessions/navi.desktop
   $DOAS install -m 644 "$WIRED_DIR/sessions/navi-x11.desktop" \
+    /usr/share/xsessions/navi.desktop
+  # stamp the session names from wired/VERSION (single source of truth) so
+  # SDDM shows the channel — "navi 2.0 "eiri"" vs "navi 1.6 "mika"" — instead
+  # of a stale hardcoded release. every deploy and every navi-update
+  # refreshes these, so mika updates re-stamp automatically.
+  local sver sname
+  sver="$(printf '%s' "$NAVI_VERSION" | awk '{print $1}')"
+  sname="$(printf '%s' "$NAVI_VERSION" | awk '{print $2}' | tr -d '"')"
+  $DOAS sed -i -e "s/^Name=.*/Name=navi $sver \"$sname\" (Wayland)/" \
+    /usr/share/wayland-sessions/navi.desktop
+  $DOAS sed -i -e "s/^Name=.*/Name=navi $sver \"$sname\" (X11)/" \
     /usr/share/xsessions/navi.desktop
   $DOAS systemctl enable sddm
   ok "sddm serves the navi login; pick Wayland or X11 at the prompt"
