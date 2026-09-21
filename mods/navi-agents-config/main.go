@@ -12,6 +12,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,10 +48,12 @@ const (
 	tabStatus tab = iota
 	tabModels
 	tabHarnesses
+	tabAutonomy
+	tabEvals
 	tabProviders
 )
 
-var tabNames = []string{"status", "models", "harnesses", "providers"}
+var tabNames = []string{"status", "models", "harnesses", "autonomy", "evals", "providers"}
 
 // provider screens (the original config UI, now the providers tab)
 type pscreen int
@@ -425,6 +428,21 @@ type model struct {
 	defaultAgent  string
 	harnessCursor int
 
+	// autonomy tab
+	autonomyCursor  int
+	autonomyCurrent string
+
+	// evals tab
+	evalSel    map[string]bool
+	evalJudge  string
+	evalCursor int
+	evalPhase  int // 0 = pick models, 1 = results
+	evalQueue  []evalJob
+	evalScores map[string][]int // model -> per-prompt score, -1 = failed/pending
+	evalTotal  int
+	evalDone   int
+	evalBusy   string // "model · prompt" currently running
+
 	// providers tab (the original config UI)
 	pscreen   pscreen
 	providers []agentenv.Provider
@@ -456,13 +474,16 @@ func initialModel() model {
 	providers := append(append([]agentenv.Provider{}, agentenv.Providers()...), custom...)
 
 	m := model{
-		tab:          tabStatus,
-		pscreen:      pscreenList,
-		providers:    providers,
-		fileVals:     fileVals,
-		harnesses:    pollHarnesses(),
-		defaultAgent: readDefaultAgent(),
-		heylain:      "quiet",
+		tab:             tabStatus,
+		pscreen:         pscreenList,
+		providers:       providers,
+		fileVals:        fileVals,
+		harnesses:       pollHarnesses(),
+		defaultAgent:    readDefaultAgent(),
+		heylain:         "quiet",
+		autonomyCurrent: currentAutonomy(),
+		evalSel:         map[string]bool{},
+		evalScores:      map[string][]int{},
 	}
 	m.plist = m.buildList()
 	m.plist.Title = "providers — pick one"
@@ -794,6 +815,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case evalStepMsg:
+		return m.handleEvalStep(msg)
+
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
@@ -834,8 +858,17 @@ func (m *model) switchTab(t tab) tea.Cmd {
 	m.pulling = false
 	m.confirmDelete = ""
 	var cmds []tea.Cmd
-	if t == tabModels {
+	if t == tabModels || t == tabEvals {
 		cmds = append(cmds, func() tea.Msg { return refreshModels() })
+	}
+	if t == tabAutonomy {
+		m.autonomyCurrent = currentAutonomy()
+		m.autonomyCursor = 0
+		for i, pr := range autonomyProfiles {
+			if pr.name == m.autonomyCurrent {
+				m.autonomyCursor = i
+			}
+		}
 	}
 	if t == tabHarnesses {
 		m.harnesses = pollHarnesses()
@@ -856,6 +889,10 @@ func tabKey(key string) (tab, bool) {
 	case "3":
 		return tabHarnesses, true
 	case "4":
+		return tabAutonomy, true
+	case "5":
+		return tabEvals, true
+	case "6":
 		return tabProviders, true
 	}
 	return 0, false
@@ -906,10 +943,10 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.switchTab(t)
 		}
 		if key == "tab" {
-			return m, m.switchTab((m.tab + 1) % 4)
+			return m, m.switchTab((m.tab + 1) % 6)
 		}
 		if key == "shift+tab" {
-			return m, m.switchTab((m.tab + 3) % 4)
+			return m, m.switchTab((m.tab + 5) % 6)
 		}
 	}
 	if key == "ctrl+c" {
@@ -923,6 +960,10 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleModelsKey(key)
 	case tabHarnesses:
 		return m.handleHarnessesKey(key)
+	case tabAutonomy:
+		return m.handleAutonomyKey(key)
+	case tabEvals:
+		return m.handleEvalsKey(key, msg)
 	case tabProviders:
 		return m.handleProviderKey(key, msg)
 	}
@@ -1313,6 +1354,10 @@ func (m model) View() string {
 		b.WriteString(m.modelsView())
 	case tabHarnesses:
 		b.WriteString(m.harnessView())
+	case tabAutonomy:
+		b.WriteString(m.autonomyView())
+	case tabEvals:
+		b.WriteString(m.evalsView())
 	case tabProviders:
 		b.WriteString(m.providerView())
 	}
@@ -1351,7 +1396,7 @@ func (m model) statusView() string {
 			if i == m.agentCursor {
 				b.WriteString(theme.Selected.Render("> "+row) + "\n")
 			} else {
-				b.WriteString("  "+theme.Normal.Render(row) + "\n")
+				b.WriteString("  " + theme.Normal.Render(row) + "\n")
 			}
 		}
 		b.WriteString("\n")
@@ -1519,4 +1564,494 @@ func main() {
 			_ = syscall.Exec(p, []string{"herdr", "agent", "attach", fm.jumpTarget}, os.Environ())
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// autonomy (opencode permission profiles)
+//
+// herdr exposes no approval lever, and no harness reads navi's files — so a
+// cross-harness "autonomy" setting would be a placebo. opencode's `permission`
+// schema (allow/ask/deny per tool) is real and documented, so the center
+// manages opencode autonomy profiles in ~/.config/opencode/opencode.json,
+// preserving every other key. Other harnesses keep their own settings.
+// ---------------------------------------------------------------------------
+
+type autonomyProfile struct {
+	name string
+	desc string
+	// value written to the "permission" key
+	permission any
+}
+
+var autonomyProfiles = []autonomyProfile{
+	{
+		name:       "ask me",
+		desc:       "every tool asks first — maximum control, maximum interruptions",
+		permission: map[string]any{"*": "ask"},
+	},
+	{
+		name: "balanced",
+		desc: "reads and search run free · edits, commands and subagents ask · rm and sudo never run",
+		permission: map[string]any{
+			"read": "allow", "glob": "allow", "grep": "allow", "list": "allow",
+			"edit":     "ask",
+			"bash":     map[string]any{"*": "ask", "rm *": "deny", "sudo *": "deny"},
+			"webfetch": "allow", "websearch": "allow",
+			"task": "ask", "skill": "ask",
+		},
+	},
+	{
+		name:       "yolo",
+		desc:       "everything runs without asking — for when you trust the machine",
+		permission: "allow",
+	},
+}
+
+func opencodeConfigPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "opencode", "opencode.json")
+}
+
+func readOpencodeConfig() map[string]any {
+	b, err := os.ReadFile(opencodeConfigPath())
+	if err != nil {
+		return map[string]any{}
+	}
+	var m map[string]any
+	if json.Unmarshal(b, &m) != nil {
+		return map[string]any{}
+	}
+	return m
+}
+
+// currentAutonomy reports which profile the live config matches:
+// ask me | balanced | yolo | custom | unset.
+func currentAutonomy() string {
+	m := readOpencodeConfig()
+	p, ok := m["permission"]
+	if !ok {
+		return "unset"
+	}
+	norm, _ := json.Marshal(p) // encoding/json sorts map keys — deterministic
+	for _, pr := range autonomyProfiles {
+		pn, _ := json.Marshal(pr.permission)
+		if string(norm) == string(pn) {
+			return pr.name
+		}
+	}
+	return "custom"
+}
+
+func writeAutonomy(p autonomyProfile) error {
+	path := opencodeConfigPath()
+	m := readOpencodeConfig()
+	m["permission"] = p.permission
+	if _, ok := m["$schema"]; !ok {
+		m["$schema"] = "https://opencode.ai/config.json"
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(b, '\n'), 0o644)
+}
+
+// ---------------------------------------------------------------------------
+// evals — model compare
+//
+// A small built-in prompt set run against 2+ pulled ollama models, each
+// response scored 1–5 by a local judge model. Token-capped and cancellable;
+// a bad eval is worse than none, so the set is tiny and discriminating.
+// ---------------------------------------------------------------------------
+
+type evalPrompt struct {
+	name   string
+	prompt string
+}
+
+var evalPrompts = []evalPrompt{
+	{"code", "Write a Python function fib(n) that returns the nth Fibonacci number iteratively. Reply with only the code."},
+	{"reasoning", "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost? Reply with only the amount."},
+	{"instruction", "Name three fruits. Do not use the letter 'e' anywhere in your answer."},
+	{"writing", "Write a two-sentence horror story."},
+	{"math", "What is 17 × 23? Reply with only the final number, no working."},
+	{"explain", "In one sentence, explain what the shell command `ls -la | grep '^d'` does."},
+	{"json", "Output a JSON object with keys \"name\" and \"born\" for Ada Lovelace (born 1815). Reply with only the JSON, no other text."},
+	{"summarize", "Summarize this in under 20 words: \"The quick brown fox jumps over the lazy dog near the riverbank at dawn, while birds sing in the tall oak trees.\""},
+}
+
+type evalJob struct {
+	model     string
+	promptIdx int
+	phase     int // 0 = generate, 1 = judge
+	response  string
+}
+
+type evalStepMsg struct {
+	job   evalJob
+	text  string // generated response (phase 0)
+	score int    // 1–5 (phase 1)
+	err   error
+}
+
+func ollamaGenerate(model, prompt string, numPredict int, temperature float64) (string, error) {
+	body, _ := json.Marshal(map[string]any{
+		"model": model, "prompt": prompt, "stream": false,
+		"options": map[string]any{"num_predict": numPredict, "temperature": temperature},
+	})
+	client := &http.Client{Timeout: 180 * time.Second}
+	resp, err := client.Post("http://127.0.0.1:11434/api/generate", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Response string `json:"response"`
+		Error    string `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", err
+	}
+	if out.Error != "" {
+		return "", fmt.Errorf("%s", out.Error)
+	}
+	return out.Response, nil
+}
+
+func ollamaJudge(judge, task, response string) (int, error) {
+	p := "You are grading an AI assistant. Task given to the assistant:\n---\n" + task +
+		"\n---\nThe assistant's response:\n---\n" + response +
+		"\n---\nScore the response 1-5 (1=wrong or unhelpful, 2=poor, 3=adequate, 4=good, 5=excellent). " +
+		"Consider correctness and whether it actually does the task. Reply with ONLY the digit."
+	text, err := ollamaGenerate(judge, p, 16, 0)
+	if err != nil {
+		return 0, err
+	}
+	for _, r := range text {
+		if r >= '1' && r <= '5' {
+			return int(r - '0'), nil
+		}
+	}
+	return 0, fmt.Errorf("judge didn't return a score")
+}
+
+func runEvalStep(job evalJob, judge string) tea.Cmd {
+	return func() tea.Msg {
+		if job.phase == 0 {
+			text, err := ollamaGenerate(job.model, evalPrompts[job.promptIdx].prompt, 256, 0.7)
+			return evalStepMsg{job: job, text: text, err: err}
+		}
+		score, err := ollamaJudge(judge, evalPrompts[job.promptIdx].prompt, job.response)
+		return evalStepMsg{job: job, score: score, err: err}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// autonomy tab
+// ---------------------------------------------------------------------------
+
+func (m model) handleAutonomyKey(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "q", "esc":
+		return m, tea.Quit
+	case "up", "k":
+		if m.autonomyCursor > 0 {
+			m.autonomyCursor--
+		}
+		return m, nil
+	case "down", "j":
+		if m.autonomyCursor < len(autonomyProfiles)-1 {
+			m.autonomyCursor++
+		}
+		return m, nil
+	case "enter":
+		pr := autonomyProfiles[m.autonomyCursor]
+		if err := writeAutonomy(pr); err != nil {
+			m.status = "save failed: " + firstLine(err.Error())
+			return m, nil
+		}
+		m.autonomyCurrent = pr.name
+		m.status = "opencode autonomy → " + pr.name
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m model) autonomyView() string {
+	var b strings.Builder
+	b.WriteString(theme.Header.Render("opencode autonomy") + "\n")
+	b.WriteString(theme.Dimmed.Render("what needs approval, what just happens — written to ~/.config/opencode/opencode.json") + "\n\n")
+	for i, pr := range autonomyProfiles {
+		mark := "  "
+		if pr.name == m.autonomyCurrent {
+			mark = lipgloss.NewStyle().Foreground(theme.Pink).Render("★ ")
+		}
+		row := fmt.Sprintf("%s%-10s %s", mark, pr.name, pr.desc)
+		if i == m.autonomyCursor {
+			b.WriteString(theme.Selected.Render("> "+row) + "\n")
+		} else {
+			b.WriteString("  " + theme.Normal.Render(row) + "\n")
+		}
+	}
+	b.WriteString("\n")
+	cur := m.autonomyCurrent
+	if cur == "unset" {
+		cur = "unset (opencode defaults — permissive)"
+	} else if cur == "custom" {
+		cur = "custom (hand-edited — pick a profile to replace it)"
+	}
+	b.WriteString(theme.Dimmed.Render("current: "+cur) + "\n")
+	b.WriteString(theme.Dimmed.Render("other harnesses keep their own approval settings for now") + "\n\n")
+	b.WriteString(theme.Dimmed.Render("enter apply profile · 1-6 tabs · q quit"))
+	return b.String()
+}
+
+// ---------------------------------------------------------------------------
+// evals tab
+// ---------------------------------------------------------------------------
+
+func (m *model) evalSelected() []string {
+	var out []string
+	for _, om := range m.ollamaModels {
+		if m.evalSel[om.Name] {
+			out = append(out, om.Name)
+		}
+	}
+	return out
+}
+
+func (m model) handleEvalsKey(key string, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// while running, only esc cancels
+	if len(m.evalQueue) > 0 {
+		if key == "esc" || key == "q" {
+			m.evalQueue = nil
+			m.evalBusy = ""
+			m.status = "eval cancelled"
+		}
+		return m, nil
+	}
+	switch key {
+	case "q":
+		return m, tea.Quit
+	case "esc":
+		if m.evalPhase == 1 {
+			m.evalPhase = 0
+			return m, nil
+		}
+		return m, tea.Quit
+	case "up", "k":
+		if m.evalCursor > 0 {
+			m.evalCursor--
+		}
+		return m, nil
+	case "down", "j":
+		if m.evalCursor < len(m.ollamaModels)-1 {
+			m.evalCursor++
+		}
+		return m, nil
+	case " ":
+		if len(m.ollamaModels) == 0 {
+			return m, nil
+		}
+		name := m.ollamaModels[m.evalCursor].Name
+		m.evalSel[name] = !m.evalSel[name]
+		if m.evalJudge == "" || !m.modelPulled(m.evalJudge) {
+			m.evalJudge = name
+		}
+		return m, nil
+	case "J":
+		// cycle judge through pulled models
+		if len(m.ollamaModels) == 0 {
+			return m, nil
+		}
+		idx := 0
+		for i, om := range m.ollamaModels {
+			if om.Name == m.evalJudge {
+				idx = i
+				break
+			}
+		}
+		m.evalJudge = m.ollamaModels[(idx+1)%len(m.ollamaModels)].Name
+		return m, nil
+	case "enter", "r", "R":
+		return m.startEval()
+	}
+	return m, nil
+}
+
+func (m model) modelPulled(name string) bool {
+	for _, om := range m.ollamaModels {
+		if om.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (m model) startEval() (tea.Model, tea.Cmd) {
+	sel := m.evalSelected()
+	if !m.ollamaActive {
+		m.status = "start ollama first — see the models tab (o)"
+		return m, nil
+	}
+	if len(sel) == 0 {
+		m.status = "select at least one model with space first"
+		return m, nil
+	}
+	if m.evalJudge == "" || !m.modelPulled(m.evalJudge) {
+		m.evalJudge = sel[0]
+	}
+	m.evalScores = map[string][]int{}
+	var queue []evalJob
+	for _, name := range sel {
+		scores := make([]int, len(evalPrompts))
+		for i := range scores {
+			scores[i] = -1
+		}
+		m.evalScores[name] = scores
+		for pi := range evalPrompts {
+			queue = append(queue, evalJob{model: name, promptIdx: pi, phase: 0})
+		}
+	}
+	m.evalQueue = queue
+	m.evalTotal = len(queue) * 2 // generate + judge per job
+	m.evalDone = 0
+	m.evalPhase = 1
+	m.status = ""
+	job := m.evalQueue[0]
+	m.evalQueue = m.evalQueue[1:]
+	m.evalBusy = job.model + " · " + evalPrompts[job.promptIdx].name
+	return m, runEvalStep(job, m.evalJudge)
+}
+
+func (m model) handleEvalStep(msg evalStepMsg) (tea.Model, tea.Cmd) {
+	if len(m.evalQueue) == 0 && m.evalBusy == "" {
+		return m, nil // stale message after cancel
+	}
+	job := msg.job
+	if msg.err != nil {
+		// leave -1 (failed); move on
+		m.status = "step failed (" + job.model + " · " + evalPrompts[job.promptIdx].name + "): " + firstLine(msg.err.Error())
+	} else if job.phase == 0 {
+		// generation done → enqueue the judge step for this response
+		m.evalQueue = append([]evalJob{{model: job.model, promptIdx: job.promptIdx, phase: 1, response: msg.text}}, m.evalQueue...)
+		m.evalDone++
+	} else {
+		scores := m.evalScores[job.model]
+		if job.promptIdx < len(scores) {
+			scores[job.promptIdx] = msg.score
+		}
+		m.evalDone++
+	}
+	if len(m.evalQueue) == 0 {
+		m.evalBusy = ""
+		m.status = "eval complete"
+		return m, nil
+	}
+	next := m.evalQueue[0]
+	m.evalQueue = m.evalQueue[1:]
+	m.evalBusy = next.model + " · " + evalPrompts[next.promptIdx].name
+	return m, runEvalStep(next, m.evalJudge)
+}
+
+func (m model) evalsView() string {
+	var b strings.Builder
+	if len(m.evalQueue) > 0 {
+		b.WriteString(theme.Header.Render("model compare — running") + "\n\n")
+		b.WriteString(theme.Normal.Render(fmt.Sprintf("%d / %d steps", m.evalDone, m.evalTotal)) + "\n")
+		b.WriteString(theme.Dimmed.Render(m.evalBusy) + "\n\n")
+		b.WriteString(theme.Dimmed.Render("esc cancel"))
+		return b.String()
+	}
+	if m.evalPhase == 1 && len(m.evalScores) > 0 {
+		return m.evalResultsView(&b)
+	}
+	b.WriteString(theme.Header.Render("model compare") + "\n")
+	b.WriteString(theme.Dimmed.Render(fmt.Sprintf("%d prompts · every response judged 1–5 by a local model", len(evalPrompts))) + "\n\n")
+	if !m.ollamaActive {
+		b.WriteString(theme.Dimmed.Render("ollama is down — start it on the models tab (o)") + "\n\n")
+	} else if len(m.ollamaModels) == 0 {
+		b.WriteString(theme.Dimmed.Render("no models pulled yet — pull some on the models tab (p)") + "\n\n")
+	} else {
+		for i, om := range m.ollamaModels {
+			box := "○"
+			if m.evalSel[om.Name] {
+				box = lipgloss.NewStyle().Foreground(theme.Green).Render("●")
+			}
+			row := fmt.Sprintf("%s %-30s", box, om.Name)
+			if i == m.evalCursor {
+				b.WriteString(theme.Selected.Render("> "+row) + "\n")
+			} else {
+				b.WriteString("  " + theme.Normal.Render(row) + "\n")
+			}
+		}
+		b.WriteString("\n")
+		judge := m.evalJudge
+		if judge == "" {
+			judge = "(first selected)"
+		}
+		b.WriteString(theme.Dimmed.Render("judge: "+judge+" · J cycles judge") + "\n\n")
+	}
+	b.WriteString(theme.Dimmed.Render("space select · enter run · 1-6 tabs · q quit"))
+	return b.String()
+}
+
+func (m model) evalResultsView(b *strings.Builder) string {
+	b.WriteString(theme.Header.Render("model compare — results") + "\n")
+	b.WriteString(theme.Dimmed.Render("judge: "+m.evalJudge) + "\n\n")
+	// header: P1..Pn + AVG
+	head := fmt.Sprintf("%-22s", "model")
+	for i := range evalPrompts {
+		head += fmt.Sprintf(" %3s", fmt.Sprintf("P%d", i+1))
+	}
+	head += fmt.Sprintf(" %5s", "AVG")
+	b.WriteString(theme.Dimmed.Render(head) + "\n")
+	best, bestAvg := "", -1.0
+	avgs := map[string]float64{}
+	for name, scores := range m.evalScores {
+		sum, n := 0, 0
+		for _, s := range scores {
+			if s > 0 {
+				sum += s
+				n++
+			}
+		}
+		avg := 0.0
+		if n > 0 {
+			avg = float64(sum) / float64(n)
+		}
+		avgs[name] = avg
+		if avg > bestAvg {
+			best, bestAvg = name, avg
+		}
+	}
+	for name, scores := range m.evalScores {
+		row := fmt.Sprintf("%-22s", trunc(name, 22))
+		for _, s := range scores {
+			if s < 0 {
+				row += fmt.Sprintf(" %3s", "–")
+			} else {
+				row += fmt.Sprintf(" %3d", s)
+			}
+		}
+		row += fmt.Sprintf(" %5.1f", avgs[name])
+		if name == best {
+			b.WriteString(theme.Selected.Render("★ "+row) + "\n")
+		} else {
+			b.WriteString("  " + theme.Normal.Render(row) + "\n")
+		}
+	}
+	b.WriteString("\n")
+	b.WriteString(theme.Dimmed.Render("esc back · enter run again · 1-6 tabs · q quit"))
+	return b.String()
+}
+
+func trunc(s string, n int) string {
+	if len(s) > n {
+		return s[:n-1] + "…"
+	}
+	return s
 }
