@@ -244,6 +244,7 @@ bindsym Mod1+a exec --no-startup-id "navi-Qx agent"
 
 # Pop-up terminal
 bindsym Mod1+Shift+a exec --no-startup-id "navi-Qx terminal"
+bindsym $mod+Ctrl+h exec --no-startup-id "alacritty -e herdr"
 
 
 ################################################################

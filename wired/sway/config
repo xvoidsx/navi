@@ -153,6 +153,7 @@ bindsym Mod1+Shift+b exec --no-startup-id "chromium"
 # alt+shift+A for pop-up terminal
 bindsym Mod1+a exec "navi-Q agent"
 bindsym Mod1+Shift+a exec "navi-Q terminal"
+bindsym $mod+Ctrl+h exec --no-startup-id "alacritty -e herdr"
 
 # change focus
 bindsym $mod+j focus left

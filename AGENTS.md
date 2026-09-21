@@ -195,6 +195,12 @@ The center's tabs: status (live herdr agents with waybar-style faces,
 enter jumps to one via `herdr agent attach`, r reads recent output),
 models (ollama service on/off via doas, pull/delete models),
 harnesses (installed harnesses, default agent — also what navi-Q opens),
+autonomy (opencode permission profiles - ask me / balanced / yolo -
+written to `~/.config/opencode/opencode.json`, preserving other keys;
+other harnesses keep their own settings for now),
+evals (model compare: an 8-prompt built-in set run against selected pulled
+ollama models, each response scored 1-5 by a local judge model,
+scoreboard with averages and a winner),
 providers (API keys). The default agent is stored in
 `~/.config/navi/default-agent` (whitelisted to known harness binaries);
 `navi-Q`/`navi-Qx` read it, falling back to opencode.
