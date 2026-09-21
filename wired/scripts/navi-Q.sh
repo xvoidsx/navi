@@ -23,7 +23,13 @@ APP_ID="navi-Q"
 
 case "${1:-}" in
     agent)
-        COMMAND=("$OC")
+        # default agent, chosen in the agent center (~/.config/navi/default-agent)
+        _qa="$(cat "$HOME/.config/navi/default-agent" 2>/dev/null)"
+        case "$_qa" in
+            pi|omp|opencode|codex|agy|crush) COMMAND=("$_qa") ;;
+            *) COMMAND=("$OC") ;;
+        esac
+        unset _qa
         ;;
 
     terminal)

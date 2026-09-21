@@ -186,9 +186,18 @@ user) → `agent-listening` (Hey Lain mic hot via
 (`idle`/`working`/`blocked`/`done`/`unknown`); the server-down shape is JSON
 with an `error` key and exit code 0, so parse the body, don't trust the exit.
 
-Click contract: left → `navi-agents-config` (floating), middle → `herdr`
-attach (floating), right → the rofi menu, which leads with blocked agents
-("⚠ <agent> needs you — jump to herdr") when any are blocked.
+Click contract: left → the agent center (`navi-agents-config`, floating),
+middle → `herdr` attach (floating), right → the rofi menu, which leads
+with blocked agents ("⚠ <agent> needs you — jump to herdr") when any are
+blocked.
+
+The center's tabs: status (live herdr agents with waybar-style faces,
+enter jumps to one via `herdr agent attach`, r reads recent output),
+models (ollama service on/off via doas, pull/delete models),
+harnesses (installed harnesses, default agent — also what navi-Q opens),
+providers (API keys). The default agent is stored in
+`~/.config/navi/default-agent` (whitelisted to known harness binaries);
+`navi-Q`/`navi-Qx` read it, falling back to opencode.
 
 Scope is honest by design: herdr only sees its own panes, so bare-terminal
 agents are invisible — tooltips say "in herdr" and never claim global
