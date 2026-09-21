@@ -172,6 +172,31 @@ The convention is `wired/waybar/mod-open.sh <title> <cmd…>`:
    misbehavior must leave footprints.
 5. If there's no compositor at all, just run the command (plain-open path).
 
+## The agent mod (`custom/agent`)
+
+The little robot face on the panel — navi's agent-status integration.
+`wired/waybar/agent-mod.sh` polls every 5s and emits waybar JSON with one of
+five classes; `wired/waybar/agent-menu.sh` is the right-click rofi dispatcher.
+
+State priority (first match wins): `agent-blocked` (a herdr agent waits on the
+user) → `agent-listening` (Hey Lain mic hot via
+`$XDG_RUNTIME_DIR/hey-lain/rec.pid`, or thinking via `processing.lock`) →
+`agent-working` → `agent-ready` (agents idle, or ollama reachable) →
+`agent-asleep`. Herdr states come from `herdr agent list`
+(`idle`/`working`/`blocked`/`done`/`unknown`); the server-down shape is JSON
+with an `error` key and exit code 0, so parse the body, don't trust the exit.
+
+Click contract: left → `navi-agents-config` (floating), middle → `herdr`
+attach (floating), right → the rofi menu, which leads with blocked agents
+("⚠ <agent> needs you — jump to herdr") when any are blocked.
+
+Scope is honest by design: herdr only sees its own panes, so bare-terminal
+agents are invisible — tooltips say "in herdr" and never claim global
+awareness. CSS lives in `wired/waybar/style.css` (`#custom-agent` + state
+classes; GTK CSS rules apply). Customized waybar configs are preserved by
+navi-update, so users on customized configs need `navi-wired-adopt` (or a
+manual module add) to see new modules.
+
 ## Release process, end to end
 
 1. Bump `wired/VERSION`; run the **iso.yml RELEASE CHECKLIST** (every
