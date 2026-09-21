@@ -115,6 +115,11 @@ type testDoneMsg struct {
 type herdrAgent struct {
 	Name   string
 	Status string // idle | working | blocked | done | unknown
+	// Target is the addressable herdr target for attach/read commands.
+	// Name is often just the detected agent label ("opencode"), which herdr
+	// does not resolve as a target (agent_not_found). Pane ids are the
+	// documented unique, always-addressable target.
+	Target string
 	Raw    map[string]any
 }
 
@@ -159,6 +164,7 @@ func listHerdrAgents() ([]herdrAgent, string) {
 		agents = append(agents, herdrAgent{
 			Name:   strField(am, "agent", "name", "id"),
 			Status: strField(am, "agent_status", "status", "state"),
+			Target: strField(am, "pane_id", "pane", "terminal_id", "terminal", "name", "agent"),
 			Raw:    am,
 		})
 	}
@@ -330,8 +336,8 @@ func deleteModelCmd(name string) tea.Msg {
 	return deleteDoneMsg{name: name}
 }
 
-func readAgentCmd(name string) tea.Msg {
-	out, err := exec.Command("herdr", "agent", "read", name, "--lines", "60", "--format", "text").CombinedOutput()
+func readAgentCmd(target, name string) tea.Msg {
+	out, err := exec.Command("herdr", "agent", "read", target, "--lines", "60", "--format", "text").CombinedOutput()
 	if err != nil {
 		return readDoneMsg{err: err, name: name, text: strings.TrimSpace(string(out))}
 	}
@@ -989,16 +995,20 @@ func (m model) handleStatusKey(key string) (tea.Model, tea.Cmd) {
 			m.status = "no agents to jump to"
 			return m, nil
 		}
-		m.jumpTarget = m.agents[m.agentCursor].Name
+		ag := m.agents[m.agentCursor]
+		m.jumpTarget = ag.Target
+		if m.jumpTarget == "" {
+			m.jumpTarget = ag.Name
+		}
 		return m, tea.Quit
 	case "r", "R":
 		if len(m.agents) == 0 {
 			m.status = "no agents running"
 			return m, nil
 		}
-		name := m.agents[m.agentCursor].Name
-		m.status = "reading " + name + "…"
-		return m, func() tea.Msg { return readAgentCmd(name) }
+		ag := m.agents[m.agentCursor]
+		m.status = "reading " + ag.Name + "…"
+		return m, func() tea.Msg { return readAgentCmd(ag.Target, ag.Name) }
 	}
 	return m, nil
 }
