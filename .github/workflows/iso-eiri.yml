@@ -12,7 +12,7 @@ name: navi ISO (2.0 "eiri" experimental)
 
 # === EIRI CHECKLIST ===
 # eiri ISOs are DATE-STAMPED snapshots of the rolling branch, not versions:
-# "navi 2 eiri — 18 September 2026". For every fresh ISO, set ISO_BASENAME
+# "navi 2 eiri — 20 September 2026". For every fresh ISO, set ISO_BASENAME
 # to navi-2.0-eiri-YYYY-MM-DD and bump EIRI_BUILD (disambiguates same-day
 # rebuilds). Everything downstream derives the image name, volume label,
 # and artifact name from ISO_BASENAME. The push trigger watches this file,
@@ -31,9 +31,9 @@ name: navi ISO (2.0 "eiri" experimental)
 #                                        navi-networking/calendar/audio)
 env:
   RELEASE: 2.0
-  ISO_BASENAME: navi-2.0-eiri-2026-09-18
+  ISO_BASENAME: navi-2.0-eiri-2026-09-20
   # bump to cut a fresh ISO (push trigger watches this file)
-  EIRI_BUILD: 6
+  EIRI_BUILD: 7
 
 on:
   # NOTE: workflow_dispatch requires the workflow file to exist on the
