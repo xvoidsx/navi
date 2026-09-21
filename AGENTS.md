@@ -192,7 +192,9 @@ with blocked agents ("⚠ <agent> needs you — jump to herdr") when any are
 blocked.
 
 The center's tabs: status (live herdr agents with waybar-style faces,
-enter jumps to one via `herdr agent attach`, r reads recent output),
+enter jumps to one via `herdr agent attach` addressed at the pane id —
+herdr doesn't resolve bare agent labels, so the label is display-only;
+r reads recent output the same way),
 models (ollama service on/off via doas, pull/delete models),
 harnesses (installed harnesses, default agent — also what navi-Q opens),
 autonomy (opencode permission profiles - ask me / balanced / yolo -
