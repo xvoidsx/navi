@@ -21,6 +21,7 @@ EXTRAS=(
   "firefox-nightly|Firefox Nightly|Bleeding-edge Firefox, straight from Mozilla's apt repo|command -v firefox-nightly >/dev/null 2>&1|nightly-browsers.sh|firefox"
   "brave-nightly|Brave Nightly|Bleeding-edge Brave, for life on the edge|command -v brave-browser-nightly >/dev/null 2>&1|nightly-browsers.sh|brave"
   "chrome|Google Chrome|The browser half the planet uses, from Google's own apt repo|command -v google-chrome >/dev/null 2>&1|chrome-installer.sh|"
+  "helium|Helium|Minimal Chromium-based browser, from Helium's own apt repo|command -v helium >/dev/null 2>&1 || command -v helium-bin >/dev/null 2>&1|helium-installer.sh|"
   "ani-cli|ani-cli|Watch anime in the terminal|command -v ani-cli >/dev/null 2>&1 || [ -x /usr/local/bin/ani-cli ]|ani-cli-installer.sh|"
   "charm|Charm toolkit|gum, glow, mods — shell superpowers from charm.sh|command -v gum >/dev/null 2>&1|charm-installer.sh|"
   "cliamp|cliamp|Terminal music player|command -v cliamp >/dev/null 2>&1|cliamp-installer.sh|"
