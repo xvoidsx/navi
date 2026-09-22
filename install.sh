@@ -429,6 +429,27 @@ setup_agents() {
     fi
     rm -f "$herdr_tmp"
   fi
+
+  # goose <-> herdr awareness: user-scope goose plugin that reports goose's
+  # lifecycle state to the herdr pane hosting the session — herdr's official
+  # "custom socket integration" path (pane.report_agent + HERDR_PANE_ID),
+  # so no herdr fork is needed. The hook script no-ops unless HERDR_ENV=1
+  # and HERDR_PANE_ID are set, so this is harmless on machines without
+  # herdr. Goose auto-discovers plugins in ~/.agents/plugins/ at startup
+  # (enabled by default when present). This is navi's own shipped plugin
+  # (not user config), so deploy refreshes it wholesale like wired/.
+  if [ -d "$REPO_DIR/scripts/goose-herdr" ]; then
+    info "installing goose/herdr awareness plugin..."
+    plugin_dest="$HOME/.agents/plugins/navi-goose-herdr"
+    mkdir -p "$plugin_dest/hooks" "$plugin_dest/scripts"
+    cp -a "$REPO_DIR/scripts/goose-herdr/plugin.json" "$plugin_dest/plugin.json"
+    cp -a "$REPO_DIR/scripts/goose-herdr/hooks/hooks.json" "$plugin_dest/hooks/hooks.json"
+    cp -a "$REPO_DIR/scripts/goose-herdr/scripts/report-state.sh" "$plugin_dest/scripts/report-state.sh"
+    chmod 0755 "$plugin_dest/scripts/report-state.sh"
+    ok "goose reports state to herdr panes (~/.agents/plugins/navi-goose-herdr)"
+  else
+    warn "scripts/goose-herdr missing from repo — skipping goose/herdr awareness"
+  fi
 }
 
 # ---------------------------------------------------------------- NaviVim
