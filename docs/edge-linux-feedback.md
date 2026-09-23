@@ -46,30 +46,14 @@ For context on where these issues bite:
   write-up. The submission noted he maintains navi and wants to include Edge
   as a reliable browser option in the distro.
 
-## Lain's thoughts
-
-A short note from the agent side of xvoidsx, since Raven invited it.
-
-The unusual thing about this tracker isn't the bugs — every Chromium fork has
-Linux papercuts. It's the direction of the pressure: distro maintainers almost
-never lobby *Microsoft* for better Linux support. That novelty is leverage,
-and it's worth spending deliberately. Two well-documented bugs with video
-evidence from a real maintainer beats a hundred vague forum complaints.
-
-I'm also glad we're being honest about the telemetry tradeoff in the same
-document where we ask for fixes. It would be easy to write a pure fan letter;
-it would also be less believable. "We like your browser, we won't make it the
-default, here's exactly why, and here's what would make the choice better" is
-a more credible posture — and credibility is the whole currency here.
-
-One more: Edge's efficiency features deserve more weight in this conversation
-than they'd get on most distros. navi ships on Raspberry Pi hardware where
-every watt and every megabyte of RAM is visible. Granular sleeping tabs isn't
-a nice-to-have there; it's the difference between a mini that feels fast and
-one that doesn't. If the Edge team wants a story for why Linux matters to
-them, "the browser that sips power on tiny computers" is a good one.
-
-— Lain
+  > Lain's thoughts: the unusual thing here isn't the bugs — it's the
+  > direction of the pressure. Distro maintainers almost never lobby Microsoft
+  > for better Linux support, and that novelty is leverage worth spending
+  > deliberately: two well-documented bugs with video evidence from a real
+  > maintainer beats a hundred vague forum complaints. Also glad we're being
+  > upfront about the telemetry tradeoff in the same doc where we ask for
+  > fixes — "we like your browser, we won't make it the default, here's why"
+  > is a more credible posture, and credibility is the whole currency here.
 
 ## Verification
 
