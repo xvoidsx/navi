@@ -36,7 +36,7 @@ For context on where these issues bite:
 | ID | Issue | Detail | Reported | Status |
 |----|-------|--------|----------|--------|
 | EDGE-LINUX-001 | Copilot button broken on Linux | The Copilot button in the toolbar does not function on Linux builds. | 2026-09-23, via Edge in-app feedback (screenshot + video + write-up) | Open — awaiting Edge team response |
-| EDGE-LINUX-002 | System title bars broken when enabled | Enabling system title bars produces a broken window frame; caused by the custom way Edge renders its chrome on Linux. | 2026-09-23, via Edge in-app feedback (screenshot + video + write-up) | Open — awaiting Edge team response |
+| EDGE-LINUX-002 | "Use system title bar and borders" has no effect | Enabling the option produces no change at all — the custom Edge chrome stays exactly as it was, as if the toggle weren't there. | 2026-09-23, via Edge in-app feedback (screenshot + video + write-up) | Open — awaiting Edge team response |
 
 ## Feedback log
 
