@@ -7,7 +7,15 @@ x="= = = = = yandex browser installer = = = = ="
 
 install_yandexbrowser() {
   local pkg="yandex-browser-stable"
-  curl -fsSL https://repo.yandex.ru/yandex-browser/YANDEX-BROWSER-KEY.GPG | doas gpg --dearmor --yes -o /usr/share/keyrings/yandex-browser.gpg
+  # import yandex gpg key to keyring
+  curl -fsSL https://repo.yandex.ru/yandex-browser/YANDEX-BROWSER-KEY.GPG \
+    | gpg --dearmor \
+    | doas tee /usr/share/keyrings/yandex-browser.gpg > /dev/null
+  # add yandex browser apt repo
+  echo "deb [arch=amd64 signed-by=/usr/share/keyrings/yandex-browser.gpg] \
+https://repo.yandex.ru/yandex-browser/deb stable main" \
+    | doas tee /etc/apt/sources.list.d/yandex-browser.list > /dev/null
+  # install yandex browser
   doas apt update && doas apt install -y "$pkg"
 }
 
