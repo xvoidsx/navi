@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Cloudflare
-Exec=chromium --force-dark-mode --app=https://dash.cloudflare.com
+Exec=navi-browser-run --force-dark-mode --app=https://dash.cloudflare.com
 Comment=Cloudflare as a navi webapp
 Terminal=false
 Type=Application

@@ -593,6 +593,7 @@ setup_mods() {
   install_mod "navi-agents-config" "navi-agents-config"
   install_mod "navi-weather"    "navi-weather"
   install_mod "navi-get"        "navi-get"
+  install_mod "navi-browser"    "navi-browser"
 }
 
 # Local brain model guard for Hey Lain. This runs on EVERY setup_heylain —
@@ -977,6 +978,7 @@ install_commands() {
   install_bin "navi-Q.sh"           "navi-Q"
   install_bin "navi-Qx.sh"          "navi-Qx"
   install_bin "navi-webapp.sh"      "navi-webapp"
+  install_bin "navi-browser-run.sh" "navi-browser-run"
   install_bin "navi-notifs.sh"       "navi-notifs"
 
   # distro-level tools live in scripts/ (repo root), outside the /wired

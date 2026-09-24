@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Wikipedia
-Exec=chromium --force-dark-mode --app=https://en.wikipedia.org
+Exec=navi-browser-run --force-dark-mode --app=https://en.wikipedia.org
 Comment=The free encyclopedia.
 Terminal=false
 Type=Application

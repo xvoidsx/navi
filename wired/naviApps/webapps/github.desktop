@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=GitHub
-Exec=chromium --force-dark-mode --app=https://github.com
+Exec=navi-browser-run --force-dark-mode --app=https://github.com
 Comment=GitHub as a navi webapp
 Terminal=false
 Type=Application

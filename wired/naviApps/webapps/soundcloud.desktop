@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=SoundCloud
-Exec=chromium --force-dark-mode --app=https://soundcloud.com
+Exec=navi-browser-run --force-dark-mode --app=https://soundcloud.com
 Comment=SoundCloud as a navi webapp
 Terminal=false
 Type=Application

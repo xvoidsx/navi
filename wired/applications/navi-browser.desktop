@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-browser
+Comment=choose navi's default Chromium browser — webapps follow your choice
+Exec=alacritty -e navi-browser
+Icon=web-browser
+Terminal=false
+Categories=System;Settings;
+NoDisplay=false

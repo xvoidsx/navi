@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Hugging Face
-Exec=chromium --force-dark-mode --app=https://huggingface.co
+Exec=navi-browser-run --force-dark-mode --app=https://huggingface.co
 Comment=Models, datasets, and AI spaces.
 Terminal=false
 Type=Application

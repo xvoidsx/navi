@@ -147,6 +147,10 @@ doctor() {
       desktop-file-validate "$first" && echo "[ok] installed entries validate"
     fi
   fi
+  browser_runtime || fail=1
+  # stale hardcoded-chromium launchers predate navi-browser-run; bring them
+  # along (idempotent, reported).
+  migrate_launchers
   return "$fail"
 }
 
@@ -183,6 +187,42 @@ refresh_caches() {
   if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f -t "${HOME}/.local/share/icons/hicolor" >/dev/null 2>&1 || true
   fi
+}
+
+# migrate_launchers: webapp launchers used to hardcode `Exec=chromium`.
+# They now Exec navi-browser-run so the default-browser setting applies at
+# launch time. Rewrite installed catalog launchers in place (idempotent).
+migrate_launchers() {
+  local app desktop
+  while IFS= read -r app; do
+    desktop="${APP_DIR}/${app}.desktop"
+    if [[ -f "$desktop" ]] && grep -q '^Exec=chromium ' "$desktop"; then
+      sed -i 's/^Exec=chromium /Exec=navi-browser-run /' "$desktop"
+      echo "migrated ${app} launcher to navi-browser-run"
+    fi
+  done < <(list_apps)
+}
+
+# browser_runtime: report which browser webapps will launch under.
+browser_runtime() {
+  local cfg="${HOME}/.config/navi/default-browser"
+  local id="(none — chromium is the fallback)"
+  if [[ -f "$cfg" ]]; then
+    id="$(tr -d '[:space:]' < "$cfg")"
+    [[ -n "$id" ]] || id="(none — chromium is the fallback)"
+  fi
+  local bin="(unresolved)"
+  if command -v navi-browser >/dev/null 2>&1; then
+    bin="$(navi-browser --print-binary 2>/dev/null)" || bin="(unresolved)"
+  elif command -v chromium >/dev/null 2>&1; then
+    bin="chromium"
+  fi
+  echo "[..] browser runtime: ${id} -> ${bin}"
+  if [[ "$bin" == "(unresolved)" ]]; then
+    echo "[!!] no Chromium-family browser found — webapps cannot launch"
+    return 1
+  fi
+  return 0
 }
 
 install_one() {
@@ -232,6 +272,7 @@ case "$1" in
     while IFS= read -r app; do
       install_one "$app"
     done < <(list_apps)
+    migrate_launchers
     refresh_caches
     ;;
   --uninstall|--remove|-r)
@@ -264,6 +305,7 @@ case "$1" in
     for app in "$@"; do
       install_one "$app"
     done
+    migrate_launchers
     refresh_caches
     ;;
 esac

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=YouTube Music
+Exec=navi-browser-run --force-dark-mode --app=https://music.youtube.com
+Comment=YouTube Music as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-youtubemusic
+StartupNotify=true
+Categories=AudioVideo;Audio;

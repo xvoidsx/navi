@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=X
-Exec=chromium --force-dark-mode --app=https://x.com
+Exec=navi-browser-run --force-dark-mode --app=https://x.com
 Comment=X (formerly Twitter) as a navi webapp
 Terminal=false
 Type=Application

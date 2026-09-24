@@ -112,6 +112,15 @@ header.hero.scrolled .tagline {
   margin: 0 auto;
 }
 
+/* the store's creed: choice over purity, stated once under the tagline */
+.hero .creed {
+  max-width: 560px;
+  margin: 0 auto 0.9rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
 .searchbar {
   display: flex;
   gap: 0.5rem;

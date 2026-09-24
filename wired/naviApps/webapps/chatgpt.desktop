@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=ChatGPT
-Exec=chromium --force-dark-mode --app=https://chatgpt.com
+Exec=navi-browser-run --force-dark-mode --app=https://chatgpt.com
 Comment=ChatGPT as a navi webapp
 Terminal=false
 Type=Application

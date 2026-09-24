@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=WeatherWise
-Exec=chromium --force-dark-mode --app=https://web.weatherwise.app
+Exec=navi-browser-run --force-dark-mode --app=https://web.weatherwise.app
 Comment=Weather and radar, beautifully done.
 Terminal=false
 Type=Application
