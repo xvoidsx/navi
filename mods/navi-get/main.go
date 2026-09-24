@@ -117,9 +117,12 @@ func isInstalled(a app, extras map[string]string) bool {
 		}
 		return false
 	case "agent":
-		// single-word installs are the binary itself ("ollama").
-		if a.Install != "" && !strings.Contains(a.Install, " ") {
-			_, err := exec.LookPath(a.Install)
+		// the package field names the binary the install produces.
+		// install commands are often multi-word pipelines (npm, curl|bash),
+		// so the install string itself can never say whether the binary
+		// is on PATH — ask the shell instead.
+		if a.Package != "" {
+			_, err := exec.LookPath(a.Package)
 			return err == nil
 		}
 		return false

@@ -99,7 +99,14 @@ cmd_install() { # <id>
   fi
   echo "  installing $name..."
   if run_installer "$e"; then
-    printf '  %b✓%b %s installed.\n' "$green" "$reset" "$name"
+    # never trust the exit code alone — re-run the detect snippet and
+    # only claim success if the thing is actually there now.
+    if is_installed "$e"; then
+      printf '  %b✓%b %s installed.\n' "$green" "$reset" "$name"
+    else
+      printf '  %b✗%b the installer finished, but %s is still not detected — check the output above.\n' "$pink" "$reset" "$name"
+      return 1
+    fi
   else
     printf '  %b✗%b %s failed to install (exit %s) — nothing else was touched.\n' "$pink" "$reset" "$name" "$?"
   fi

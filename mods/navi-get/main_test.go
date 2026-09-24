@@ -96,14 +96,16 @@ func TestIsInstalledWebapp(t *testing.T) {
 }
 
 func TestIsInstalledAgent(t *testing.T) {
-	if !isInstalled(app{Source: "agent", Install: "sh"}, nil) {
-		t.Fatal("sh should resolve via LookPath")
+	// the package field names the binary the install produces, no
+	// matter how the install command is spelled.
+	if !isInstalled(app{Source: "agent", Package: "sh", Install: "doas npm install -g sh-thing"}, nil) {
+		t.Fatal("sh should resolve via LookPath through the package field")
 	}
-	if isInstalled(app{Source: "agent", Install: "npm install -g some-thing"}, nil) {
-		t.Fatal("multi-word agent install should not claim installed")
+	if isInstalled(app{Source: "agent", Package: "definitely-not-a-real-binary", Install: "doas npm install -g some-thing"}, nil) {
+		t.Fatal("missing binary must not claim installed")
 	}
 	if isInstalled(app{Source: "agent", Install: "coming soon"}, nil) {
-		t.Fatal("placeholder install should not claim installed")
+		t.Fatal("empty package must not claim installed")
 	}
 }
 

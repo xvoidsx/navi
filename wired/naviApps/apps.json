@@ -1223,7 +1223,7 @@
   "summary": "GitHub's agentic coding CLI — Copilot in the terminal, auth'd to your GitHub plan.",
   "category": "agents",
   "source": "agent",
-  "package": "copilot-cli",
+  "package": "copilot",
   "install": "curl -fsSL https://gh.io/copilot-install | doas bash",
   "homepage": "https://github.com/github/copilot-cli",
   "icon": "🐙"
