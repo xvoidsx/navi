@@ -1142,8 +1142,8 @@
   "category": "agents",
   "source": "agent",
   "package": "codex",
-  "install": "npm install -g @openai/codex",
-  "remove": "npm uninstall -g @openai/codex",
+  "install": "doas npm install -g @openai/codex",
+  "remove": "doas npm uninstall -g @openai/codex",
   "homepage": "https://github.com/openai/codex",
   "icon": "⚡"
  },
@@ -1165,8 +1165,8 @@
   "category": "agents",
   "source": "agent",
   "package": "aider",
-  "install": "python3 -m pip install aider-chat",
-  "remove": "python3 -m pip uninstall -y aider-chat",
+  "install": "doas python3 -m pip install --break-system-packages aider-chat",
+  "remove": "doas python3 -m pip uninstall -y aider-chat",
   "homepage": "https://aider.chat",
   "icon": "🤝"
  },
@@ -1177,8 +1177,8 @@
   "category": "agents",
   "source": "agent",
   "package": "pi",
-  "install": "npm install -g @mariozechner/pi-coding-agent",
-  "remove": "npm uninstall -g @mariozechner/pi-coding-agent",
+  "install": "doas npm install -g @mariozechner/pi-coding-agent",
+  "remove": "doas npm uninstall -g @mariozechner/pi-coding-agent",
   "homepage": "https://github.com/badlogic/pi-mono",
   "icon": "🧩"
  },
@@ -1189,8 +1189,8 @@
   "category": "agents",
   "source": "agent",
   "package": "crush",
-  "install": "npm install -g @charmland/crush",
-  "remove": "npm uninstall -g @charmland/crush",
+  "install": "doas npm install -g @charmland/crush",
+  "remove": "doas npm uninstall -g @charmland/crush",
   "homepage": "https://github.com/charmbracelet/crush",
   "icon": "💘"
  },
@@ -1201,8 +1201,8 @@
   "category": "agents",
   "source": "agent",
   "package": "openclaw",
-  "install": "npm install -g openclaw@latest",
-  "remove": "npm uninstall -g openclaw",
+  "install": "doas npm install -g openclaw@latest",
+  "remove": "doas npm uninstall -g openclaw",
   "icon": "💬"
  },
  {
@@ -1212,8 +1212,8 @@
   "category": "agents",
   "source": "agent",
   "package": "kilo",
-  "install": "npm install -g @kilocode/cli",
-  "remove": "npm uninstall -g @kilocode/cli",
+  "install": "doas npm install -g @kilocode/cli",
+  "remove": "doas npm uninstall -g @kilocode/cli",
   "homepage": "https://kilo.ai",
   "icon": "🚀"
  },
