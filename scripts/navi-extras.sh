@@ -17,6 +17,10 @@
 x="= = = = = navi extras = = = = ="
 
 # id|name|description|detect-snippet|installer|installer-args
+# NOTE: the detect snippet is shell and may itself contain '|' (the
+# ani-cli and helium entries use '||'). field() parses the tail
+# backwards for exactly this reason — do not replace it with a naive
+# cut -d'|' -f5.
 EXTRAS=(
   "firefox-nightly|Firefox Nightly|Bleeding-edge Firefox, straight from Mozilla's apt repo|command -v firefox-nightly >/dev/null 2>&1|nightly-browsers.sh|firefox"
   "brave-nightly|Brave Nightly|Bleeding-edge Brave, for life on the edge|command -v brave-browser-nightly >/dev/null 2>&1|nightly-browsers.sh|brave"
@@ -44,7 +48,17 @@ done
 pink='\033[95m'; green='\033[92m'; dim='\033[2m'; bold='\033[1m'; reset='\033[0m'
 
 field() { # <entry> <n> — pull the nth | field
-  awk -F'|' -v n="$2" '{print $n}' <<<"$1"
+  # fields 1-3 (id, name, description) never contain '|', but the
+  # detect snippet (field 4) is shell and may contain '|' — '||' in
+  # particular. so the tail is parsed backwards: the installer script
+  # is always second-to-last, installer args last, and the snippet is
+  # everything between field 3 and the installer, re-joined with '|'.
+  case "$2" in
+    1|2|3) awk -F'|' -v n="$2" '{print $n}' <<<"$1" ;;
+    4) awk -F'|' '{s=$4; for (i=5; i<=NF-2; i++) s=s"|"$i; print s}' <<<"$1" ;;
+    5) awk -F'|' '{print $(NF-1)}' <<<"$1" ;;
+    *) awk -F'|' '{print $NF}' <<<"$1" ;;
+  esac
 }
 
 is_installed() { # <entry>
