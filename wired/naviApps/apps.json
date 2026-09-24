@@ -1224,8 +1224,7 @@
   "category": "agents",
   "source": "agent",
   "package": "copilot-cli",
-  "install": "npm install -g @github/copilot",
-  "remove": "npm uninstall -g @github/copilot",
+  "install": "curl -fsSL https://gh.io/copilot-install | bash",
   "homepage": "https://github.com/github/copilot-cli",
   "icon": "🐙"
  },
