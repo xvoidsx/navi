@@ -2,10 +2,11 @@ package main
 
 import (
 	"os"
-	"strings"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 )
@@ -164,5 +165,87 @@ func TestBrowseViewRenders(t *testing.T) {
 	}
 	if !strings.Contains(out, "Ollama") {
 		t.Fatal("filtered view should contain Ollama")
+	}
+}
+
+func keyMsg(r rune) tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}
+}
+
+func isQuit(cmd tea.Cmd) bool {
+	if cmd == nil {
+		return false
+	}
+	_, ok := cmd().(tea.QuitMsg)
+	return ok
+}
+
+// Typing while the search box is focused must never fire shortcuts:
+// every letter that could collide (r, u, d, q) lands in the input.
+func TestTypingDoesNotTriggerShortcuts(t *testing.T) {
+	m := newModel(testApps())
+	if !m.input.Focused() {
+		t.Fatal("search box should start focused")
+	}
+	for _, r := range []rune{'r', 'u', 'd', 'q'} {
+		next, cmd := m.Update(keyMsg(r))
+		m = next.(model)
+		if isQuit(cmd) {
+			t.Fatalf("typing %q quit the app", r)
+		}
+		if m.screen != screenBrowse {
+			t.Fatalf("typing %q left the browse screen", r)
+		}
+		if m.status != "" {
+			t.Fatalf("typing %q produced a status: %q", r, m.status)
+		}
+	}
+	if got := m.input.Value(); got != "rudq" {
+		t.Fatalf("expected typed letters in the search box, got %q", got)
+	}
+}
+
+// Tab blurs the search box; shortcuts fire again in list mode.
+func TestTabTogglesShortcutMode(t *testing.T) {
+	m := newModel(testApps())
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = next.(model)
+	if m.input.Focused() {
+		t.Fatal("Tab should blur the search box")
+	}
+
+	next, _ = m.Update(keyMsg('r'))
+	m = next.(model)
+	if m.status != "states refreshed." {
+		t.Fatalf("blurred 'r' should refresh, got status %q", m.status)
+	}
+
+	next, cmd := m.Update(keyMsg('q'))
+	if !isQuit(cmd) {
+		t.Fatal("blurred 'q' should quit")
+	}
+
+	// '/' refocuses the search box from list mode
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = next.(model)
+	next, _ = m.Update(keyMsg('/'))
+	m = next.(model)
+	if !m.input.Focused() {
+		t.Fatal("'/' should refocus the search box")
+	}
+}
+
+// Esc with text in the box clears the query instead of quitting.
+func TestEscClearsQuery(t *testing.T) {
+	m := newModel(testApps())
+	m.input.SetValue("yandex")
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = next.(model)
+	if isQuit(cmd) {
+		t.Fatal("Esc with a query should clear, not quit")
+	}
+	if m.input.Value() != "" {
+		t.Fatalf("expected cleared query, got %q", m.input.Value())
 	}
 }

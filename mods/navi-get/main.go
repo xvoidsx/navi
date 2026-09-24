@@ -297,6 +297,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Structural keys win no matter what has focus.
 	switch msg.Type {
 	case tea.KeyCtrlC:
 		return m, tea.Quit
@@ -339,14 +340,33 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.target = sel
 		m.screen = screenConfirmInstall
 		return m, nil
+	case tea.KeyTab:
+		// Tab toggles between typing in the search box and the
+		// shortcut layer. Shortcuts only fire when the search box
+		// is blurred, so typing can never trigger them.
+		if m.input.Focused() {
+			m.input.Blur()
+		} else {
+			m.input.Focus()
+		}
+		return m, nil
 	}
 
+	if m.input.Focused() {
+		// Typing mode: every other key belongs to the search box.
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+		m.applyFilter()
+		return m, cmd
+	}
+
+	// Shortcut mode: the search box is blurred.
 	switch msg.String() {
+	case "/":
+		m.input.Focus()
+		return m, nil
 	case "q":
-		// 'q' quits only when the search box is empty, so typing still works.
-		if m.input.Value() == "" {
-			return m, tea.Quit
-		}
+		return m, tea.Quit
 	case "u", "d":
 		sel := m.selected()
 		if sel == nil {
@@ -372,11 +392,7 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.status = "states refreshed."
 		return m, nil
 	}
-
-	var cmd tea.Cmd
-	m.input, cmd = m.input.Update(msg)
-	m.applyFilter()
-	return m, cmd
+	return m, nil
 }
 
 func (m model) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -491,6 +507,7 @@ func (m model) browseView() string {
 		[2]string{"u", "remove"},
 		[2]string{"r", "refresh"},
 		[2]string{"q", "quit"},
+		[2]string{"tab", "focus search"},
 	))
 	return b.String()
 }
