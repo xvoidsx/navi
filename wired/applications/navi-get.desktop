@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-get
+Comment=navi software center: search the catalog and install apps, extras, and agents
+Exec=alacritty -e navi-get
+Icon=system-software-install
+Terminal=false
+Categories=System;Settings;
+NoDisplay=false

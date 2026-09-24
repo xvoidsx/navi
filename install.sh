@@ -592,6 +592,7 @@ setup_mods() {
   install_mod "navi-lain-config" "navi-lain-config"
   install_mod "navi-agents-config" "navi-agents-config"
   install_mod "navi-weather"    "navi-weather"
+  install_mod "navi-get"        "navi-get"
 }
 
 # Local brain model guard for Hey Lain. This runs on EVERY setup_heylain —
