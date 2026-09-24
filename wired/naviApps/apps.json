@@ -1254,6 +1254,30 @@
     "icon": "🦁"
   },
   {
+    "id": "native-edge",
+    "name": "Microsoft Edge",
+    "summary": "Microsoft's Chromium-based browser — from Microsoft's own apt repo.",
+    "category": "Internet",
+    "source": "native",
+    "package": "edge",
+    "install": "navi-extras --install edge",
+    "remove": "doas apt remove -y microsoft-edge-stable",
+    "homepage": "https://www.microsoft.com/edge",
+    "icon": "🌐"
+  },
+  {
+    "id": "native-yandex",
+    "name": "Yandex Browser",
+    "summary": "Yandex's Chromium-based browser — from Yandex's own apt repo.",
+    "category": "Internet",
+    "source": "native",
+    "package": "yandex",
+    "install": "navi-extras --install yandex",
+    "remove": "doas apt remove -y yandex-browser-stable",
+    "homepage": "https://browser.yandex.com",
+    "icon": "🌐"
+  },
+  {
     "id": "native-ani-cli",
     "name": "ani-cli",
     "summary": "Watch anime in the terminal — streams straight to mpv.",
