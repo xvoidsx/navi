@@ -1218,6 +1218,18 @@
   "icon": "🚀"
  },
  {
+  "id": "agent-copilot-cli",
+  "name": "Copilot CLI",
+  "summary": "GitHub's agentic coding CLI — Copilot in the terminal, auth'd to your GitHub plan.",
+  "category": "agents",
+  "source": "agent",
+  "package": "copilot-cli",
+  "install": "npm install -g @github/copilot",
+  "remove": "npm uninstall -g @github/copilot",
+  "homepage": "https://github.com/github/copilot-cli",
+  "icon": "🐙"
+ },
+ {
   "id": "web-cloudflare",
   "name": "Cloudflare",
   "summary": "DNS, CDN, and edge infra — the Cloudflare dashboard as a navi webapp.",
