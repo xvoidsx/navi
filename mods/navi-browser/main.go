@@ -151,6 +151,86 @@ func writeDefault(id string) error {
 }
 
 // ---------------------------------------------------------------------------
+// system default browser (xdg-settings)
+// ---------------------------------------------------------------------------
+
+// applicationsDirs returns the .desktop search dirs in preference order.
+func applicationsDirs() []string {
+	home, err := os.UserHomeDir()
+	dirs := []string{}
+	if err == nil && home != "" {
+		dirs = append(dirs, filepath.Join(home, ".local", "share", "applications"))
+	}
+	dirs = append(dirs, "/usr/share/applications")
+	return dirs
+}
+
+// resolveDesktopFile finds the .desktop file whose Exec line launches
+// binPath. It matches on the binary basename so channel variants
+// (brave-browser-nightly, microsoft-edge-beta) resolve to their own
+// launcher. Returns "" when nothing matches.
+func resolveDesktopFile(binPath string, dirs []string) string {
+	base := filepath.Base(binPath)
+	for _, dir := range dirs {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".desktop") {
+				continue
+			}
+			raw, err := os.ReadFile(filepath.Join(dir, e.Name()))
+			if err != nil {
+				continue
+			}
+			for _, line := range strings.Split(string(raw), "\n") {
+				line = strings.TrimSpace(line)
+				if !strings.HasPrefix(line, "Exec=") {
+					continue
+				}
+				fields := strings.Fields(strings.TrimPrefix(line, "Exec="))
+				if len(fields) == 0 {
+					continue
+				}
+				prog := strings.Trim(fields[0], `"'`)
+				if prog == binPath || filepath.Base(prog) == base {
+					return e.Name()
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// setSystemDefault makes desktop (a .desktop file name, e.g.
+// "microsoft-edge.desktop") the system default browser via xdg-settings,
+// so link handlers and login flows follow the chosen runtime.
+func setSystemDefault(desktop string) error {
+	if _, err := exec.LookPath("xdg-settings"); err != nil {
+		return fmt.Errorf("xdg-settings not found")
+	}
+	cmd := exec.Command("xdg-settings", "set", "default-web-browser", desktop)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("xdg-settings: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// xdgCurrentDefault reports the current system default browser's .desktop
+// file, or "" when unset or unknown.
+func xdgCurrentDefault() string {
+	if _, err := exec.LookPath("xdg-settings"); err != nil {
+		return ""
+	}
+	out, err := exec.Command("xdg-settings", "get", "default-web-browser").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// ---------------------------------------------------------------------------
 // detection
 // ---------------------------------------------------------------------------
 
@@ -312,6 +392,7 @@ type model struct {
 	status        string
 	ok            bool
 	pendingPolicy *browserState // after set-default: offer policy deploy
+	pendingXdg    *browserState // after set-default: offer system-default flip
 	width, height int
 }
 
@@ -541,6 +622,7 @@ func (m model) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ok = true
 			m.screen = screenResult
 			m.pendingPolicy = st
+			m.pendingXdg = st
 			return m, nil
 		case confirmDeployPolicy:
 			command, err := deployPolicyShell(st.policyDir)
@@ -578,11 +660,38 @@ func (m model) updateResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, runShellCmd(command, "navi policy deployed to", st.def.Name, confirmDeployPolicy)
 	}
+
+	// after a set-default, "d" offers the system-default flip. Opt-in: the
+	// runtime choice alone never changes the xdg default.
+	if m.pendingXdg != nil && msg.String() == "d" {
+		st := m.pendingXdg
+		m.pendingXdg = nil
+		desktop := resolveDesktopFile(st.binPath, applicationsDirs())
+		switch {
+		case desktop == "":
+			m.status = fmt.Sprintf("no .desktop launcher found for %s — system default unchanged.", st.def.Name)
+			m.ok = false
+		case desktop == xdgCurrentDefault():
+			m.status = fmt.Sprintf("%s is already the system default browser.", st.def.Name)
+			m.ok = true
+		default:
+			if err := setSystemDefault(desktop); err != nil {
+				m.status = fmt.Sprintf("could not set system default: %v", err)
+				m.ok = false
+			} else {
+				m.status = fmt.Sprintf("%s is now the system default browser too — link handlers and login flows follow it.", st.def.Name)
+				m.ok = true
+			}
+		}
+		return m, nil
+	}
+
 	switch msg.Type {
 	case tea.KeyEnter, tea.KeyEsc:
 		m.screen = screenBrowse
 		m.status = ""
 		m.pendingPolicy = nil
+		m.pendingXdg = nil
 		return m, nil
 	}
 	if msg.String() == "q" {
@@ -750,6 +859,13 @@ func (m model) resultView() string {
 		b.WriteString(theme.Dimmed.Render("  Without it, webapps lose the theme, uBlock Origin Lite, and Proton Pass."))
 		b.WriteString("\n\n")
 		keys = append(keys, [2]string{"p", "deploy policy now"})
+	}
+	if m.pendingXdg != nil {
+		b.WriteString(theme.Dimmed.Render(fmt.Sprintf("  Make %s the system default browser too?", m.pendingXdg.def.Name)))
+		b.WriteString("\n")
+		b.WriteString(theme.Dimmed.Render("  Link handlers and login flows (like GitHub auth) follow the system default."))
+		b.WriteString("\n\n")
+		keys = append(keys, [2]string{"d", "set as system default"})
 	}
 	keys = append(keys, [2]string{"enter", "back"}, [2]string{"q", "quit"})
 	b.WriteString(theme.Footer(true, keys...))

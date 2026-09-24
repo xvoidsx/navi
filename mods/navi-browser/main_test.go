@@ -183,3 +183,82 @@ func TestBrowseViewNoSequenceLeak(t *testing.T) {
 		t.Fatal("view does not mention the installed browser")
 	}
 }
+
+func TestResolveDesktopFile(t *testing.T) {
+	appdir := t.TempDir()
+	write := func(name, exec string) {
+		os.WriteFile(filepath.Join(appdir, name),
+			[]byte("[Desktop Entry]\nName=X\nExec="+exec+"\n"), 0o644)
+	}
+	write("microsoft-edge.desktop", "/usr/bin/microsoft-edge-stable --profile-directory=Default %U")
+	write("brave-browser-nightly.desktop", "brave-browser-nightly --no-first-run")
+	write("firefox-esr.desktop", "/usr/bin/firefox-esr %u")
+	write("quoted.desktop", `"/opt/weird browser/bin" --flag`)
+
+	dirs := []string{filepath.Join(t.TempDir(), "missing"), appdir}
+
+	if got := resolveDesktopFile("/usr/bin/microsoft-edge-stable", dirs); got != "microsoft-edge.desktop" {
+		t.Fatalf("edge = %q, want microsoft-edge.desktop", got)
+	}
+	// basename match, no absolute path in Exec
+	if got := resolveDesktopFile("/usr/bin/brave-browser-nightly", dirs); got != "brave-browser-nightly.desktop" {
+		t.Fatalf("brave nightly = %q, want brave-browser-nightly.desktop", got)
+	}
+	if got := resolveDesktopFile("/usr/bin/firefox-esr", dirs); got != "firefox-esr.desktop" {
+		t.Fatalf("firefox = %q, want firefox-esr.desktop", got)
+	}
+	if got := resolveDesktopFile("/nope/not-installed", dirs); got != "" {
+		t.Fatalf("unknown binary = %q, want empty", got)
+	}
+	if got := resolveDesktopFile("/usr/bin/microsoft-edge-stable", []string{filepath.Join(t.TempDir(), "missing")}); got != "" {
+		t.Fatalf("missing dir = %q, want empty", got)
+	}
+}
+
+// fakeXdgSettings drops a stub xdg-settings on PATH that logs its args.
+func fakeXdgSettings(t *testing.T, getReply string) (bindir, log string) {
+	t.Helper()
+	bindir = t.TempDir()
+	log = filepath.Join(t.TempDir(), "args.log")
+	script := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$@\" >> " + log + "\n" +
+		"if [ \"$1\" = get ]; then printf '%s\\n' " + getReply + "; fi\n" +
+		"exit 0\n"
+	os.WriteFile(filepath.Join(bindir, "xdg-settings"), []byte(script), 0o755)
+	return bindir, log
+}
+
+func TestSetSystemDefault(t *testing.T) {
+	home := t.TempDir()
+	bindir, log := fakeXdgSettings(t, "")
+	withEnv(t, home, bindir)
+
+	if err := setSystemDefault("microsoft-edge.desktop"); err != nil {
+		t.Fatalf("setSystemDefault: %v", err)
+	}
+	args, _ := os.ReadFile(log)
+	want := "set\ndefault-web-browser\nmicrosoft-edge.desktop\n"
+	if string(args) != want {
+		t.Fatalf("xdg-settings args = %q, want %q", args, want)
+	}
+
+	// no xdg-settings on PATH: clean error, no exec attempt
+	withEnv(t, home, t.TempDir())
+	if err := setSystemDefault("microsoft-edge.desktop"); err == nil ||
+		!strings.Contains(err.Error(), "xdg-settings not found") {
+		t.Fatalf("missing xdg-settings err = %v, want 'xdg-settings not found'", err)
+	}
+}
+
+func TestXdgCurrentDefault(t *testing.T) {
+	home := t.TempDir()
+	bindir, _ := fakeXdgSettings(t, "brave-browser.desktop")
+	withEnv(t, home, bindir)
+	if got := xdgCurrentDefault(); got != "brave-browser.desktop" {
+		t.Fatalf("xdgCurrentDefault = %q, want brave-browser.desktop", got)
+	}
+	withEnv(t, home, t.TempDir()) // no xdg-settings
+	if got := xdgCurrentDefault(); got != "" {
+		t.Fatalf("xdgCurrentDefault without xdg-settings = %q, want empty", got)
+	}
+}

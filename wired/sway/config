@@ -144,9 +144,9 @@ bindsym Mod1+e exec --no-startup-id "remoji"
 
 # browser keybinds
 # alt+B for firefox-esr
-# alt+Shift+B for chromium
+# alt+Shift+B for the default Chromium browser (follows navi-browser)
 bindsym Mod1+b exec --no-startup-id "firefox-esr"
-bindsym Mod1+Shift+b exec --no-startup-id "chromium"
+bindsym Mod1+Shift+b exec --no-startup-id "navi-browser-run"
 
 # navi-Q (pop-up terminal/agent)
 # alt+A for pop-up agent
