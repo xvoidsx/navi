@@ -97,7 +97,9 @@ PKGS=(
   # NaviVim (default terminal IDE): telescope needs ripgrep + fd
   # (Debian calls it fd-find), treesitter parsers and fzf-native compile
   # at first launch (build-essential), shellcheck for config linting.
-  ripgrep fd-find shellcheck build-essential
+  # fzf also ships system-wide: ani-cli needs it, and it's handy
+  # everywhere else too.
+  ripgrep fd-find fzf shellcheck build-essential
   # eiri QoL prototypes: Alt+Tab switcher (screenshot/crop/thumbnail) and
   # the bottom-center volume OSD (GTK3 popup).
   grim python3-pil python3-gi gir1.2-gtk-3.0
