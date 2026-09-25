@@ -25,7 +25,7 @@ case "${1:-}" in
         # default agent, chosen in the agent center (~/.config/navi/default-agent)
         _qa="$(cat "$HOME/.config/navi/default-agent" 2>/dev/null)"
         case "$_qa" in
-            pi|omp|opencode|codex|agy|crush|goose) COMMAND=("$_qa") ;;
+            pi|omp|opencode|codex|agy|crush|goose|hermes|openclaw|muse|aider|kilo|copilot|kimi|claude|gemini) COMMAND=("$_qa") ;;
             *) COMMAND=("$OC") ;;
         esac
         unset _qa

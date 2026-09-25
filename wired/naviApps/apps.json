@@ -1229,6 +1229,30 @@
   "icon": "🐙"
  },
  {
+  "id": "agent-claude-code",
+  "name": "Claude Code",
+  "summary": "Anthropic's agentic coding CLI — Claude in the terminal, deeply at home in your codebase.",
+  "category": "agents",
+  "source": "agent",
+  "package": "claude",
+  "install": "doas npm install -g @anthropic-ai/claude-code",
+  "remove": "doas npm uninstall -g @anthropic-ai/claude-code",
+  "homepage": "https://docs.anthropic.com/en/docs/claude-code",
+  "icon": "🟠"
+ },
+ {
+  "id": "agent-gemini-cli",
+  "name": "Gemini CLI",
+  "summary": "Google's terminal agent — Gemini's coding and research chops in your shell.",
+  "category": "agents",
+  "source": "agent",
+  "package": "gemini",
+  "install": "doas npm install -g @google/gemini-cli",
+  "remove": "doas npm uninstall -g @google/gemini-cli",
+  "homepage": "https://github.com/google-gemini/gemini-cli",
+  "icon": "✨"
+ },
+ {
   "id": "web-cloudflare",
   "name": "Cloudflare",
   "summary": "DNS, CDN, and edge infra — the Cloudflare dashboard as a navi webapp.",
@@ -1348,5 +1372,76 @@
   "install": "navi-extras --install cliamp",
   "homepage": "https://github.com/bjarneo/cliamp",
   "icon": "🎵"
+ },
+ {
+  "id": "native-navivim",
+  "name": "NaviVim",
+  "summary": "navi's default terminal IDE — Neovim with a hand-rolled config, Telescope-style finding, and a dashboard that says “Close the world. Open the Wired.”",
+  "category": "Editors",
+  "source": "native",
+  "package": "nvim",
+  "install": "navi-extras --install navivim",
+  "homepage": "https://github.com/xvoidsx/navivim",
+  "icon": "🌌"
+ },
+ {
+  "id": "native-vim",
+  "name": "Vim",
+  "summary": "The ubiquitous terminal editor — modal, everywhere, and already muscle memory for half the planet.",
+  "category": "Editors",
+  "source": "native",
+  "package": "vim",
+  "install": "doas apt install -y vim",
+  "remove": "doas apt remove -y vim",
+  "homepage": "https://www.vim.org",
+  "icon": "⌨️"
+ },
+ {
+  "id": "native-vscode",
+  "name": "VS Code",
+  "summary": "Microsoft's Electron-based editor — the extension marketplace everything else is measured against.",
+  "category": "Editors",
+  "source": "native",
+  "package": "code",
+  "install": "navi-extras --install vscode",
+  "remove": "doas apt remove -y code",
+  "homepage": "https://code.visualstudio.com",
+  "icon": "🆚"
+ },
+ {
+  "id": "native-vscodium",
+  "name": "VSCodium",
+  "summary": "The community build of VS Code — the same editor with none of Microsoft's telemetry.",
+  "category": "Editors",
+  "source": "native",
+  "package": "codium",
+  "install": "navi-extras --install vscodium",
+  "remove": "doas apt remove -y codium",
+  "homepage": "https://vscodium.com",
+  "icon": "💠"
+ },
+ {
+  "id": "native-zed",
+  "name": "Zed",
+  "summary": "The fast, collaborative editor — Rust-native speed, multiplayer editing, AI built in.",
+  "category": "Editors",
+  "source": "native",
+  "package": "zed",
+  "install": "curl -fsSL https://zed.dev/install.sh | sh",
+  "remove": "rm -f \"$HOME/.local/bin/zed\"",
+  "homepage": "https://zed.dev",
+  "icon": "⚡"
+ },
+ {
+  "id": "native-sublime-text",
+  "name": "Sublime Text",
+  "summary": "The speed-demon proprietary editor — Goto Anything, multiple cursors, instant startup.",
+  "category": "Editors",
+  "source": "native",
+  "package": "subl",
+  "install": "navi-extras --install sublime",
+  "remove": "doas apt remove -y sublime-text",
+  "homepage": "https://www.sublimetext.com",
+  "icon": "🖋️"
  }
 ]
