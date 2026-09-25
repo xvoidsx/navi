@@ -25,7 +25,7 @@ EXTRAS=(
   "firefox-nightly|Firefox Nightly|Bleeding-edge Firefox, straight from Mozilla's apt repo|command -v firefox-nightly >/dev/null 2>&1|nightly-browsers.sh|firefox"
   "brave-nightly|Brave Nightly|Bleeding-edge Brave, for life on the edge|command -v brave-browser-nightly >/dev/null 2>&1|nightly-browsers.sh|brave"
   "chrome|Google Chrome|The browser half the planet uses, from Google's own apt repo|command -v google-chrome >/dev/null 2>&1|chrome-installer.sh|"
-  "edge|Microsoft Edge|Microsoft's Chromium-based browser, from Microsoft's own apt repo|command -v microsoft-edge >/dev/null 2>&1|msedge-installer.sh|"
+  "edge|Microsoft Edge|Microsoft's Chromium-based browser, from Microsoft's own apt repo|command -v microsoft-edge-stable >/dev/null 2>&1|msedge-installer.sh|"
   "yandex|Yandex Browser|Yandex's Chromium-based browser, from Yandex's own apt repo|command -v yandex-browser >/dev/null 2>&1|yandexbrowser-installer.sh|"
   "helium|Helium|Minimal Chromium-based browser, from Helium's own apt repo|command -v helium >/dev/null 2>&1 || command -v helium-bin >/dev/null 2>&1|helium-installer.sh|"
   "ani-cli|ani-cli|Watch anime in the terminal|command -v ani-cli >/dev/null 2>&1 || [ -x /usr/local/bin/ani-cli ]|ani-cli-installer.sh|"
@@ -103,7 +103,7 @@ run_installer() { # <entry> — returns the installer's exit code
 }
 
 cmd_install() { # <id>
-  local e
+  local e rc
   e="$(find_extra "$1")" || { echo "unknown extra: $1 (try --list)" >&2; return 2; }
   local name
   name="$(field "$e" 2)"
@@ -122,7 +122,14 @@ cmd_install() { # <id>
       return 1
     fi
   else
-    printf '  %b✗%b %s failed to install (exit %s) — nothing else was touched.\n' "$pink" "$reset" "$name" "$?"
+    # the installer failed — propagate its exit code. falling off the end
+    # here used to return the printf's 0, so navi-get reported "installed"
+    # for software that never installed (seen with Edge on low-memory
+    # machines: dpkg-deb's decompress got OOM-killed, apt failed, and the
+    # menu still claimed success).
+    rc=$?
+    printf '  %b✗%b %s failed to install (exit %s) — nothing else was touched.\n' "$pink" "$reset" "$name" "$rc"
+    return "$rc"
   fi
 }
 
