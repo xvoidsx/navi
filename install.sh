@@ -103,6 +103,10 @@ PKGS=(
   # eiri QoL prototypes: Alt+Tab switcher (screenshot/crop/thumbnail) and
   # the bottom-center volume OSD (GTK3 popup).
   grim python3-pil python3-gi gir1.2-gtk-3.0
+  # zram-tools: compressed swap for low-memory machines (setup_zram
+  # enables it only when RAM <= 2 GiB). the cloudbook bench proved big
+  # deb unpacks OOM without it.
+  zram-tools
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -1097,6 +1101,43 @@ tighten_sudo() {
   ok "provisioning NOPASSWD removed; sudo now asks for the login password"
 }
 
+setup_zram() {
+  step "zram (compressed swap)"
+  # shellcheck disable=SC1091
+  source "$REPO_DIR/scripts/lib/hardware.sh"
+  if ! navi_is_lowmem; then
+    ok "plenty of RAM — zram left alone"
+    return 0
+  fi
+  # low-memory machine (the cloudbook bench, old thinkpads, little pis):
+  # a compressed swap device in RAM, so big deb unpacks and heavy
+  # browser tabs stop getting OOM-killed. permanent and system-wide —
+  # this is why the per-installer memory warnings are gone.
+  if [ ! -f /etc/default/zramswap ] \
+    || ! grep -q "^ALGO=zstd" /etc/default/zramswap 2>/dev/null; then
+    $DOAS tee /etc/default/zramswap >/dev/null <<'EOF'
+# managed by navi (setup_zram) — compressed swap for low-memory machines
+ALGO=zstd
+PERCENT=50
+PRIORITY=100
+EOF
+    ok "zram configured (zstd, 50% of RAM)"
+  else
+    ok "zram already configured"
+  fi
+  if ! $DOAS systemctl is-enabled -q zramswap.service 2>/dev/null; then
+    $DOAS systemctl enable zramswap.service >/dev/null \
+      || warn "could not enable zramswap.service"
+  fi
+  if navi_zram_active; then
+    ok "zram swap already active"
+  elif $DOAS systemctl start zramswap.service 2>/dev/null; then
+    ok "zram swap active"
+  else
+    warn "zram configured but could not be started — it will come up on next boot"
+  fi
+}
+
 setup_environment() {
   step "environment"
   if [ -f "$WIRED_SHARE/../system/environment" ]; then
@@ -1499,6 +1540,7 @@ main() {
     install_commands
     setup_doas
     setup_sudo
+    setup_zram
     setup_agents
     setup_navivim
     setup_mods
@@ -1535,6 +1577,7 @@ main() {
   install_commands
   setup_doas
   setup_sudo
+  setup_zram
   setup_agents
   setup_navivim
   setup_mods
