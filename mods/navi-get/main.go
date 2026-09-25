@@ -137,7 +137,7 @@ func removeCmd(a app) string {
 		return a.Remove
 	}
 	if a.Source == "webapp" && a.Package != "" {
-		return "navi-webapp --uninstall " + a.Package
+		return "navi-webapp uninstall " + a.Package
 	}
 	return ""
 }

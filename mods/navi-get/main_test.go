@@ -66,7 +66,7 @@ func TestRemoveCmd(t *testing.T) {
 		t.Fatalf("native remove: %q", got)
 	}
 	// webapp entries synthesize the navi-webapp spelling
-	if got := removeCmd(apps[2]); got != "navi-webapp --uninstall navi-radio" {
+	if got := removeCmd(apps[2]); got != "navi-webapp uninstall navi-radio" {
 		t.Fatalf("webapp remove: %q", got)
 	}
 	// agents with no remove field and no fallback
