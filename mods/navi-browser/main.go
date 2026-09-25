@@ -84,6 +84,13 @@ var browserTable = []browserDef{
 		ExtrasID:  "brave-nightly",
 	},
 	{
+		ID: "brave-origin", Name: "Brave Origin",
+		Blurb:     "Brave stripped to its essentials — Shields and speed, none of the crypto/AI/VPN extras.",
+		Binaries:  []string{"brave-origin-stable", "brave-origin"},
+		PolicyDir: "/etc/brave/policies/managed",
+		ExtrasID:  "brave-origin",
+	},
+	{
 		ID: "chrome", Name: "Google Chrome",
 		Blurb:     "The reference build — stock Chromium plus Google's services.",
 		Binaries:  []string{"google-chrome-stable", "google-chrome"},

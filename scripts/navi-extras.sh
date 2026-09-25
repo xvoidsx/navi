@@ -24,6 +24,7 @@ x="= = = = = navi extras = = = = ="
 EXTRAS=(
   "firefox-nightly|Firefox Nightly|Bleeding-edge Firefox, straight from Mozilla's apt repo|command -v firefox-nightly >/dev/null 2>&1|nightly-browsers.sh|firefox"
   "brave-nightly|Brave Nightly|Bleeding-edge Brave, for life on the edge|command -v brave-browser-nightly >/dev/null 2>&1|nightly-browsers.sh|brave"
+  "brave-origin|Brave Origin|Brave stripped to its essentials — Shields and speed, minus the crypto, AI, and VPN extras. Free on Linux|command -v brave-origin-stable >/dev/null 2>&1|brave-origin-installer.sh|"
   "chrome|Google Chrome|The browser half the planet uses, from Google's own apt repo|command -v google-chrome >/dev/null 2>&1|chrome-installer.sh|"
   "edge|Microsoft Edge|Microsoft's Chromium-based browser, from Microsoft's own apt repo|command -v microsoft-edge-stable >/dev/null 2>&1|msedge-installer.sh|"
   "yandex|Yandex Browser|Yandex's Chromium-based browser, from Yandex's own apt repo|command -v yandex-browser >/dev/null 2>&1|yandexbrowser-installer.sh|"

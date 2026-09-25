@@ -1279,6 +1279,18 @@
   "icon": "🦁"
  },
  {
+  "id": "native-brave-origin",
+  "name": "Brave Origin",
+  "summary": "Brave stripped to its essentials — Shields and speed, minus the crypto, AI, and VPN extras. Free on Linux.",
+  "category": "Internet",
+  "source": "native",
+  "package": "brave-origin",
+  "install": "navi-extras --install brave-origin",
+  "remove": "doas apt remove -y brave-origin",
+  "homepage": "https://brave.com/",
+  "icon": "🦁"
+ },
+ {
   "id": "native-edge",
   "name": "Microsoft Edge",
   "summary": "Microsoft's Chromium-based browser — from Microsoft's own apt repo.",
