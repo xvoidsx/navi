@@ -9,7 +9,7 @@
 // brave-browser --app.
 //
 // Switching the binary alone would silently drop navi's managed policy
-// (theme, uBlock Origin Lite, Proton Pass), so the picker also deploys navi.json to
+// (theme, blackice, Proton Pass), so the picker also deploys navi.json to
 // the chosen browser's managed-policy directory. Policy directories differ
 // across Chromium forks, so the picker probes each browser binary for its
 // compiled-in policy path and falls back to the known table when the probe
@@ -863,7 +863,7 @@ func (m model) resultView() string {
 	if m.pendingPolicy != nil {
 		b.WriteString(theme.Dimmed.Render(fmt.Sprintf("  %s is the default but doesn't have navi's policy yet.", m.pendingPolicy.def.Name)))
 		b.WriteString("\n")
-		b.WriteString(theme.Dimmed.Render("  Without it, webapps lose the theme, uBlock Origin Lite, and Proton Pass."))
+		b.WriteString(theme.Dimmed.Render("  Without it, webapps lose the theme, blackice, and Proton Pass."))
 		b.WriteString("\n\n")
 		keys = append(keys, [2]string{"p", "deploy policy now"})
 	}
