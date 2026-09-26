@@ -120,8 +120,8 @@ bindsym $mod+Return exec alacritty
 bindsym $mod+Shift+q kill
 
 # bindings for turning gaps on and off
-bindsym $mod+g exec --no-startup-id "swaymsg 'gaps inner 6; gaps outer 9' && notify-send 'wired helper' 'Gaps enabled.'"
-bindsym $mod+Shift+g exec --no-startup-id "swaymsg 'gaps inner 0; gaps outer 0' && notify-send 'wired helper' 'Gaps disabled.'"
+bindsym $mod+g exec --no-startup-id "swaymsg 'gaps inner all set 6; gaps outer all set 9' && notify-send 'wired helper' 'Gaps enabled.'"
+bindsym $mod+Shift+g exec --no-startup-id "swaymsg 'gaps inner all set 0; gaps outer all set 0' && notify-send 'wired helper' 'Gaps disabled.'"
 
 # navi launchers
 bindsym $mod+d exec dmenu_run -fn "NotoSans-10" -nb black -nf pink -sb green -sf red -p "nightshade - run command: "

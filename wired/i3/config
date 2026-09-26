@@ -169,9 +169,9 @@ bindsym $mod+Shift+q kill
 # GAPS
 ################################################################
 
-bindsym $mod+g exec --no-startup-id "i3-msg 'gaps inner 6; gaps outer 9' && notify-send 'wired helper' 'Gaps enabled.'"
+bindsym $mod+g exec --no-startup-id "i3-msg 'gaps inner all set 6; gaps outer all set 9' && notify-send 'wired helper' 'Gaps enabled.'"
 
-bindsym $mod+Shift+g exec --no-startup-id "i3-msg 'gaps inner 0; gaps outer 0' && notify-send 'wired helper' 'Gaps disabled.'"
+bindsym $mod+Shift+g exec --no-startup-id "i3-msg 'gaps inner all set 0; gaps outer all set 0' && notify-send 'wired helper' 'Gaps disabled.'"
 
 
 ################################################################
