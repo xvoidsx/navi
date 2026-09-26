@@ -17,7 +17,7 @@ Super+S: Switch to stacked windowing.
 Super+E: Switch to tiled windowing.
 Super+Shift+R: Restart the window manager in-place.
 Super+Shift+Z: Lock your screen (uses wired-lock/swaylock).
-Super+P: Take a screenshot with grimshot (copies to clipboard).
+Super+P: navishot picker - screenshot a selected area, a window, or the entire screen (saves to Pictures/Screenshots, copies to clipboard).
 Super+Shift+N: Pop out recent notifications.
 Super+Shift+F: Pop out file manager (nemo).
 Super+C: Pop out a calendar window (gsimplecal).

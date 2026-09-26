@@ -209,7 +209,7 @@ bindsym Caps_Lock exec --no-startup-id "notify-send 'wired helper' 'Caps Lock pr
 
 # Screenshot
 # X11-native screenshot implementation.
-bindsym $mod+p exec --no-startup-id "flameshot gui"
+bindsym $mod+p exec --no-startup-id "navishot"
 
 # System monitor
 bindsym Mod1+h exec --no-startup-id "alacritty -e htop"

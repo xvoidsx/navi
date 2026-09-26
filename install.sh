@@ -65,7 +65,7 @@ PKGS=(
   i3 i3lock-fancy nitrogen pamixer wget curl git htop opendoas sudo lsd
   nsxiv pulseaudio-utils xcompmgr picom waybar alacritty fonts-inter xterm
   arandr nemo rofi xss-lock feh pandoc volumeicon-alsa polybar blueman dunst
-  flameshot meteo-qt pasystray ffmpeg mpv kitty stterm surf conky-all suckless-tools zathura zathura-pdf-poppler
+  flameshot meteo-qt pasystray ffmpeg mpv kitty stterm surf conky-all suckless-tools zathura zathura-pdf-poppler maim xdotool xclip
   lxpolkit lxappearance vim nnn cmus cava amfora sway swaylock
   swayidle swaybg grimshot xdg-desktop-portal-wlr qt5ct tty-clock wf-recorder
   brightnessctl sakura foot gsimplecal calcurse pavucontrol yaru-theme-gtk yaru-theme-icon bibata-cursor-theme
@@ -986,6 +986,7 @@ install_commands() {
   install_bin "navi-webapp.sh"      "navi-webapp"
   install_bin "navi-browser-run.sh" "navi-browser-run"
   install_bin "navi-notifs.sh"       "navi-notifs"
+  install_bin "navishot.sh"          "navishot"
 
   # distro-level tools live in scripts/ (repo root), outside the /wired
   # desktop layer — same /usr/bin destination, same rofi visibility.
