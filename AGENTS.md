@@ -271,6 +271,14 @@ it, and only for what's actually done.
 - **Field failures get field-grade diagnostics.** When a launcher misbehaves
   on hardware, it must leave logs (`mod-open.log`); diagnose the live
   output, not the mocks.
+- **`gaps` has two forms; runtime changes must use the 4-arg one.** sway/i3's
+  2-arg form (`gaps inner 0`) is the *config-directive* path — it only sets the
+  default for future workspaces and never re-arranges the live ones. Anything
+  that changes gaps at runtime (keybinds, scripts) must use the 4-arg form
+  (`gaps inner all set 0`), which applies per-workspace and re-arranges
+  immediately. The old Super+G/Super+Shift+G bindings silently did nothing
+  until windows moved to a fresh workspace — which initializes from the new
+  defaults.
 
 ## naviApps catalog rule
 
