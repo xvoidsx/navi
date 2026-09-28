@@ -44,11 +44,12 @@ const (
 	tabOutputs
 	tabInputs
 	tabConfig
+	tabNowPlaying
 )
 
-const numTabs = 5
+const numTabs = 6
 
-var tabTitles = []string{"PLAYBACK", "RECORDING", "OUTPUTS", "INPUTS", "CONFIG"}
+var tabTitles = []string{"PLAYBACK", "REC", "OUTPUTS", "INPUTS", "CONFIG", "PLAYING"}
 
 type screen int
 
@@ -135,6 +136,18 @@ type model struct {
 	err     error
 
 	animFrame int
+
+	// now-playing tab state (MPRIS via playerctl)
+	npPlayers   []string
+	npPlayer    string
+	npState     State
+	npPosBase   time.Duration
+	npPosAnchor time.Time
+	npArtKey    string
+	npArt       artBlock
+	npArtBusy   bool
+	npNote      string
+	npErr       string
 
 	// subscribe plumbing
 	subCh      chan string
@@ -328,6 +341,56 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tx, cmd = m.tx.Update(msg)
 		return m, cmd
 
+	case npPlayersMsg:
+		m.npPlayers = msg
+		if m.npPlayer == "" && len(m.npPlayers) > 0 {
+			m.npPlayer = m.npPlayers[0]
+			return m, npPollCmd(m.npPlayer)
+		}
+		return m, nil
+
+	case npStateMsg:
+		if m.tab != tabNowPlaying {
+			return m, nil // left the tab while the read was in flight
+		}
+		return m, m.npApplyState(msg.st)
+
+	case npArtMsg:
+		// Drop a stale render that arrived after the track changed.
+		if msg.key == m.npArtKey {
+			m.npArt, m.npArtBusy = msg.block, false
+		}
+		return m, nil
+
+	case npControlMsg:
+		if msg.err != nil {
+			if unsupported(msg.err) {
+				// Self-healing capability discovery, inherited
+				// from navi-nowplaying: the first press that
+				// fails teaches the tab the key is dead, and
+				// from then on it renders faint.
+				if m.npState.Unavailable == nil {
+					m.npState.Unavailable = map[string]bool{}
+				}
+				m.npState.Unavailable[msg.verb] = true
+				m.npSetNote("this player can't " + npHumanVerb(msg.verb))
+			} else {
+				m.npSetErr(msg.err.Error())
+			}
+		}
+		if m.tab == tabNowPlaying {
+			return m, npPollCmd(m.npPlayer)
+		}
+		return m, nil
+
+	case npPollTickMsg:
+		// Only poll while the tab is visible: three playerctl
+		// forks every 1.5s is cheap, but pointless when unobserved.
+		if m.tab == tabNowPlaying && havePlayer() {
+			return m, tea.Batch(npPollTickCmd(), npPollCmd(m.npPlayer))
+		}
+		return m, nil
+
 	case transTickMsg:
 		if m.transition > 0 {
 			m.transition--
@@ -383,6 +446,7 @@ func (m *model) clampCursors() {
 		len(m.sinks),
 		len(m.visibleSources()),
 		len(m.cards),
+		0, // tabNowPlaying: no cursor rows
 	}
 	for i := 0; i < numTabs; i++ {
 		if m.cursor[i] >= lengths[i] {
@@ -426,8 +490,10 @@ func (m model) rowCount() int {
 		return len(m.sinks)
 	case tabInputs:
 		return len(m.visibleSources())
-	default:
+	case tabConfig:
 		return len(m.cards)
+	default: // tabNowPlaying: no cursor rows
+		return 0
 	}
 }
 
@@ -439,11 +505,19 @@ func (m *model) moveCursor(d int) {
 	m.cursor[m.tab] = (m.cursor[m.tab] + d + n) % n
 }
 
-func (m *model) setTab(t tab) {
+func (m *model) setTab(t tab) tea.Cmd {
 	m.tab = t
 	m.transition = transFrames
 	m.message = ""
 	m.err = nil
+	cmds := []tea.Cmd{transTickCmd()}
+	if t == tabNowPlaying {
+		m.npNote, m.npErr = "", ""
+		if cmd := m.npEnterCmd(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m model) curStream(playback bool) (Stream, bool) {
@@ -492,18 +566,21 @@ func (m model) updateMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m.quit()
 	case "tab":
-		m.setTab((m.tab + 1) % numTabs)
-		return m, transTickCmd()
+		return m, m.setTab((m.tab + 1) % numTabs)
 	case "shift+tab":
-		m.setTab((m.tab + numTabs - 1) % numTabs)
-		return m, transTickCmd()
-	case "1", "2", "3", "4", "5":
+		return m, m.setTab((m.tab + numTabs - 1) % numTabs)
+	case "1", "2", "3", "4", "5", "6":
 		t := tab(msg.String()[0] - '1')
 		if t != m.tab {
-			m.setTab(t)
-			return m, transTickCmd()
+			return m, m.setTab(t)
 		}
 		return m, nil
+	}
+	// The now-playing tab owns its keys (transport, not mixer).
+	if m.tab == tabNowPlaying {
+		return m.updateNowPlaying(msg)
+	}
+	switch msg.String() {
 	case "up", "k":
 		m.moveCursor(-1)
 	case "down", "j":
@@ -817,6 +894,9 @@ func (m model) tabBar() string {
 			parts = append(parts, theme.Dimmed.Render(" "+label))
 		}
 	}
+	// Single-space join: six tabs must stay on one 62-cell line
+	// ("▸1 PLAYBACK 2 REC 3 OUTPUTS 4 INPUTS 5 CONFIG 6 PLAYING"
+	// is 60 cells; anything longer wraps — lipgloss wraps past 62).
 	return strings.Join(parts, " ")
 }
 
@@ -824,40 +904,160 @@ func (m model) mainView() string {
 	var b strings.Builder
 	b.WriteString(m.tabBar())
 	b.WriteString("\n\n")
-	switch m.tab {
-	case tabPlayback:
-		m.writeStreams(&b, m.playback, true)
-	case tabRecording:
-		m.writeStreams(&b, m.recording, false)
-	case tabOutputs:
-		m.writeDevices(&b, m.sinks, true)
-	case tabInputs:
-		m.writeDevices(&b, m.visibleSources(), false)
-	case tabConfig:
-		m.writeCards(&b)
+	if m.tab == tabNowPlaying {
+		// The media tab renders its own body (art, meter, reserved
+		// note line) — the mixer's stream/device blocks, the audio
+		// idle line, and the op message/err lines don't apply here.
+		m.writeNowPlaying(&b)
+	} else {
+		// Every list tab renders exactly audioMiddleLines: a 6-line
+		// row section (three two-line rows, windowed around the
+		// cursor) plus a 2-line status section. The frame never
+		// grows or shrinks between tabs — it always exactly fills
+		// the 66x19 window.
+		b.WriteString(m.tabMiddle())
 	}
-	if m.message != "" {
-		b.WriteString("\n" + okStyle.Render("✓ "+m.message) + "\n")
-	}
-	if m.err != nil {
-		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
-	}
-	if m.daemonErr != nil {
-		b.WriteString("\n" + theme.Error.Render("× audio daemon unreachable") + "\n")
-		b.WriteString(theme.Dimmed.Render("  "+truncateRunes(m.daemonErr.Error(), 56)) + "\n")
-		b.WriteString(theme.Dimmed.Render("  is PulseAudio running? press R to retry") + "\n")
-	} else if m.loading {
-		b.WriteString("\n" + theme.Spinner(m.animFrame) + " " + theme.Dimmed.Render("listening to the daemon...") + "\n")
-	} else if !m.audioLive() {
-		// Nothing moving: the mod breathes, waiting.
-		b.WriteString("\n" + theme.Glow("  ○ the Wired is silent — listening", time.Now()) + "\n")
-	}
-	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
+	// The blank line before the divider is load-bearing: content is
+	// exactly 15 lines (tabBar 1 + blank 1 + middle 8 + blank 1 +
+	// divider 1 + footer 3), a constant 19-line frame in the 66x19
+	// window on every tab and every screen.
+	b.WriteString("\n\n" + theme.Divider(frameWidth) + "\n")
 	b.WriteString(m.footer())
 	return m.place(b.String())
 }
 
-func (m model) writeStreams(b *strings.Builder, streams []Stream, playback bool) {
+// audioMiddleLines is the fixed middle height every audio tab renders:
+// tabBar(1) + blank(1) + middle(8) + blank(1) + divider(1) + footer(3)
+// = 15 content lines, a constant 19-line frame in the 66x19 window.
+// List tabs split it into 6 row lines + 2 status lines; the media tab
+// renders its own 8 (art 6 + progress 1 + note 1).
+const audioMiddleLines = 8
+
+// listWindow returns the [start, end) row window: at most maxRows,
+// always containing cursor. Pure — the row renderer and the status
+// line both call it, so the scroll indicator never disagrees with
+// what's on screen.
+func listWindow(n, cursor, maxRows int) (start, end int) {
+	if n <= maxRows {
+		return 0, n
+	}
+	start = cursor - maxRows/2
+	if start < 0 {
+		start = 0
+	}
+	if start > n-maxRows {
+		start = n - maxRows
+	}
+	return start, start + maxRows
+}
+
+// padLines forces s to exactly n lines (pads with blanks, clips the
+// tail). Fixed-height frames depend on it everywhere.
+func padLines(s string, n int) string {
+	lines := strings.Split(strings.TrimSuffix(s, "\n"), "\n")
+	for len(lines) < n {
+		lines = append(lines, "")
+	}
+	if len(lines) > n {
+		lines = lines[:n]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// tabMiddle renders the 6-line row section + 2-line status section for
+// the five mixer tabs.
+func (m model) tabMiddle() string {
+	return m.rowsSection() + "\n" + m.statusSection()
+}
+
+// rowsSection renders exactly 6 lines: three two-line rows windowed
+// around the cursor, padded with blanks when the list is short.
+func (m model) rowsSection() string {
+	var b strings.Builder
+	const maxRows = 3
+	switch m.tab {
+	case tabPlayback:
+		m.writeWindowedStreams(&b, m.playback, true, maxRows)
+	case tabRecording:
+		m.writeWindowedStreams(&b, m.recording, false, maxRows)
+	case tabOutputs:
+		m.writeWindowedDevices(&b, m.sinks, true, maxRows)
+	case tabInputs:
+		m.writeWindowedDevices(&b, m.visibleSources(), false, maxRows)
+	case tabConfig:
+		m.writeWindowedCards(&b, maxRows)
+	}
+	return padLines(b.String(), 6)
+}
+
+// statusSection renders exactly 2 lines: the priority status message,
+// and the scroll position when the current list is windowed.
+func (m model) statusSection() string {
+	l1 := ""
+	switch {
+	case m.err != nil:
+		l1 = theme.Error.Render("× " + m.err.Error())
+	case m.message != "":
+		l1 = okStyle.Render("✓ " + m.message)
+	case m.daemonErr != nil:
+		l1 = theme.Error.Render("× audio daemon unreachable — is PulseAudio running? (R to retry)")
+	case m.loading:
+		l1 = theme.Spinner(m.animFrame) + " " + theme.Dimmed.Render("listening to the daemon...")
+	case !m.audioLive():
+		// Nothing moving: the mod breathes, waiting.
+		l1 = theme.Glow("  ○ the Wired is silent — listening", time.Now())
+	}
+	l2 := m.scrollIndicator()
+	return l1 + "\n" + l2
+}
+
+// scrollIndicator reports the window position ("↑ 2 more · ↓ 5 more")
+// when the current tab's list is taller than the visible rows.
+func (m model) scrollIndicator() string {
+	var n int
+	switch m.tab {
+	case tabPlayback:
+		n = len(m.playback)
+	case tabRecording:
+		n = len(m.recording)
+	case tabOutputs:
+		n = len(m.sinks)
+	case tabInputs:
+		n = len(m.visibleSources())
+	case tabConfig:
+		n = len(m.cards)
+	default:
+		return ""
+	}
+	const maxRows = 3
+	start, end := listWindow(n, m.cursor[m.tab], maxRows)
+	parts := make([]string, 0, 3)
+	if n > maxRows {
+		if start > 0 {
+			parts = append(parts, fmt.Sprintf("↑ %d more", start))
+		}
+		if end < n {
+			parts = append(parts, fmt.Sprintf("↓ %d more", n-end))
+		}
+	}
+	if m.tab == tabInputs && !m.showMonitors {
+		hidden := 0
+		for _, s := range m.sources {
+			if strings.HasSuffix(s.Name, ".monitor") {
+				hidden++
+			}
+		}
+		if hidden > 0 {
+			parts = append(parts, fmt.Sprintf("%d monitor(s) hidden — v to show", hidden))
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return theme.Dimmed.Render("  " + strings.Join(parts, " · "))
+}
+
+func (m model) writeWindowedStreams(b *strings.Builder, streams []Stream, playback bool, maxRows int) {
 	color := theme.Pink
 	if !playback {
 		color = theme.Cyan
@@ -870,7 +1070,9 @@ func (m model) writeStreams(b *strings.Builder, streams []Stream, playback bool)
 		b.WriteString(theme.Dimmed.Render("  no "+what+" streams right now") + "\n")
 		return
 	}
-	for i, s := range streams {
+	start, end := listWindow(len(streams), m.cursor[m.tab], maxRows)
+	for i := start; i < end; i++ {
+		s := streams[i]
 		cursor := "  "
 		name := padRight(truncateRunes(streamName(s), 24), 24)
 		if i == m.cursor[m.tab] {
@@ -892,12 +1094,14 @@ func (m model) writeStreams(b *strings.Builder, streams []Stream, playback bool)
 	// (no footnote: the shimmer just is what it is.)
 }
 
-func (m model) writeDevices(b *strings.Builder, nodes []AudioNode, isSink bool) {
+func (m model) writeWindowedDevices(b *strings.Builder, nodes []AudioNode, isSink bool, maxRows int) {
 	if len(nodes) == 0 {
 		b.WriteString(theme.Dimmed.Render("  no devices found") + "\n")
 		return
 	}
-	for i, n := range nodes {
+	start, end := listWindow(len(nodes), m.cursor[m.tab], maxRows)
+	for i := start; i < end; i++ {
+		n := nodes[i]
 		cursor := "  "
 		name := padRight(truncateRunes(n.Description, 34), 34)
 		if i == m.cursor[m.tab] {
@@ -925,25 +1129,18 @@ func (m model) writeDevices(b *strings.Builder, nodes []AudioNode, isSink bool) 
 		}
 		b.WriteString(line + "\n")
 	}
-	if m.tab == tabInputs && !m.showMonitors {
-		hidden := 0
-		for _, s := range m.sources {
-			if strings.HasSuffix(s.Name, ".monitor") {
-				hidden++
-			}
-		}
-		if hidden > 0 {
-			b.WriteString(theme.Dimmed.Render(fmt.Sprintf("  %d monitor source(s) hidden — v to show", hidden)) + "\n")
-		}
-	}
+	// (the "monitors hidden" note lives on the status line now —
+	// the row section is exactly 6 lines, no exceptions.)
 }
 
-func (m model) writeCards(b *strings.Builder) {
+func (m model) writeWindowedCards(b *strings.Builder, maxRows int) {
 	if len(m.cards) == 0 {
 		b.WriteString(theme.Dimmed.Render("  no cards found") + "\n")
 		return
 	}
-	for i, c := range m.cards {
+	start, end := listWindow(len(m.cards), m.cursor[m.tab], maxRows)
+	for i := start; i < end; i++ {
+		c := m.cards[i]
 		cursor := "  "
 		name := truncateRunes(c.Description, 54)
 		if i == m.cursor[m.tab] {
@@ -1045,6 +1242,9 @@ func (m model) streamDetail(s Stream, playback bool) string {
 }
 
 func (m model) footer() string {
+	if m.tab == tabNowPlaying {
+		return m.npFooter()
+	}
 	onDevice := m.tab == tabOutputs || m.tab == tabInputs
 	rLabel := "route"
 	switch m.tab {
@@ -1054,7 +1254,7 @@ func (m model) footer() string {
 		rLabel = "profile"
 	}
 	line1 := theme.Footer(true,
-		[2]string{"1-5", "tabs"},
+		[2]string{"1-6", "tabs"},
 		[2]string{"↑↓", "navigate"},
 		[2]string{"+/-", "volume"},
 	)
@@ -1079,9 +1279,16 @@ func (m model) routeView() string {
 	b.WriteString(theme.Header.Render("ROUTE STREAM") + "\n\n")
 	b.WriteString(theme.Normal.Render("  "+streamName(m.routeStream)) + "\n")
 	b.WriteString(theme.Dimmed.Render("  choose an "+what+" device") + "\n\n")
+	// Route targets are one line each; the list windows to 8 rows so
+	// this screen keeps the same constant 19-line frame as the tabs.
+	// Header block is 5 lines; list block pads to 7; plus the blank,
+	// divider, and (single-line) footer the content is exactly 15
+	// lines — the same constant 19-line frame as the tabs, so the
+	// border never jumps entering or leaving this screen.
+	var lb strings.Builder
 	if len(m.routeTargets) == 0 {
-		b.WriteString(theme.Dimmed.Render("  no devices available") + "\n")
-	} else {
+		lb.WriteString(theme.Dimmed.Render("  no devices available") + "\n")
+	} else if len(m.routeTargets) <= 7 {
 		for i, n := range m.routeTargets {
 			cursor := "  "
 			name := truncateRunes(n.Description, 50)
@@ -1089,10 +1296,31 @@ func (m model) routeView() string {
 				cursor = theme.Selected.Render("› ")
 				name = theme.Selected.Render(name)
 			}
-			b.WriteString(cursor + name + "\n")
+			lb.WriteString(cursor + name + "\n")
 		}
+	} else {
+		start, end := listWindow(len(m.routeTargets), m.routeCursor, 6)
+		for i := start; i < end; i++ {
+			n := m.routeTargets[i]
+			cursor := "  "
+			name := truncateRunes(n.Description, 50)
+			if i == m.routeCursor {
+				cursor = theme.Selected.Render("› ")
+				name = theme.Selected.Render(name)
+			}
+			lb.WriteString(cursor + name + "\n")
+		}
+		more := []string{}
+		if start > 0 {
+			more = append(more, fmt.Sprintf("↑ %d more", start))
+		}
+		if end < len(m.routeTargets) {
+			more = append(more, fmt.Sprintf("↓ %d more", len(m.routeTargets)-end))
+		}
+		lb.WriteString(theme.Dimmed.Render("  "+strings.Join(more, " · ")) + "\n")
 	}
-	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
+	b.WriteString(padLines(lb.String(), 7))
+	b.WriteString("\n\n" + theme.Divider(frameWidth) + "\n")
 	b.WriteString(theme.Footer(true,
 		[2]string{"↑↓", "navigate"},
 		[2]string{"enter", "route"},
@@ -1212,6 +1440,25 @@ func dumpSample() {
 	}
 	m.defaultSink = "alsa_output.pci-0000_00_1b.0.analog-stereo"
 	m.defaultSource = "alsa_input.pci-0000_00_1b.0.analog-stereo"
+
+	// Sample media state so --dump exercises the NOW PLAYING tab too.
+	m.npPlayers = []string{"chromium.instance7561"}
+	m.npPlayer = "chromium.instance7561"
+	m.npState = State{
+		Player: "chromium.instance7561",
+		Track: Track{
+			Title:  "Scars Don't Blink",
+			Artist: "Two Poins Black",
+			Album:  "トキオバーン",
+			Length: 2*time.Minute + 32*time.Second,
+		},
+		Status:      "Playing",
+		Position:    83 * time.Second,
+		Unavailable: map[string]bool{},
+	}
+	m.npPosBase, m.npPosAnchor = 83*time.Second, time.Now()
+	m.npArtKey = artKey("", npArtCols, npArtRows)
+	m.npArt = placeholder(npArtCols, npArtRows)
 
 	m.tx = theme.Transmission{Visible: true, Clean: "present day, present time...", Text: "present day, present time..."}
 
