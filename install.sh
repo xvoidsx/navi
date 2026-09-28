@@ -64,6 +64,9 @@ PKGS=(
   # doas stays the navi-native way up; see setup_sudo.
   i3 i3lock-fancy nitrogen pamixer wget curl git htop opendoas sudo lsd
   nsxiv pulseaudio-utils xcompmgr picom waybar alacritty fonts-inter xterm
+  # navi-bluetooth (eiri): BlueZ for bluetoothctl, upower for the headset
+  # battery fallback when a device doesn't report Battery Percentage itself.
+  bluez upower
   arandr nemo rofi xss-lock feh pandoc volumeicon-alsa polybar blueman dunst
   flameshot meteo-qt pasystray ffmpeg mpv kitty stterm surf conky-all suckless-tools zathura zathura-pdf-poppler maim xdotool xclip
   lxpolkit lxappearance vim nnn cmus cava amfora sway swaylock
@@ -598,6 +601,7 @@ setup_mods() {
   install_mod "navi-networking" "navi-networking"
   install_mod "navi-calendar"   "navi-calendar"
   install_mod "navi-audio"      "navi-audio"
+  install_mod "navi-bluetooth"  "navi-bluetooth"
   install_mod "navi-lain-config" "navi-lain-config"
   install_mod "navi-agents-config" "navi-agents-config"
   install_mod "navi-weather"    "navi-weather"
