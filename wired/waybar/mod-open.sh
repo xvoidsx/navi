@@ -32,28 +32,28 @@ shift
 [ "$#" -ge 1 ] || { echo "usage: mod-open.sh <window-title> <command> [args...]" >&2; exit 1; }
 
 # family geometry: COLSxLINES per mod, matched on the command's basename.
-# the window hugs the frame's rounding: width is the frame's true width
-# (frameWidth + 4: border + padding), height is the frame's true height
-# (body lines + 4 chrome) plus one row of grace for status lines that
-# come and go. dynamic lists (networking, bluetooth, calendar agenda,
-# reminders) get a little more room; the notifs viewport fills whatever
-# it's given, so it stays tall. tweak a number here, never at the callers.
+# measured, not guessed: most mods ship a --dump sample renderer, so each
+# frame was rendered headless and sized exactly (all 62-wide mods are a
+# true 66 cells; get/browser are 72; agents-config is 68). height is the
+# tallest dumped screen plus one grace row; list-y mods get room for
+# real-world data (audio streams, calendar events). viewports (notifs)
+# and self-hugging frames (wiredrop: width-4) fill whatever they're given.
 case "$(basename "$1")" in
 navi-nowplaying) DIMS="66x20" ;;
-navi-networking) DIMS="66x27" ;;
+navi-networking) DIMS="66x34" ;;
 navi-calendar) DIMS="66x26" ;;
 navi-audio) DIMS="66x19" ;;
-navi-bluetooth) DIMS="66x21" ;;
-navi-weather) DIMS="66x23" ;;
-navi-power) DIMS="66x19" ;;
-navi-display) DIMS="66x17" ;;
-navi-get) DIMS="72x22" ;;
-navi-browser) DIMS="72x22" ;;
-navi-reminders) DIMS="66x23" ;;
+navi-bluetooth) DIMS="66x23" ;;
+navi-weather) DIMS="66x22" ;;
+navi-power) DIMS="66x24" ;;
+navi-display) DIMS="66x24" ;;
+navi-get) DIMS="72x32" ;;
+navi-browser) DIMS="72x23" ;;
+navi-reminders) DIMS="66x19" ;;
 navi-notifs) DIMS="70x30" ;; # viewport list — fills the window, tall is right
-navi-lain-config) DIMS="68x24" ;;
-navi-agents-config) DIMS="68x27" ;;
-wiredrop) DIMS="66x21" ;;
+navi-lain-config) DIMS="68x20" ;;
+navi-agents-config) DIMS="68x24" ;;
+wiredrop) DIMS="66x21" ;; # self-hugging: frame renders at (terminal width - 4)
 *) DIMS="" ;;
 esac
 
