@@ -612,6 +612,7 @@ setup_mods() {
   install_mod "navi-display"    "navi-display"
   install_mod "navi-reminders"  "navi-reminders"
   install_mod "navi-reminders"  "navi-reminder-fire"
+  install_mod "navi-notifs"     "navi-notifs"
   install_mod "wiredrop"        "wiredrop"
 
   # wiredrop: the receiver only receives while the daemon listens, so it
