@@ -665,7 +665,14 @@ func main() {
 	flag.Parse()
 
 	// Same contract as navi-networking: if the backend isn't on PATH, say
-	// so once and exit rather than opening an empty window.
+	// so once and exit rather than opening an empty window. --dump is
+	// exempt: it's deterministic sample data for headless layout review,
+	// and must work in build environments without a player bus.
+	if *dump {
+		dumpSample()
+		return
+	}
+
 	if !havePlayer() {
 		fmt.Fprintln(os.Stderr, "navi-nowplaying: playerctl not found — install playerctl (apt install playerctl)")
 		os.Exit(1)
@@ -678,11 +685,6 @@ func main() {
 
 	if *dumpLive {
 		dumpLiveFrame()
-		return
-	}
-
-	if *dump {
-		dumpSample()
 		return
 	}
 

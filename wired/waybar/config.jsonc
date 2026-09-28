@@ -23,7 +23,7 @@
         "clock#3"
     ],
     "modules-right": [
-        //"custom/media",
+        "custom/nowplaying",
 	"custom/weather",
 	"custom/update",
 	"custom/volume",
@@ -100,18 +100,19 @@
             "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-networking\" navi-networking",
             "interval": 30
         },
-    // this is a 'testing' audioplayer module. shows currently playing audio and is interactive.
-    "custom/media": {
-	    "format": "{}",
-	    "return-type": "json",
-	    "max-length": 20,
-	    "fixed-width": true,
-	    "escape": true,
-	    "exec": "/usr/local/bin/mediaplayer.sh",
-	    "on-click": "playerctl play-pause",
-	    "interval": 1
+    // now playing: fixed-width slot showing what's on the MPRIS bus.
+    // click opens the full navi-nowplaying mod.
+    "custom/nowplaying": {
+        "format": "{}",
+        "return-type": "json",
+        "max-length": 22,
+        "fixed-width": true,
+        "escape": true,
+        "exec": "/usr/share/navi/wired/waybar/waybar-nowplaying.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi now playing\" navi-nowplaying",
+        "interval": 2,
+        "tooltip": true
     },
-    // - - - XXX end testing section XXX - - -
     "memory": {
         "interval": 5,
         "format": "Mem {}%"

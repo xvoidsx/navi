@@ -21,4 +21,5 @@ const (
 	Gray  = lipgloss.Color("#8a6a8a") // secondary text — muted mauve in the Ghost family, never neutral grey
 	Faint = lipgloss.Color("#3a2f3d") // barely-there chrome (inactive footer keys)
 	Dark  = lipgloss.Color("#0f0f0f") // panel background
+	Empty = lipgloss.Color("#181318") // empty sleeve — a solid slab a hair above Dark, for "no cover here" art slots
 )
