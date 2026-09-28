@@ -125,6 +125,37 @@ func TestIsInstalledNativeExtras(t *testing.T) {
 	}
 }
 
+func TestAptPackage(t *testing.T) {
+	cases := map[string]string{
+		"doas apt install -y freedoom":                    "freedoom",
+		"sudo apt install vim":                            "vim",
+		"doas apt install --no-install-recommends -y foo": "foo",
+		"navi-extras --install edge":                      "",
+		"flatpak install -y flathub sh.ppy.osu":           "",
+		"doas apt remove -y freedoom":                     "",
+		"":                                                "",
+	}
+	for in, want := range cases {
+		if got := aptPackage(in); got != want {
+			t.Fatalf("aptPackage(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestIsInstalledNativeApt(t *testing.T) {
+	// a definitely-not-installed package must read missing (dpkg-query
+	// errors or reports otherwise on every machine this runs on)
+	a := app{Source: "native", Package: "navi-test-pkg-that-does-not-exist", Install: "doas apt install -y navi-test-pkg-that-does-not-exist"}
+	if isInstalled(a, nil, nil) {
+		t.Fatal("bogus apt package should read not installed")
+	}
+	// non-apt native installs still read missing without extras state
+	b := app{Source: "native", Package: "x", Install: "curl https://example.com/install.sh | bash"}
+	if isInstalled(b, nil, nil) {
+		t.Fatal("non-apt native install should read not installed")
+	}
+}
+
 func TestIsInstalledFlatpak(t *testing.T) {
 	flatpaks := map[string]bool{"sh.ppy.osu": true, "org.gimp.GIMP": true}
 	a := app{ID: "flatpak-osu-lazer", Source: "flatpak", Package: "sh.ppy.osu"}

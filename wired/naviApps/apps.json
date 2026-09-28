@@ -1719,7 +1719,7 @@
   {
     "id": "flatpak-uzdoom",
     "name": "UZDoom",
-    "summary": "Modern Doom-engine port (GZDoom family) — needs your WADs.",
+    "summary": "Modern Doom-engine port (GZDoom family) — pair it with Freedoom for a fully-free Doom.",
     "category": "Games",
     "subcategory": "FOSS Games",
     "source": "flatpak",
@@ -1728,6 +1728,19 @@
     "remove": "flatpak uninstall -y org.zdoom.UZDoom",
     "homepage": "https://zdoom.org",
     "icon": "😈"
+  },
+  {
+    "id": "native-freedoom",
+    "name": "Freedoom",
+    "summary": "Free-software Doom game data — levels, sprites, sounds. Pair it with UZDoom for a fully-free Doom.",
+    "category": "Games",
+    "subcategory": "FOSS Games",
+    "source": "native",
+    "package": "freedoom",
+    "install": "doas apt install -y freedoom",
+    "remove": "doas apt remove -y freedoom",
+    "homepage": "https://freedoom.github.io",
+    "icon": "🔥"
   },
   {
     "id": "flatpak-pokemmo",

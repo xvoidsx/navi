@@ -102,6 +102,26 @@ func flatpakApps() map[string]bool {
 	return m
 }
 
+// aptPackage extracts the package name from a plain
+// `doas apt install -y <pkg>` install command (flags may vary).
+// Empty when the install command isn't a plain apt install.
+func aptPackage(install string) string {
+	f := strings.Fields(install)
+	// strip a leading privilege escalator
+	if len(f) > 0 && (f[0] == "doas" || f[0] == "sudo") {
+		f = f[1:]
+	}
+	if len(f) < 3 || f[0] != "apt" || f[1] != "install" {
+		return ""
+	}
+	for _, arg := range f[2:] {
+		if !strings.HasPrefix(arg, "-") {
+			return arg
+		}
+	}
+	return ""
+}
+
 // extrasState shells to `navi-extras --list` once and maps extra id ->
 // "installed"/"missing". nil when navi-extras isn't usable.
 func extrasState() map[string]string {
@@ -136,6 +156,11 @@ func isInstalled(a app, extras map[string]string, flatpaks map[string]bool) bool
 		if strings.HasPrefix(a.Install, "navi-extras --install ") && extras != nil {
 			id := strings.TrimPrefix(a.Install, "navi-extras --install ")
 			return extras[id] == "installed"
+		}
+		// plain Debian package installs: ask dpkg.
+		if pkg := aptPackage(a.Install); pkg != "" {
+			out, err := exec.Command("dpkg-query", "-W", "-f=${Status}", pkg).Output()
+			return err == nil && strings.TrimSpace(string(out)) == "install ok installed"
 		}
 		return false
 	case "agent":
