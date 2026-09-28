@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 )
 
 // a small but realistic wttr.in j1 payload: current + one day + two slots.
@@ -137,5 +138,249 @@ func TestLocationsView(t *testing.T) {
 	view := m.View()
 	if !strings.Contains(view, "here (auto)") || !strings.Contains(view, "Mena, Arkansas") {
 		t.Error("locations view missing entries")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// NWS alerts
+// ---------------------------------------------------------------------------
+
+// sampleNWS is a trimmed but real-shaped api.weather.gov response: one
+// Moderate statement (captured live for Mena, AR) and one synthetic
+// Extreme warning so every severity step is exercised.
+const sampleNWS = `{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "event": "Special Weather Statement",
+        "severity": "Moderate",
+        "headline": "Special Weather Statement issued September 21 at 6:35PM CDT by NWS Little Rock AR",
+        "description": "* WHAT...Minor flooding is possible.\n\n* WHERE...Portions of western Arkansas.",
+        "instruction": "Stay tuned to weather radio for updates.",
+        "effective": "2026-09-21T18:35:00-05:00",
+        "expires": "2026-09-21T19:15:00-05:00",
+        "senderName": "NWS Little Rock AR"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "event": "Tornado Warning",
+        "severity": "Extreme",
+        "headline": "Tornado Warning issued May 3 at 2:10PM CDT by NWS Tulsa OK",
+        "description": "A confirmed large tornado is on the ground.",
+        "instruction": "Take shelter immediately in a basement or interior room.",
+        "effective": "2026-05-03T14:10:00-05:00",
+        "expires": "2026-05-03T15:00:00-05:00",
+        "senderName": "NWS Tulsa OK"
+      }
+    }
+  ]
+}`
+
+func sampleAlerts(t *testing.T) []nwsAlert {
+	t.Helper()
+	var col nwsCollection
+	if err := json.Unmarshal([]byte(sampleNWS), &col); err != nil {
+		t.Fatalf("parse NWS sample: %v", err)
+	}
+	var out []nwsAlert
+	for _, f := range col.Features {
+		out = append(out, f.Properties)
+	}
+	return out
+}
+
+func TestParseNWSAlerts(t *testing.T) {
+	alerts := sampleAlerts(t)
+	if len(alerts) != 2 {
+		t.Fatalf("got %d alerts, want 2", len(alerts))
+	}
+	if alerts[0].Event != "Special Weather Statement" || alerts[0].Severity != "Moderate" {
+		t.Errorf("alert[0] = %q/%q", alerts[0].Event, alerts[0].Severity)
+	}
+	if alerts[0].SenderName != "NWS Little Rock AR" {
+		t.Errorf("alert[0].SenderName = %q", alerts[0].SenderName)
+	}
+	if alerts[1].Event != "Tornado Warning" || alerts[1].Severity != "Extreme" {
+		t.Errorf("alert[1] = %q/%q", alerts[1].Event, alerts[1].Severity)
+	}
+	if !strings.Contains(alerts[1].Instruction, "Take shelter") {
+		t.Error("alert[1] instruction not parsed")
+	}
+}
+
+func TestSeverityColor(t *testing.T) {
+	cases := []struct {
+		sev  string
+		want string // expected hex
+	}{
+		{"Extreme", "#ff3131"},
+		{"extreme", "#ff3131"}, // case-insensitive
+		{"Severe", "#ff9f1c"},
+		{"Moderate", "#ffd60a"},
+		{"Minor", "#00ffff"},
+		{"Unknown", "#5c4a5c"},  // dims out
+		{"weird", "#5c4a5c"},    // unknown severity degrades to dim
+		{"", "#5c4a5c"},
+	}
+	for _, c := range cases {
+		if got := string(severityColor(c.sev)); got != c.want {
+			t.Errorf("severityColor(%q) = %q, want %q", c.sev, got, c.want)
+		}
+	}
+}
+
+func TestExpiresShort(t *testing.T) {
+	got := expiresShort("2026-09-21T19:15:00-05:00")
+	if len(got) != 5 || got[2] != ':' {
+		t.Errorf("expiresShort = %q, want HH:MM shape", got)
+	}
+	if expiresShort("") != "" {
+		t.Error("expiresShort(\"\") should be empty")
+	}
+	if expiresShort("not a time") != "" {
+		t.Error("expiresShort(garbage) should be empty")
+	}
+}
+
+func TestIsOutOfBoundsBody(t *testing.T) {
+	london := []byte(`{"type":"https://api.weather.gov/problems/InvalidParameter","status":400,"detail":"Parameter \"point\" is invalid: out of bounds"}`)
+	if !isOutOfBoundsBody(london) {
+		t.Error("London 400 body not detected as out-of-bounds")
+	}
+	other := []byte(`{"type":"https://api.weather.gov/problems/ServerError","status":500,"detail":"boom"}`)
+	if isOutOfBoundsBody(other) {
+		t.Error("server error misclassified as out-of-bounds")
+	}
+	if isOutOfBoundsBody([]byte("not json")) {
+		t.Error("garbage body misclassified as out-of-bounds")
+	}
+}
+
+func TestCoordsOf(t *testing.T) {
+	w := sampleResp(t)
+	if _, _, ok := coordsOf(w); ok {
+		t.Error("coordsOf should fail when nearest_area has no lat/lon")
+	}
+	w.Areas[0].Latitude = "34.586"
+	w.Areas[0].Longitude = "-94.239"
+	lat, lon, ok := coordsOf(w)
+	if !ok || lat != "34.586" || lon != "-94.239" {
+		t.Errorf("coordsOf = %q,%q,%v", lat, lon, ok)
+	}
+	if _, _, ok := coordsOf(nil); ok {
+		t.Error("coordsOf(nil) should fail")
+	}
+}
+
+func TestAlertsCacheRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	env := alertsEnvelope{FetchedAt: time.Now(), Alerts: sampleAlerts(t)}
+	if err := saveAlertsCacheTo(dir, "34.586", "-94.239", env); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	loaded, ok := loadAlertsCacheFrom(dir, "34.586", "-94.239")
+	if !ok {
+		t.Fatal("load failed")
+	}
+	if !cacheFresh(loaded) {
+		t.Error("just-saved cache should be fresh")
+	}
+	if len(loaded.Alerts) != 2 || loaded.Alerts[1].Event != "Tornado Warning" {
+		t.Error("cache round-trip lost alerts")
+	}
+	// stale cache is detected
+	loaded.FetchedAt = time.Now().Add(-time.Hour)
+	if cacheFresh(loaded) {
+		t.Error("hour-old cache should be stale")
+	}
+	// unsupported locations round-trip too
+	uenv := alertsEnvelope{FetchedAt: time.Now(), Unsupported: true}
+	if err := saveAlertsCacheTo(dir, "51.5074", "-0.1278", uenv); err != nil {
+		t.Fatalf("save unsupported: %v", err)
+	}
+	uloaded, ok := loadAlertsCacheFrom(dir, "51.5074", "-0.1278")
+	if !ok || !uloaded.Unsupported {
+		t.Error("unsupported flag did not survive the round-trip")
+	}
+	// missing cache
+	if _, ok := loadAlertsCacheFrom(dir, "0", "0"); ok {
+		t.Error("missing cache should not load")
+	}
+}
+
+func TestSanitizeCoord(t *testing.T) {
+	if got := sanitizeCoord("-94.239"); got != "-94.239" {
+		t.Errorf("sanitizeCoord = %q", got)
+	}
+	if strings.Contains(sanitizeCoord("../../etc"), "/") {
+		t.Error("sanitizeCoord left a path separator in place")
+	}
+}
+
+func TestBannerLine(t *testing.T) {
+	m := newModel()
+	if got := m.bannerLine(); got != "" {
+		t.Errorf("empty alerts banner = %q, want empty", got)
+	}
+	m.alerts = sampleAlerts(t)
+	banner := m.bannerLine()
+	if !strings.Contains(banner, "SPECIAL WEATHER STATEMENT") {
+		t.Errorf("banner = %q, want the event", banner)
+	}
+	if !strings.Contains(banner, "expires") {
+		t.Errorf("banner = %q, want expires time", banner)
+	}
+	// cycling: second alert shows after advancing the cycle
+	m.alertCycle = 1
+	if banner2 := m.bannerLine(); !strings.Contains(banner2, "TORNADO WARNING") {
+		t.Errorf("cycled banner = %q, want tornado warning", banner2)
+	}
+	// unsupported dims honestly
+	m2 := newModel()
+	m2.alertsUnsupported = true
+	if got := m2.bannerLine(); !strings.Contains(got, "outside the US") {
+		t.Errorf("unsupported banner = %q", got)
+	}
+}
+
+func TestAlertsViews(t *testing.T) {
+	m := newModel()
+	m.view = "alerts"
+	if view := m.View(); !strings.Contains(view, "all clear") {
+		t.Error("empty alerts view should say all clear")
+	}
+	m.alerts = sampleAlerts(t)
+	view := m.View()
+	if !strings.Contains(view, "Tornado Warning") || !strings.Contains(view, "[EXTREME]") {
+		t.Error("alerts list missing rows/chips")
+	}
+	m.alertsUnsupported = true
+	if view := m.View(); !strings.Contains(view, "outside the US") {
+		t.Error("unsupported alerts view missing the honest note")
+	}
+	// detail view renders full text
+	m.alertsUnsupported = false
+	m.view = "alertdetail"
+	m.alertCursor = 1
+	dview := m.View()
+	for _, want := range []string{"TORNADO WARNING", "Take shelter", "NWS Tulsa OK"} {
+		if !strings.Contains(dview, want) {
+			t.Errorf("detail view missing %q", want)
+		}
+	}
+}
+
+func TestWrapText(t *testing.T) {
+	lines := wrapText("one two three four", 10)
+	if len(lines) != 2 || lines[0] != "one two" || lines[1] != "three four" {
+		t.Errorf("wrapText = %q", lines)
+	}
+	lines = wrapText("para one\n\npara two", 40)
+	if len(lines) != 3 || lines[1] != "" {
+		t.Errorf("wrapText paragraph break = %q", lines)
 	}
 }
