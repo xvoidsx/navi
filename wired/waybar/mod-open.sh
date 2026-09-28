@@ -4,6 +4,13 @@
 #
 # usage: mod-open.sh <window-title> <command> [args...]
 #
+# fitted windows: every mod gets a terminal sized to its own frame
+# (COLSxLINES cells, via alacritty -o window.dimensions), so the rounded
+# frame isn't drowned in dead terminal space. the table below is the
+# family geometry — tweak a number here, never at the callers. commands
+# not listed (herdr, the update click script, anything future) fall back
+# to the old 640x760 pixel resize.
+#
 # standing rule: navi mods always float. a for_window rule in the shipped
 # sway config can't be relied on — customized configs are preserved by the
 # updater, by design — and sleep-then-float races slow machines (the
@@ -24,7 +31,40 @@ TITLE="${1:?usage: mod-open.sh <window-title> <command> [args...]}"
 shift
 [ "$#" -ge 1 ] || { echo "usage: mod-open.sh <window-title> <command> [args...]" >&2; exit 1; }
 
-FLOAT_CMDS="floating enable, resize set 640 760, move position center"
+# family geometry: COLSxLINES per mod, matched on the command's basename.
+# sized to each mod's frame plus a small margin — the mods center their
+# frames, so a row or two of slack is invisible, but an ocean isn't.
+case "$(basename "$1")" in
+navi-nowplaying) DIMS="68x21" ;;
+navi-networking) DIMS="70x28" ;;
+navi-calendar) DIMS="70x28" ;;
+navi-audio) DIMS="70x22" ;;
+navi-bluetooth) DIMS="70x22" ;;
+navi-weather) DIMS="70x26" ;;
+navi-power) DIMS="70x22" ;;
+navi-display) DIMS="70x20" ;;
+navi-get) DIMS="76x25" ;;
+navi-browser) DIMS="76x25" ;;
+navi-reminders) DIMS="70x24" ;;
+navi-notifs) DIMS="70x34" ;; # viewport list — tall is right
+navi-lain-config) DIMS="70x28" ;;
+navi-agents-config) DIMS="72x30" ;;
+wiredrop) DIMS="70x26" ;;
+*) DIMS="" ;;
+esac
+
+FLOAT_CMDS="floating enable, move position center"
+ALACRITTY_OPTS=()
+if [ -n "$DIMS" ]; then
+  COLS="${DIMS%x*}"
+  LINES="${DIMS#*x}"
+  # cell-exact sizing: DPI-independent, no pixel math, no sway resize.
+  ALACRITTY_OPTS=(-o "window.dimensions.columns=$COLS" -o "window.dimensions.lines=$LINES")
+else
+  # unknown command: the old pixel resize, as before.
+  FLOAT_CMDS="floating enable, resize set 640 760, move position center"
+fi
+
 LOG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/navi"
 LOG_FILE="$LOG_DIR/mod-open.log"
 
@@ -56,7 +96,7 @@ if [ -f "$AGENTS_ENV" ]; then
   set -a; . "$AGENTS_ENV" 2>/dev/null; set +a
 fi
 
-alacritty --title "$TITLE" -e "$@" &
+alacritty --title "$TITLE" "${ALACRITTY_OPTS[@]}" -e "$@" &
 term_pid=$!
 
 if [ "$COMPOSITOR" = "sway" ]; then
@@ -73,11 +113,11 @@ if [ "$COMPOSITOR" = "sway" ]; then
     kill -0 "$term_pid" 2>/dev/null || break
     sleep 0.5
   done
-  log "title='$TITLE' compositor=sway pid=$term_pid floated=$floated"
+  log "title='$TITLE' dims='${DIMS:-640x760px}' compositor=sway pid=$term_pid floated=$floated"
 elif [ "$COMPOSITOR" = "i3" ]; then
   sleep 0.6
   i3-msg "[title=\"$TITLE\"] floating enable" >/dev/null 2>&1
-  log "title='$TITLE' compositor=i3 pid=$term_pid"
+  log "title='$TITLE' dims='${DIMS:-640x760px}' compositor=i3 pid=$term_pid"
 else
-  log "title='$TITLE' compositor=none pid=$term_pid (plain open)"
+  log "title='$TITLE' dims='${DIMS:-640x760px}' compositor=none pid=$term_pid (plain open)"
 fi

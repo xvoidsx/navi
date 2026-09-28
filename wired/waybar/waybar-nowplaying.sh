@@ -5,7 +5,9 @@
 # A fixed-width slot: the text is always padded/truncated to SLOT
 # characters, so neighboring modules never slide when a track starts,
 # stops, or has a long name. Idle shows a dim ♫; playing or paused shows
-# ♫ artist — title, truncated. Click opens the full navi-nowplaying mod.
+# ♫ artist — title. While playing, a label longer than the slot scrolls
+# as a marquee *inside* the slot — the slot itself never changes size.
+# Click opens the full navi-nowplaying mod.
 #
 # Reads MPRIS through playerctl, so it follows whatever is actually
 # playing — Chromium, cmus, mpv, spotify — the same bus the mod reads.
@@ -14,6 +16,7 @@ set -uo pipefail
 
 SLOT=22 # display width of the slot, in characters
 export SLOT
+export POS # set per-tick by marquee(); exported so its python reader sees it
 
 json_escape() { printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'; }
 
@@ -82,9 +85,55 @@ fi
 tip="$tip
 $short · $(fmt_time "$pos") / $(fmt_time "$len")"
 
+# marquee renders a SLOT-char window sliding over a long label, one step
+# per poll tick, so a long "artist — title" reads in full without the slot
+# ever changing size. state lives in the cache: "<hash> <pos> <dwell>".
+# the label hash resets the scroll on track change; dwell holds the head
+# of the label for two ticks (~4s) before the scroll starts. only used
+# while playing — paused and idle stay perfectly still.
+marquee() {
+  local label="$1"
+  local cache="${XDG_CACHE_HOME:-$HOME/.cache}/navi"
+  local state="$cache/nowplaying-marquee"
+  mkdir -p "$cache" 2>/dev/null || true
+  local hash old_hash pos dwell
+  hash="$(printf '%s' "$label" | cksum | cut -d' ' -f1)"
+  old_hash=""; pos=0; dwell=0
+  if [ -f "$state" ]; then
+    read -r old_hash pos dwell <"$state" 2>/dev/null || true
+    case "$pos" in '' | *[!0-9]*) pos=0 ;; esac
+    case "$dwell" in '' | *[!0-9]*) dwell=0 ;; esac
+    if [ "$old_hash" != "$hash" ]; then pos=0; dwell=0; fi
+  fi
+  local scroll="${label}    ♫    "
+  local len new_pos
+  len="$(printf '%s' "$scroll" | python3 -c 'import sys; print(len(sys.stdin.read()))')"
+  if [ "$dwell" -lt 2 ]; then
+    new_pos=0; dwell=$((dwell + 1))
+  else
+    new_pos=$(( (pos + 1) % len ))
+  fi
+  printf '%s %d %d' "$hash" "$new_pos" "$dwell" >"$state" 2>/dev/null || true
+  # POS is exported at the top of this script, so the assignment below
+  # reaches the python child (a VAR=x prefix on a pipeline would only
+  # reach printf, not python3).
+  POS="$pos"
+  printf '%s' "$scroll" | python3 -c '
+import os, sys
+n = int(os.environ["SLOT"]); p = int(os.environ["POS"])
+s = sys.stdin.read(); dbl = s + s
+sys.stdout.write(dbl[p:p+n])
+'
+}
+
 case "$status" in
 Playing)
-  emit "$(fit "♫ $label")" "$tip" "playing"
+  full="♫ $label"
+  if [ "$(printf '%s' "$full" | python3 -c 'import sys; print(len(sys.stdin.read()))')" -gt "$SLOT" ]; then
+    emit "$(marquee "$full")" "$tip" "playing"
+  else
+    emit "$(fit "$full")" "$tip" "playing"
+  fi
   ;;
 Paused)
   emit "$(fit "♫ $label")" "$tip (paused)" "paused"
