@@ -26,7 +26,7 @@
         //"custom/media",
 	"custom/weather",
 	"custom/update",
-	"pulseaudio",
+	"custom/volume",
         "network",
         "battery",
         "backlight",
@@ -74,20 +74,19 @@
         "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-calendar\" navi-calendar"
     },
 
-    "pulseaudio": {
-        "format": "🔊 {volume:2}%",  // Added volume character
-        "format-bluetooth": "🔊 Volume {volume}% ",
-        "format-muted": "🔇 mute",  // Added mute character
-        "format-icons": {
-            "headphones": "🎧",
-            "default": [
-                "🔊",
-                "🔈"
-            ]
-        },
-        "scroll-step": 5,
+    "custom/volume": {
+        // navi-audio volume module: live volume + short output-device
+        // label ("HDMI", "Speakers"). audio-status.sh is long-running and
+        // re-emits on `pactl subscribe` events — no polling.
+        "format": "{}",
+        "return-type": "json",
+        "exec": "/usr/share/navi/wired/waybar/audio-status.sh",
         "on-click": "pamixer -t",
-        "on-click-right": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-audio\" navi-audio"
+        "on-scroll-up": "pamixer -i 5",
+        "on-scroll-down": "pamixer -d 5",
+        "on-click-right": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-audio\" navi-audio",
+        "on-click-middle": "/usr/share/navi/wired/waybar/audio-switch.sh",
+        "tooltip": true
     },
     // - - - XXX testing section XXX - - -
     // this is a 'testing' network module. if it doesn't work out right, we'll remove it

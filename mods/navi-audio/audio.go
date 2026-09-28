@@ -548,6 +548,85 @@ func moveStreamCmd(playback bool, id, target int, note string) tea.Cmd {
 	}
 }
 
+// findDevice resolves a device by its pactl name, falling back to a
+// case-insensitive description match (handy for rofi/CLI input).
+func findDevice(nodes []AudioNode, name string) (AudioNode, bool) {
+	for _, n := range nodes {
+		if n.Name == name {
+			return n, true
+		}
+	}
+	for _, n := range nodes {
+		if strings.EqualFold(n.Description, name) {
+			return n, true
+		}
+	}
+	return AudioNode{}, false
+}
+
+// deviceShortName is the panel/toast label for a device: the active port
+// description when the port has a human one ("HDMI", "Speakers",
+// "Headphones"), otherwise the trimmed device description.
+func deviceShortName(n AudioNode) string {
+	if d := portDesc(n); d != "" && d != n.ActivePort {
+		return truncateRunes(d, 18)
+	}
+	return shortName(n.Description)
+}
+
+// switchDevice is the one-key output/input switch, shared by the TUI's
+// Enter key and the --switch-sink / --switch-source CLI: set the default
+// device, then move every live stream onto it. pavucontrol can't do this
+// in one step; navi-audio can.
+func switchDevice(ctx context.Context, isSink bool, name string) (string, error) {
+	snap, err := fetchSnapshot(ctx)
+	var nodes []AudioNode
+	var streams []Stream
+	var setCmd, moveCmd, kind string
+	if isSink {
+		nodes, streams = snap.sinks, snap.playback
+		setCmd, moveCmd, kind = "set-default-sink", "move-sink-input", "output"
+	} else {
+		nodes, streams = snap.sources, snap.recording
+		setCmd, moveCmd, kind = "set-default-source", "move-source-output", "input"
+	}
+	if len(nodes) == 0 {
+		if err != nil {
+			return "", err
+		}
+		return "", fmt.Errorf("no %s devices found", kind)
+	}
+	target, ok := findDevice(nodes, name)
+	if !ok {
+		return "", fmt.Errorf("no %s device matching %q", kind, name)
+	}
+	if _, err := pactl(ctx, setCmd, target.Name); err != nil {
+		return "", err
+	}
+	moved := 0
+	for _, s := range streams {
+		if s.Device == target.Index {
+			continue
+		}
+		if _, err := pactl(ctx, moveCmd, strconv.Itoa(s.Index), strconv.Itoa(target.Index)); err != nil {
+			return "", fmt.Errorf("stream #%d: %w", s.Index, err)
+		}
+		moved++
+	}
+	label := deviceShortName(target)
+	if label == "" {
+		label = target.Name
+	}
+	if moved == 0 {
+		return fmt.Sprintf("→ %s · already there", label), nil
+	}
+	noun := "streams"
+	if moved == 1 {
+		noun = "stream"
+	}
+	return fmt.Sprintf("→ %s · moved %d %s", label, moved, noun), nil
+}
+
 func setPortCmd(isSink bool, id int, port, note string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := opCtx()

@@ -74,7 +74,7 @@ window#waybar > box {
 #workspaces,
 #window,
 #clock,
-#pulseaudio,
+#custom-volume,
 #network,
 #battery,
 #backlight,
@@ -135,7 +135,7 @@ window#waybar > box {
 
 #workspaces:hover,
 #clock:hover,
-#pulseaudio:hover,
+#custom-volume:hover,
 #network:hover,
 #battery:hover,
 #backlight:hover,
@@ -283,7 +283,7 @@ window#waybar.empty #window {
     color: @neon-green;
 }
 
-#pulseaudio,
+#custom-volume,
 #idle_inhibitor {
     color: @neon-cyan;
 }
@@ -434,7 +434,7 @@ window#waybar.empty #window {
     text-shadow: none;
 }
 
-#pulseaudio.muted {
+#custom-volume.muted {
     color: rgba(255, 255, 255, 0.48);
     border-color: rgba(255, 255, 255, 0.20);
     box-shadow: 0 2px 7px rgba(0, 0, 0, 0.50), inset 0 1px 0 rgba(255, 255, 255, 0.05);

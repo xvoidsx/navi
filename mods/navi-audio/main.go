@@ -516,6 +516,8 @@ func (m model) updateMain(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.muteCmd()
 	case "d":
 		return m, m.defaultCmd()
+	case "enter":
+		return m, m.switchKeyCmd()
 	case "r":
 		return m, m.actionRCmd()
 	case "v":
@@ -596,7 +598,8 @@ func (m *model) muteCmd() tea.Cmd {
 }
 
 // defaultCmd sets the selected device as the fallback (pavucontrol's
-// "Set as fallback").
+// "Set as fallback"). Default only — streams stay where they are; Enter
+// is the one that moves everything.
 func (m *model) defaultCmd() tea.Cmd {
 	switch m.tab {
 	case tabOutputs:
@@ -609,6 +612,35 @@ func (m *model) defaultCmd() tea.Cmd {
 		}
 	}
 	return nil
+}
+
+// switchKeyCmd is the one-key device switch (spec §1): Enter on OUTPUTS
+// sets the default sink AND moves every playback stream onto it; INPUTS
+// mirrors for sources. One shared helper with the --switch-sink CLI.
+func (m *model) switchKeyCmd() tea.Cmd {
+	switch m.tab {
+	case tabOutputs:
+		if n, ok := m.curSink(); ok {
+			return switchDeviceCmd(true, n.Name)
+		}
+	case tabInputs:
+		if n, ok := m.curSource(); ok {
+			return switchDeviceCmd(false, n.Name)
+		}
+	}
+	return nil
+}
+
+func switchDeviceCmd(isSink bool, name string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := opCtx()
+		defer cancel()
+		note, err := switchDevice(ctx, isSink, name)
+		if err != nil {
+			return opMsg{err: err}
+		}
+		return opMsg{note: note}
+	}
 }
 
 // actionRCmd is the context key: route a stream, cycle a device port, or
@@ -1027,6 +1059,7 @@ func (m model) footer() string {
 		[2]string{"+/-", "volume"},
 	)
 	line2 := theme.Footer(true, [2]string{"m", "mute"}) + "   " +
+		theme.Footer(onDevice, [2]string{"enter", "switch"}) + "   " +
 		theme.Footer(onDevice, [2]string{"d", "fallback"}) + "   " +
 		theme.Footer(true, [2]string{"r", rLabel}) + "   " +
 		theme.Footer(m.tab == tabInputs, [2]string{"v", "monitors"})
@@ -1101,9 +1134,22 @@ func streamName(s Stream) string {
 // ── main & headless dump ───────────────────────────────────────────────
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "--dump" {
-		dumpSample()
-		return
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--dump":
+			dumpSample()
+			return
+		case "--switch-sink", "--switch-source":
+			if len(os.Args) < 3 || os.Args[2] == "" {
+				fmt.Fprintln(os.Stderr, "usage: navi-audio "+os.Args[1]+" <device-name>")
+				os.Exit(2)
+			}
+			runSwitch(os.Args[1] == "--switch-sink", os.Args[2])
+			return
+		case "--help", "-h":
+			fmt.Fprintln(os.Stderr, "usage: navi-audio [--dump] [--switch-sink <name>] [--switch-source <name>]")
+			os.Exit(0)
+		}
 	}
 	if _, err := exec.LookPath("pactl"); err != nil {
 		fmt.Fprintln(os.Stderr, "navi-audio: pactl was not found.")
@@ -1116,6 +1162,24 @@ func main() {
 		os.Exit(1)
 	}
 	time.Sleep(50 * time.Millisecond)
+}
+
+// runSwitch is the headless one-key switch: the exact same switchDevice
+// path the TUI's Enter key runs, for the waybar rofi picker and scripts.
+func runSwitch(isSink bool, name string) {
+	if _, err := exec.LookPath("pactl"); err != nil {
+		fmt.Fprintln(os.Stderr, "navi-audio: pactl was not found.")
+		fmt.Fprintln(os.Stderr, "Install pulseaudio-utils first.")
+		os.Exit(1)
+	}
+	ctx, cancel := opCtx()
+	defer cancel()
+	note, err := switchDevice(ctx, isSink, name)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "navi-audio: "+err.Error())
+		os.Exit(1)
+	}
+	fmt.Println(note)
 }
 
 // dumpSample renders every tab headless (no pactl, no TTY) with
