@@ -13,6 +13,7 @@ We include 3 default **navi mods**:
 - `navi-networks`: A utility allowing you to connect to networks, check your internet speed, set DNS, and share the network with a QR code.
 - `navi-calendar`: A utility allowing you to view the calendar.
 - `navi-audio`: A utility allowing you to control the volume of attached devices such as speakers, output sources, and more.
+- `navi-bluetooth`: A Bluetooth manager replacing blueman-applet — pair, trust, connect, disconnect, and forget devices; adapter power, discoverability, and scan toggles; headset battery via `bluetoothctl info` with a upower fallback.
 - `navi-weather`: A utility for checking the weather — current conditions, the next 12 hours, and a 3-day forecast, with saved locations and an imperial/metric toggle (wttr.in backend, no API key).
 - `navi-power`: Power profiles (power-profiles-daemon), honest battery readouts (sysfs + upower time estimates), and ThinkPad charge thresholds — the threshold UI only appears where the kernel exposes it.
 - `navi-display`: Monitor layout without the GUI settings app — arrange, enable, rotate, scale, and set modes on every connected output (sway and i3 backends), plus a night-light schedule (wlsunset/gammastep).
