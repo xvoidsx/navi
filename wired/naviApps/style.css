@@ -209,6 +209,21 @@ main { max-width: 1100px; margin: 0 auto; padding: 1rem 1rem 3rem; }
 
 .sec-agents { color: #ffffff; text-shadow: 0 0 14px rgba(0, 255, 255, 0.5); }
 
+.sec-games { color: var(--pink); text-shadow: 0 0 14px rgba(255, 16, 240, 0.55); }
+
+/* Games section sub-rows (Storefronts & Launchers, Emulation, …) */
+.subcat-title {
+  font-size: 0.85rem;
+  letter-spacing: 0.25em;
+  text-transform: lowercase;
+  color: var(--muted);
+  margin: 1.4rem 0 0.6rem;
+}
+.subcat-title::before {
+  content: "▸ ";
+  color: var(--pink);
+}
+
 /* first-party cards get the gradient-border treatment */
 .grid.featured .card {
   border: 2px solid transparent;
@@ -268,6 +283,8 @@ main { max-width: 1100px; margin: 0 auto; padding: 1rem 1rem 3rem; }
 .badge.native { color: var(--green); border-color: var(--green); }
 
 .badge.agent { color: var(--cyan); border-color: var(--cyan); }
+
+.badge.flatpak { color: #ffffff; border-color: #ffffff; }
 
 .card p { color: var(--muted); font-size: 0.92rem; flex: 1; }
 

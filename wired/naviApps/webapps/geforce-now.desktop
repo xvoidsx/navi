@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=GeForce NOW
+Exec=navi-browser-run --force-dark-mode --app=https://play.geforcenow.com
+Comment=GeForce NOW as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-geforce-now
+StartupNotify=true
+Categories=Game;

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Xbox Cloud Gaming
+Exec=navi-browser-run --force-dark-mode --app=https://xbox.com/play
+Comment=Xbox Cloud Gaming as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-xbox-cloud
+StartupNotify=true
+Categories=Game;
