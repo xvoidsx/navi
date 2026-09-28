@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-power
+Comment=Power profiles, battery status, and ThinkPad charge thresholds
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-power" navi-power
+Icon=battery-full
+Terminal=false
+Categories=System;Settings;Power;
+NoDisplay=false

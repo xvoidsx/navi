@@ -107,6 +107,9 @@ PKGS=(
   # enables it only when RAM <= 2 GiB). the cloudbook bench proved big
   # deb unpacks OOM without it.
   zram-tools
+  # navi-power mod (eiri): power-profiles-daemon provides
+  # powerprofilesctl; upower gives honest time-to-empty/full estimates.
+  power-profiles-daemon upower
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -600,6 +603,8 @@ setup_mods() {
   install_mod "navi-weather"    "navi-weather"
   install_mod "navi-get"        "navi-get"
   install_mod "navi-browser"    "navi-browser"
+  install_mod "navi-power"      "navi-power"
+  install_mod "navi-display"    "navi-display"
 }
 
 # Local brain model guard for Hey Lain. This runs on EVERY setup_heylain —
