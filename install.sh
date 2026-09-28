@@ -127,6 +127,7 @@ PKGS=(
 DEFAULT_WEBAPPS=(
   navi-radio neighborli glyyph pandora
   github youtube yomi twitch discord perplexity dropbox
+  xbox-cloud geforce-now
 )
 
 # ---------------------------------------------------------------- ui

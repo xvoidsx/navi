@@ -1781,7 +1781,8 @@
     "downloadUrl": "webapps/xbox-cloud.desktop",
     "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Xbox Cloud Gaming\nExec=navi-browser-run --force-dark-mode --app=https://xbox.com/play\nComment=Xbox Cloud Gaming as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-xbox-cloud\nStartupNotify=true\nCategories=Game;\n",
     "homepage": "https://xbox.com/play",
-    "icon": "☁️"
+    "icon": "☁️",
+    "logo": "icons/xbox-cloud.svg"
   },
   {
     "id": "web-geforce-now",
@@ -1796,6 +1797,7 @@
     "downloadUrl": "webapps/geforce-now.desktop",
     "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=GeForce NOW\nExec=navi-browser-run --force-dark-mode --app=https://play.geforcenow.com\nComment=GeForce NOW as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-geforce-now\nStartupNotify=true\nCategories=Game;\n",
     "homepage": "https://play.geforcenow.com",
-    "icon": "🖥️"
+    "icon": "🖥️",
+    "logo": "icons/geforce-now.svg"
   }
 ]
