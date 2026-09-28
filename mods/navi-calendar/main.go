@@ -121,6 +121,8 @@ const (
 	modeBrowse mode = iota
 	modeAdd
 	modeConfirmDelete
+	modeQuickAdd
+	modeQuickConfirm
 )
 
 type model struct {
@@ -141,6 +143,12 @@ type model struct {
 	agendaSel int
 	confirmEv *event
 	errMsg    string
+
+	// quick-add state
+	quickInput textinput.Model
+	quickErr   string
+	quickEv    *event // parsed event awaiting confirm
+	quickArmed bool   // past-time warning acknowledged
 }
 
 func newModel() model {
@@ -154,6 +162,13 @@ func newModel() model {
 	}
 	mdl.events, _ = loadEvents()
 	mdl.initInputs()
+	qi := textinput.New()
+	qi.Prompt = ""
+	qi.Placeholder = "dinner with ryoko friday 7pm"
+	qi.CharLimit = 96
+	qi.TextStyle = theme.Input
+	qi.PlaceholderStyle = theme.Fainted
+	mdl.quickInput = qi
 	return mdl
 }
 
@@ -259,6 +274,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.inputs[m.focusIdx], cmd = m.inputs[m.focusIdx].Update(msg)
 		return m, cmd
 	}
+	if m.mode == modeQuickAdd {
+		var cmd tea.Cmd
+		m.quickInput, cmd = m.quickInput.Update(msg)
+		return m, cmd
+	}
 	return m, nil
 }
 
@@ -273,6 +293,38 @@ func (m model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "n", "N", "esc":
 			m.mode = modeBrowse
 			m.confirmEv = nil
+			return m, nil
+		}
+		return m, nil
+	}
+
+	if m.mode == modeQuickAdd {
+		switch key {
+		case "esc":
+			m.mode = modeBrowse
+			m.quickErr = ""
+			m.quickInput.Blur()
+			return m, nil
+		case "enter":
+			m.runQuickParse()
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.quickInput, cmd = m.quickInput.Update(msg)
+		return m, cmd
+	}
+
+	if m.mode == modeQuickConfirm {
+		switch key {
+		case "esc":
+			m.mode = modeQuickAdd
+			m.quickInput.Focus()
+			return m, nil
+		case "e", "E":
+			m.quickToManual()
+			return m, nil
+		case "enter":
+			m.confirmQuickSave()
 			return m, nil
 		}
 		return m, nil
@@ -308,7 +360,7 @@ func (m model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// browse mode
 	switch key {
-	case "q", "ctrl+c":
+	case "ctrl+c":
 		return m, tea.Quit
 	case "esc":
 		m.errMsg = ""
@@ -332,6 +384,8 @@ func (m model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.errMsg = ""
 	case "a":
 		m.startAdd()
+	case "q":
+		m.startQuickAdd()
 	case "d":
 		m.startDelete()
 	}
@@ -358,6 +412,79 @@ func (m *model) startAdd() {
 	m.focusInputs()
 }
 
+// ---------------------------------------------------------------------------
+// quick-add
+// ---------------------------------------------------------------------------
+
+func (m *model) startQuickAdd() {
+	m.mode = modeQuickAdd
+	m.quickErr = ""
+	m.quickEv = nil
+	m.quickArmed = false
+	m.errMsg = ""
+	m.quickInput.Focus()
+}
+
+// runQuickParse runs the quick-add parser over the input line. Success
+// moves to the confirm screen; failure shows the refusal inline and keeps
+// the input for editing.
+func (m *model) runQuickParse() {
+	ev, err := parseQuickAdd(m.quickInput.Value(), time.Now())
+	if err != nil {
+		m.quickErr = err.Error()
+		return
+	}
+	m.quickEv = &ev
+	m.quickErr = ""
+	// past events need a second Enter on the confirm screen; anything
+	// else is armed to save immediately.
+	m.quickArmed = !quickIsPast(ev, time.Now())
+	m.quickInput.Blur()
+	m.mode = modeQuickConfirm
+}
+
+// confirmQuickSave saves the parsed event. A past event requires the
+// warning to be armed first — the first Enter arms, the second saves.
+func (m *model) confirmQuickSave() {
+	if m.quickEv == nil {
+		m.mode = modeBrowse
+		return
+	}
+	if !m.quickArmed {
+		m.quickArmed = true
+		return
+	}
+	ev := *m.quickEv
+	if err := m.addEvent(ev.Title, ev.Date, ev.Time); err != nil {
+		m.quickErr = "couldn't save: " + err.Error()
+		m.mode = modeQuickAdd
+		m.quickInput.Focus()
+		m.quickEv = nil
+		return
+	}
+	m.jumpToDate(ev.Date)
+	m.quickEv = nil
+	m.quickInput.SetValue("")
+	m.mode = modeBrowse
+	m.errMsg = ""
+}
+
+// quickToManual drops the parsed event into the manual add form,
+// pre-filled, for tweaking.
+func (m *model) quickToManual() {
+	if m.quickEv == nil {
+		return
+	}
+	m.mode = modeAdd
+	m.focusIdx = 0
+	m.inputs[0].SetValue(m.quickEv.Title)
+	m.inputs[1].SetValue(m.quickEv.Date)
+	m.inputs[2].SetValue(m.quickEv.Time)
+	m.errMsg = ""
+	m.quickEv = nil
+	m.focusInputs()
+}
+
 func (m *model) submitAdd() {
 	title := strings.TrimSpace(m.inputs[0].Value())
 	date := strings.TrimSpace(m.inputs[1].Value())
@@ -379,24 +506,35 @@ func (m *model) submitAdd() {
 		m.focusInputs()
 		return
 	}
+	if err := m.addEvent(title, date, tm); err != nil {
+		m.errMsg = "couldn't save: " + err.Error()
+		return
+	}
+	m.jumpToDate(date)
+	m.mode = modeBrowse
+	m.errMsg = ""
+}
+
+// addEvent appends an event and persists the store — the shared storage
+// path for the manual form and quick-add.
+func (m *model) addEvent(title, date, tm string) error {
 	m.events = append(m.events, event{
 		ID:    fmt.Sprintf("%d", time.Now().UnixNano()),
 		Title: title,
 		Date:  date,
 		Time:  tm,
 	})
-	if err := saveEvents(m.events); err != nil {
-		m.errMsg = "couldn't save: " + err.Error()
-		return
-	}
-	// jump the cursor to the new event's day so it's visible
+	return saveEvents(m.events)
+}
+
+// jumpToDate moves the cursor to the given YYYY-MM-DD day so a newly
+// added event is visible.
+func (m *model) jumpToDate(date string) {
 	if d, err := time.Parse("2006-01-02", date); err == nil {
 		m.cursor = d
 		m.syncViewToCursor()
 	}
 	m.agendaSel = 0
-	m.mode = modeBrowse
-	m.errMsg = ""
 }
 
 func (m *model) startDelete() {
@@ -528,6 +666,12 @@ func (m model) agendaPane() string {
 	case modeAdd:
 		b.WriteString(m.addForm())
 		return b.String()
+	case modeQuickAdd:
+		b.WriteString(m.quickAddView())
+		return b.String()
+	case modeQuickConfirm:
+		b.WriteString(m.quickConfirmView())
+		return b.String()
 	case modeConfirmDelete:
 		if m.confirmEv != nil {
 			ev := m.confirmEv
@@ -581,6 +725,42 @@ func (m model) addForm() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+func (m model) quickAddView() string {
+	var b strings.Builder
+	b.WriteString(theme.Header.Render("QUICK ADD"))
+	b.WriteString("\n")
+	b.WriteString(m.quickInput.View() + "\n")
+	if m.quickErr != "" {
+		b.WriteString(theme.Error.Render(m.quickErr) + "\n")
+	}
+	b.WriteString(theme.Dimmed.Render("enter parse · esc cancel"))
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func (m model) quickConfirmView() string {
+	var b strings.Builder
+	b.WriteString(theme.Header.Render("QUICK ADD"))
+	b.WriteString("\n")
+	ev := m.quickEv
+	if ev == nil {
+		return b.String()
+	}
+	d, _ := time.Parse("2006-01-02", ev.Date)
+	when := d.Format("Monday 02 January") + " · " + ev.Time
+	b.WriteString(theme.Normal.Render(ev.Title) + "\n")
+	b.WriteString(theme.Grayed.Render(when) + "\n")
+	past := quickIsPast(*ev, time.Now())
+	if past {
+		b.WriteString(theme.Error.Render("that's in the past") + "\n")
+	}
+	hint := "enter save · e manual form · esc back"
+	if past && !m.quickArmed {
+		hint = "enter confirm past time · e manual form · esc back"
+	}
+	b.WriteString(theme.Dimmed.Render(hint))
+	return strings.TrimRight(b.String(), "\n")
+}
+
 func (m model) footer() string {
 	line1 := theme.Footer(true,
 		[2]string{"←→ hl", "day"},
@@ -590,9 +770,10 @@ func (m model) footer() string {
 	)
 	line2 := theme.Footer(true,
 		[2]string{"a", "add"},
+		[2]string{"q", "quick add"},
 		[2]string{"d", "delete"},
 		[2]string{"esc", "cancel"},
-		[2]string{"q", "quit"},
+		[2]string{"ctrl+c", "quit"},
 	)
 	return line1 + "\n" + line2
 }
