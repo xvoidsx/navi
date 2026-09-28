@@ -2,11 +2,13 @@
 #
 # waybar custom/nowplaying module — the wired's ear on the music.
 #
-# A fixed-width slot: the text is always padded/truncated to SLOT
-# characters, so neighboring modules never slide when a track starts,
-# stops, or has a long name. Idle shows a dim ♫; playing or paused shows
-# ♫ artist — title. While playing, a label longer than the slot scrolls
-# as a marquee *inside* the slot — the slot itself never changes size.
+# A fixed-width slot *while playing*: the text is padded/truncated to
+# SLOT characters, so neighbors never slide as the marquee scrolls or a
+# long-named track starts. But a quiet module shouldn't rent a wide
+# slot — paused and idle collapse to a single glyph, so the bar gives
+# the space back until the music returns. (The width change happens on
+# the discrete play/pause event, never continuously.)
+# Idle shows a dim ♫, paused a dim ⏸, playing shows ♫ artist — title.
 # Click opens the full navi-nowplaying mod.
 #
 # Reads MPRIS through playerctl, so it follows whatever is actually
@@ -44,13 +46,13 @@ fmt_time() { # <seconds, may be float> -> m:ss
 }
 
 if ! command -v playerctl >/dev/null 2>&1; then
-  emit "$(fit '♫')" "playerctl isn't installed — navi-nowplaying needs it" "idle"
+  emit "♫" "playerctl isn't installed — navi-nowplaying needs it" "idle"
   exit 0
 fi
 
 player="$(playerctl -l 2>/dev/null | head -n 1)"
 if [ -z "$player" ]; then
-  emit "$(fit '♫')" "nothing playing — the wired is quiet (click to open navi-nowplaying)" "idle"
+  emit "♫" "nothing playing — the wired is quiet (click to open navi-nowplaying)" "idle"
   exit 0
 fi
 
@@ -136,9 +138,10 @@ Playing)
   fi
   ;;
 Paused)
-  emit "$(fit "♫ $label")" "$tip (paused)" "paused"
+  # collapsed: the bar gets its space back; the tooltip keeps the track.
+  emit "⏸" "$tip (paused)" "paused"
   ;;
 *)
-  emit "$(fit '♫')" "nothing playing — the wired is quiet (click to open navi-nowplaying)" "idle"
+  emit "♫" "nothing playing — the wired is quiet (click to open navi-nowplaying)" "idle"
   ;;
 esac
