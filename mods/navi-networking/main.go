@@ -31,6 +31,21 @@ import (
 // do not let status strings wrap inside it.
 var frameWidth = 62
 
+// Fixed-frame geometry: every screen renders exactly netBodyRows body
+// lines (netFrameRows total). The network list shows at most netMaxNets
+// (windowed around the cursor); VPN profiles and history are windowed
+// too. QR codes (share, hotspot) get a fixed netQRBudget region —
+// padding when smaller, never clipped when within budget. Message and
+// error slots are fixed so footers never shift.
+const (
+	netBodyRows  = 33
+	netFrameRows = netBodyRows + 4
+	netMaxNets   = 20
+	netMaxVPN    = 6
+	netMaxHist   = 12
+	netQRBudget  = 22
+)
+
 // okStyle is the one local style: "good news" green, composed from theme
 // tokens. Everything else comes from the theme package directly.
 var okStyle = theme.DotOn.Copy().Bold(true)
@@ -227,22 +242,22 @@ type model struct {
 
 	// Speed-test history, loaded from disk when the history screen
 	// opens and appended after every successful test.
-	history            []speedEntry
+	history             []speedEntry
 	historyConfirmClear bool
 
 	// WireGuard profiles, refreshed at startup and after every
 	// toggle/import.
-	vpnProfiles  []vpnProfile
-	vpnCursor    int
-	vpnImporting bool
+	vpnProfiles   []vpnProfile
+	vpnCursor     int
+	vpnImporting  bool
 	vpnImportPath string
 
 	// Hotspot state.
-	hotspotActive   bool
-	hotspotSSID     string
-	hotspotPW       string
-	hotspotCursor   int // 0 = SSID, 1 = password
-	hotspotConfirm  bool // "disconnect wifi and start hotspot?" confirm
+	hotspotActive  bool
+	hotspotSSID    string
+	hotspotPW      string
+	hotspotCursor  int  // 0 = SSID, 1 = password
+	hotspotConfirm bool // "disconnect wifi and start hotspot?" confirm
 
 	// returnTo is where esc goes from the hotspot/vpn/history
 	// screens (whichever of networks/dashboard opened them).
@@ -1854,7 +1869,7 @@ func (m model) View() string {
 }
 
 func (m model) frame(content string) string {
-	return theme.Frame(frameWidth, "navi networking", m.info.SSID != "", m.tx.View(frameWidth), content)
+	return theme.FrameFixed(frameWidth, "navi networking", m.info.SSID != "", m.tx.View(frameWidth), content, netBodyRows)
 }
 
 func (m model) place(content string) string {
@@ -1914,14 +1929,16 @@ func (m model) networkView() string {
 	var b strings.Builder
 	b.WriteString(theme.Header.Render("NETWORKS"))
 	b.WriteString("\n\n")
+	// Network list: windowed around the cursor, fixed 22-line region.
+	var lb strings.Builder
 	if m.loading {
-		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("scanning for networks..."))
-		b.WriteString("\n")
+		lb.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("scanning for networks...") + "\n")
 	} else if len(m.networks) == 0 {
-		b.WriteString(theme.Dimmed.Render("  no Wi-Fi networks found"))
-		b.WriteString("\n")
+		lb.WriteString(theme.Dimmed.Render("  no Wi-Fi networks found") + "\n")
 	} else {
-		for i, n := range m.networks {
+		start, end := theme.ListWindow(len(m.networks), m.cursor, netMaxNets)
+		for i := start; i < end; i++ {
+			n := m.networks[i]
 			cursor := "  "
 			if i == m.cursor {
 				cursor = theme.Selected.Render("› ")
@@ -1936,23 +1953,28 @@ func (m model) networkView() string {
 			if sec == "" {
 				sec = "OPEN"
 			}
-			b.WriteString(fmt.Sprintf("%s%-28s %s  %s", cursor, name, signalBars(n.Signal), theme.Dimmed.Render(sec)))
+			lb.WriteString(fmt.Sprintf("%s%-28s %s  %s", cursor, name, signalBars(n.Signal), theme.Dimmed.Render(sec)))
 			if n.InUse {
-				b.WriteString("  " + okStyle.Render("●"))
+				lb.WriteString("  " + okStyle.Render("●"))
 			}
-			b.WriteString("\n")
+			lb.WriteString("\n")
+		}
+		if hint := theme.ScrollHint(len(m.networks), start, end); hint != "" {
+			lb.WriteString("  " + hint + "\n")
 		}
 	}
+	b.WriteString(theme.PadLines(lb.String(), 22))
+	// Status slot: always two lines (message, error, "no link" glow, or blank).
+	status := "\n\n"
 	if m.message != "" {
-		b.WriteString("\n" + okStyle.Render("✓ "+m.message) + "\n")
-	}
-	if m.err != nil {
-		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
-	}
-	if !m.loading && m.info.SSID == "" && m.err == nil && m.message == "" {
+		status = "\n" + okStyle.Render("✓ "+m.message) + "\n"
+	} else if m.err != nil {
+		status = "\n" + theme.Error.Render("× "+m.err.Error()) + "\n"
+	} else if !m.loading && m.info.SSID == "" {
 		// No link, nothing happening: the mod breathes, waiting.
-		b.WriteString("\n" + theme.Glow("  ○ no link — listening for the Wired", time.Now()) + "\n")
+		status = "\n" + theme.Glow("  ○ no link — listening for the Wired", time.Now()) + "\n"
 	}
+	b.WriteString(status)
 	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
 	b.WriteString(m.networksFooter())
 	return m.place(b.String())
@@ -1964,14 +1986,20 @@ func (m model) passwordView() string {
 	b.WriteString(theme.Normal.Render("  Network  ") + theme.Selected.Render(m.selected.SSID) + "\n")
 	b.WriteString(theme.Dimmed.Render("  Security  ") + theme.Normal.Render(m.selected.Security) + "\n\n")
 	b.WriteString(theme.Normal.Render("  Password") + "\n\n")
-	b.WriteString(theme.Input.Render("  > " + strings.Repeat("•", len([]rune(m.password)))))
+	b.WriteString(theme.Input.Render("  > "+strings.Repeat("•", len([]rune(m.password)))) + "\n")
+	// Loading slot: always two lines.
 	if m.loading {
-		b.WriteString("\n\n" + theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("connecting..."))
+		b.WriteString("\n" + theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("connecting...") + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
+	// Error slot: always one line.
 	if m.err != nil {
-		b.WriteString("\n\n" + theme.Error.Render("  × "+m.err.Error()))
+		b.WriteString(theme.Error.Render("  × "+m.err.Error()) + "\n")
+	} else {
+		b.WriteString("\n")
 	}
-	b.WriteString("\n\n" + theme.Dimmed.Render("  enter connect   esc cancel"))
+	b.WriteString("\n" + theme.Dimmed.Render("  enter connect   esc cancel"))
 	return m.place(b.String())
 }
 func (m model) openConfirmView() string {
@@ -1988,8 +2016,11 @@ func (m model) openConfirmView() string {
 	b.WriteString("\n\n")
 	b.WriteString(theme.Normal.Render("  Signal  ") + signalBars(m.selected.Signal) + "\n")
 	b.WriteString(theme.Normal.Render("  BSSID   ") + theme.Grayed.Render(m.selected.BSSID) + "\n\n")
+	// Loading slot: always two lines.
 	if m.loading {
 		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("connecting...") + "\n\n")
+	} else {
+		b.WriteString("\n\n")
 	}
 	b.WriteString(theme.Selected.Render("  [ enter ] connect"))
 	b.WriteString("   " + theme.Dimmed.Render("[ esc ] cancel"))
@@ -2000,21 +2031,27 @@ func (m model) dashboardView() string {
 	b.WriteString(theme.Header.Render("CONNECTION"))
 	b.WriteString("\n\n")
 	if m.info.SSID == "" {
-		b.WriteString(theme.Dimmed.Render("  no active Wi-Fi connection"))
+		b.WriteString(theme.Dimmed.Render("  no active Wi-Fi connection") + "\n\n\n\n\n\n\n\n")
 	} else {
 		b.WriteString(okStyle.Render("  ● "+m.info.SSID) + "\n\n")
+		// VPN slot: always two lines.
 		if vpn := m.activeVPNName(); vpn != "" {
 			b.WriteString(okStyle.Render("  ▲ VPN "+vpn) + "\n\n")
+		} else {
+			b.WriteString("\n\n")
 		}
 		b.WriteString(theme.Normal.Render("  Signal    ") + signalBars(m.info.Signal) + "\n")
 		b.WriteString(theme.Normal.Render("  Security  ") + m.info.Security + "\n")
 		b.WriteString(theme.Normal.Render("  Device    ") + m.info.Device + "\n")
 		b.WriteString(theme.Normal.Render("  BSSID     ") + theme.Grayed.Render(m.info.BSSID) + "\n")
 	}
+	// Error slot: always one line.
 	if m.err != nil {
-		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()))
+		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
-	b.WriteString("\n\n" + theme.Divider(frameWidth) + "\n")
+	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
 	b.WriteString(m.networksFooter())
 	return m.place(b.String())
 }
@@ -2030,13 +2067,19 @@ func (m model) dnsView() string {
 		}
 		b.WriteString(cursor + p.Name + "\n")
 	}
+	// Loading slot: always one line.
 	if m.loading {
-		b.WriteString("\n" + theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("applying..."))
+		b.WriteString("\n" + theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("applying...") + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
+	// Error slot: always two lines.
 	if m.err != nil {
-		b.WriteString("\n\n" + theme.Error.Render("× "+m.err.Error()))
+		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
-	b.WriteString("\n\n" + theme.Dimmed.Render("  enter select   ↑↓ navigate   esc back"))
+	b.WriteString("\n" + theme.Dimmed.Render("  enter select   ↑↓ navigate   esc back"))
 	return m.place(b.String())
 }
 func (m model) customDNSView() string {
@@ -2055,28 +2098,40 @@ func (m model) customDNSView() string {
 		}
 		b.WriteString(cursor + theme.Normal.Render(l+"  ") + val + "\n")
 	}
+	// Loading slot: always one line.
 	if m.loading {
-		b.WriteString("\n" + theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("applying DNS..."))
+		b.WriteString("\n" + theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("applying DNS...") + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
+	// Error slot: always two lines.
 	if m.err != nil {
-		b.WriteString("\n\n" + theme.Error.Render("× "+m.err.Error()))
+		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
-	b.WriteString("\n\n" + theme.Dimmed.Render("  ↑↓ select   tab next   enter apply   esc cancel"))
+	b.WriteString("\n" + theme.Dimmed.Render("  ↑↓ select   tab next   enter apply   esc cancel"))
 	return m.place(b.String())
 }
 func (m model) detailsView() string {
 	var b strings.Builder
 	b.WriteString(theme.Header.Render("CONNECTION DETAILS"))
 	b.WriteString("\n\n")
+	// Loading slot: always one line (blank when idle).
 	if m.loading {
 		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("loading...") + "\n")
+	} else {
+		b.WriteString("\n")
 	}
 	rows := [][2]string{{"SSID", m.info.SSID}, {"Device", m.info.Device}, {"BSSID", m.info.BSSID}, {"Signal", fmt.Sprintf("%d%%", m.info.Signal)}, {"Security", m.info.Security}, {"IPv4", m.info.IPv4}, {"Gateway", m.info.Gateway}, {"DNS IPv4", m.info.DNSv4}, {"DNS IPv6", m.info.DNSv6}}
 	for _, r := range rows {
 		b.WriteString(fmt.Sprintf("  %-12s %s\n", r[0], theme.Normal.Render(r[1])))
 	}
+	// Error slot: always two lines.
 	if m.err != nil {
-		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()))
+		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
 	b.WriteString("\n" + theme.Dimmed.Render("esc back"))
 	return m.place(b.String())
@@ -2091,15 +2146,21 @@ func (m model) shareView() string {
 	}
 	b.WriteString(okStyle.Render("  "+m.info.SSID) + "\n")
 	b.WriteString(theme.Dimmed.Render("  scan this QR code with your phone") + "\n\n")
+	// QR region: fixed netQRBudget lines, padded when the code is smaller.
+	var qb strings.Builder
 	if m.qr != "" {
 		for _, line := range qrLines(m.qr) {
-			b.WriteString("  " + line + "\n")
+			qb.WriteString("  " + line + "\n")
 		}
 	}
-	b.WriteString("\n" + theme.Dimmed.Render("esc back"))
+	b.WriteString(theme.PadLines(qb.String(), netQRBudget))
+	// Error slot: always two lines.
 	if m.err != nil {
-		b.WriteString("\n\n" + theme.Error.Render("× "+m.err.Error()))
+		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
+	b.WriteString("\n" + theme.Dimmed.Render("esc back"))
 	return m.place(b.String())
 }
 func (m model) forgetView() string {
@@ -2107,8 +2168,11 @@ func (m model) forgetView() string {
 	b.WriteString(theme.Header.Render("FORGET NETWORK"))
 	b.WriteString("\n\n")
 	b.WriteString(theme.Normal.Render("  Forget ") + theme.Selected.Render(m.selected.SSID) + theme.Normal.Render("?\n\n  This removes its saved NetworkManager profile.\n\n"))
+	// Loading slot: always two lines.
 	if m.loading {
 		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("forgetting...") + "\n\n")
+	} else {
+		b.WriteString("\n\n")
 	}
 	b.WriteString(theme.Selected.Render("  [ enter ] forget"))
 	b.WriteString("   " + theme.Dimmed.Render("[ esc ] cancel"))
@@ -2120,6 +2184,8 @@ func (m model) speedTestView() string {
 	b.WriteString(theme.Header.Render("SPEED TEST"))
 	b.WriteString("\n\n")
 
+	// Test region: fixed 8 lines so the frame never shifts between states.
+	var tb strings.Builder
 	switch {
 	case m.speedRunning:
 		stage := stageLatency
@@ -2128,7 +2194,7 @@ func (m model) speedTestView() string {
 		}
 		switch stage {
 		case stageLatency:
-			b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("measuring latency..."))
+			tb.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("measuring latency..."))
 		case stageDownload, stageUpload:
 			label := "↓ download"
 			if stage == stageUpload {
@@ -2143,29 +2209,30 @@ func (m model) speedTestView() string {
 					frac = 1
 				}
 			}
-			b.WriteString(theme.Normal.Render("  " + label))
-			b.WriteString("\n\n  " + theme.Meter(40, frac, theme.Pink, theme.Faint))
-			b.WriteString("\n  " + theme.Dimmed.Render(fmt.Sprintf("%.1f / %.1f MB", float64(done)/1_000_000, float64(total)/1_000_000)))
+			tb.WriteString(theme.Normal.Render("  " + label))
+			tb.WriteString("\n\n  " + theme.Meter(40, frac, theme.Pink, theme.Faint))
+			tb.WriteString("\n  " + theme.Dimmed.Render(fmt.Sprintf("%.1f / %.1f MB", float64(done)/1_000_000, float64(total)/1_000_000)))
 			if len(m.samples) > 1 {
-				b.WriteString("\n\n  " + theme.Sparkline(m.samples, 40, theme.Cyan))
-				b.WriteString("\n  " + theme.Grayed.Render(fmt.Sprintf("%.1f Mbps live", m.samples[len(m.samples)-1])))
+				tb.WriteString("\n\n  " + theme.Sparkline(m.samples, 40, theme.Cyan))
+				tb.WriteString("\n  " + theme.Grayed.Render(fmt.Sprintf("%.1f Mbps live", m.samples[len(m.samples)-1])))
 			}
 		}
-		b.WriteString("\n\n" + theme.Dimmed.Render("  esc cancel"))
+		tb.WriteString("\n\n" + theme.Dimmed.Render("  esc cancel"))
 
 	case m.speedResult.err != nil:
-		b.WriteString(theme.Error.Render("× " + m.speedResult.err.Error()))
-		b.WriteString("\n\n" + theme.Dimmed.Render("  t retry   esc back"))
+		tb.WriteString(theme.Error.Render("× " + m.speedResult.err.Error()))
+		tb.WriteString("\n\n" + theme.Dimmed.Render("  t retry   esc back"))
 
 	case m.speedResult.downloadMbps > 0:
-		b.WriteString(theme.Normal.Render("  Latency   ") + fmt.Sprintf("%.0f ms", m.speedResult.latencyMs) + "\n")
-		b.WriteString(theme.Normal.Render("  Download  ") + okStyle.Render(fmt.Sprintf("%.1f Mbps", m.speedResult.downloadMbps)) + "\n")
-		b.WriteString(theme.Normal.Render("  Upload    ") + okStyle.Render(fmt.Sprintf("%.1f Mbps", m.speedResult.uploadMbps)) + "\n")
-		b.WriteString("\n" + theme.Dimmed.Render("  t run again   esc back"))
+		tb.WriteString(theme.Normal.Render("  Latency   ") + fmt.Sprintf("%.0f ms", m.speedResult.latencyMs) + "\n")
+		tb.WriteString(theme.Normal.Render("  Download  ") + okStyle.Render(fmt.Sprintf("%.1f Mbps", m.speedResult.downloadMbps)) + "\n")
+		tb.WriteString(theme.Normal.Render("  Upload    ") + okStyle.Render(fmt.Sprintf("%.1f Mbps", m.speedResult.uploadMbps)) + "\n")
+		tb.WriteString("\n" + theme.Dimmed.Render("  t run again   esc back"))
 
 	default:
-		b.WriteString(theme.Dimmed.Render("  press t to run a speed test"))
+		tb.WriteString(theme.Dimmed.Render("  press t to run a speed test"))
 	}
+	b.WriteString(theme.PadLines(tb.String(), 8))
 	return m.place(b.String())
 }
 
@@ -2188,10 +2255,12 @@ func (m model) hotspotView() string {
 		b.WriteString(okStyle.Render("  ● hotspot active") + "\n\n")
 		b.WriteString(theme.Normal.Render("  SSID      ") + theme.Selected.Render(m.hotspotSSID) + "\n")
 		b.WriteString(theme.Normal.Render("  Password  ") + theme.Normal.Render(m.hotspotPW) + "\n\n")
-		b.WriteString(theme.Dimmed.Render("  scan to join:") + "\n\n")
+		// QR region: fixed netQRBudget lines, padded when the code is smaller.
+		var qb strings.Builder
 		for _, line := range qrLines(wifiQR(m.hotspotSSID, "WPA2", m.hotspotPW)) {
-			b.WriteString("  " + line + "\n")
+			qb.WriteString("  " + line + "\n")
 		}
+		b.WriteString(theme.PadLines(qb.String(), netQRBudget))
 		b.WriteString("\n" + theme.Dimmed.Render("  x stop hotspot   esc back"))
 	} else {
 		fields := [][2]string{{"SSID", m.hotspotSSID}, {"Password", m.hotspotPW}}
@@ -2209,8 +2278,11 @@ func (m model) hotspotView() string {
 		b.WriteString("\n" + theme.Dimmed.Render("  device "+m.wifiDev) + "\n")
 		b.WriteString("\n" + theme.Dimmed.Render("  ↑↓/tab field   ctrl+r new password   enter start   esc back"))
 	}
+	// Error slot: always two lines.
 	if m.err != nil {
-		b.WriteString("\n\n" + theme.Error.Render("× "+m.err.Error()))
+		b.WriteString("\n\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
+	} else {
+		b.WriteString("\n\n\n")
 	}
 	return m.place(b.String())
 }
@@ -2237,10 +2309,16 @@ func (m model) vpnView() string {
 		return m.place(b.String())
 	}
 	if len(m.vpnProfiles) == 0 {
-		b.WriteString(theme.Dimmed.Render("  no WireGuard profiles saved") + "\n\n")
-		b.WriteString(theme.Dimmed.Render("  press i to import one from a .conf file"))
+		b.WriteString(theme.PadLines(
+			theme.Dimmed.Render("  no WireGuard profiles saved")+"\n\n"+
+				theme.Dimmed.Render("  press i to import one from a .conf file"),
+			netMaxVPN+1))
 	} else {
-		for i, p := range m.vpnProfiles {
+		// Profiles: windowed around the cursor, fixed netMaxVPN region.
+		var vb strings.Builder
+		start, end := theme.ListWindow(len(m.vpnProfiles), m.vpnCursor, netMaxVPN)
+		for i := start; i < end; i++ {
+			p := m.vpnProfiles[i]
 			cursor := "  "
 			if i == m.vpnCursor {
 				cursor = theme.Selected.Render("› ")
@@ -2249,18 +2327,28 @@ func (m model) vpnView() string {
 			if i == m.vpnCursor {
 				name = theme.Selected.Render(name)
 			}
-			b.WriteString(cursor + name)
+			vb.WriteString(cursor + name)
 			if p.Active {
-				b.WriteString("  " + okStyle.Render("● active"))
+				vb.WriteString("  " + okStyle.Render("● active"))
 			}
-			b.WriteString("\n")
+			vb.WriteString("\n")
 		}
+		if hint := theme.ScrollHint(len(m.vpnProfiles), start, end); hint != "" {
+			vb.WriteString("  " + hint + "\n")
+		}
+		b.WriteString(theme.PadLines(vb.String(), netMaxVPN+1))
 	}
+	// Message slot: always two lines.
 	if m.message != "" {
 		b.WriteString("\n" + okStyle.Render("✓ "+m.message) + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
+	// Error slot: always two lines.
 	if m.err != nil {
 		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
 	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
 	if len(m.vpnProfiles) == 0 {
@@ -2282,26 +2370,30 @@ func (m model) historyView() string {
 		return m.place(b.String())
 	}
 	if len(m.history) == 0 {
-		b.WriteString(theme.Dimmed.Render("  no speed tests recorded yet") + "\n\n")
-		b.WriteString(theme.Dimmed.Render("  run one with t from the dashboard"))
+		b.WriteString(theme.PadLines(
+			theme.Dimmed.Render("  no speed tests recorded yet")+"\n\n"+
+				theme.Dimmed.Render("  run one with t from the dashboard"),
+			netMaxHist+3))
 	} else {
-		// Newest first, cap the visible rows.
+		// Newest first, windowed to netMaxHist rows.
+		var hb strings.Builder
 		n := len(m.history)
-		shown := 12
+		shown := netMaxHist
 		if n < shown {
 			shown = n
 		}
 		for i := 0; i < shown; i++ {
 			e := m.history[n-1-i]
-			b.WriteString(fmt.Sprintf("  %s  %5.0f ms   ↓ %6.1f   ↑ %6.1f\n",
+			hb.WriteString(fmt.Sprintf("  %s  %5.0f ms   ↓ %6.1f   ↑ %6.1f\n",
 				e.Time.Format("02 Jan 15:04"), e.PingMs, e.DownMbps, e.UpMbps))
 		}
 		var downs []float64
 		for _, e := range m.history {
 			downs = append(downs, e.DownMbps)
 		}
-		b.WriteString("\n  " + theme.Dimmed.Render("download Mbps:") + "\n")
-		b.WriteString("  " + theme.Sparkline(downs, 40, theme.Cyan) + "\n")
+		hb.WriteString("\n  " + theme.Dimmed.Render("download Mbps:") + "\n")
+		hb.WriteString("  " + theme.Sparkline(downs, 40, theme.Cyan) + "\n")
+		b.WriteString(theme.PadLines(hb.String(), netMaxHist+3))
 	}
 	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
 	if len(m.history) > 0 {
@@ -2391,5 +2483,47 @@ func dumpSample() {
 	m.hotspotSSID = "navi-cloudbook"
 	m.hotspotPW = "wired-drop-01"
 	m.hotspotActive = true
+	fmt.Println(m.View())
+
+	fmt.Println("=== PASSWORD ===")
+	m.screen = screenPassword
+	m.selected = Network{SSID: "ghost-ap", Security: "WPA2"}
+	m.password = "secret123"
+	fmt.Println(m.View())
+
+	fmt.Println("=== OPEN CONFIRM ===")
+	m.screen = screenOpenConfirm
+	m.selected = Network{SSID: "open-cafe", Signal: 34, BSSID: "aa:bb:cc:dd:ee:ff"}
+	fmt.Println(m.View())
+
+	fmt.Println("=== DASHBOARD ===")
+	m.screen = screenDashboard
+	fmt.Println(m.View())
+
+	fmt.Println("=== DNS ===")
+	m.screen = screenDNS
+	m.dnsCursor = 1
+	fmt.Println(m.View())
+
+	fmt.Println("=== CUSTOM DNS ===")
+	m.screen = screenCustomDNS
+	m.customDNS = [4]string{"1.1.1.1", "", "", ""}
+	fmt.Println(m.View())
+
+	fmt.Println("=== DETAILS ===")
+	m.screen = screenDetails
+	m.info.IPv4 = "192.168.1.42"
+	m.info.Gateway = "192.168.1.1"
+	m.info.DNSv4 = "1.1.1.1"
+	fmt.Println(m.View())
+
+	fmt.Println("=== SHARE ===")
+	m.screen = screenShare
+	m.qr = "WIFI:T:WPA;S:wired-uplink;P:correct-horse-battery-staple-99;;"
+	fmt.Println(m.View())
+
+	fmt.Println("=== FORGET ===")
+	m.screen = screenForgetConfirm
+	m.selected = Network{SSID: "ghost-ap"}
 	fmt.Println(m.View())
 }

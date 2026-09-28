@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 	theme "github.com/rav3ndust/navi-theme"
 )
@@ -114,7 +114,6 @@ func testModel(t *testing.T) model {
 	m.rebuildContent()
 	return m
 }
-
 
 func TestPinnedHeaderStays(t *testing.T) {
 	m := testModel(t)

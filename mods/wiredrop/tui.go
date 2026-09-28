@@ -17,6 +17,11 @@ import (
 
 const tuiWidth = 62
 
+// Fixed-frame geometry: 18 body lines. Device/file lists windowed.
+// Frame is 22 rows total (theme.Frame adds txRow line).
+const wdBodyRows = 18
+const wdMaxDevices = 8
+
 type tuiScreen int
 
 const (
@@ -307,7 +312,8 @@ func (m *tuiModel) View() string {
 		body = m.viewHistory()
 	}
 	footer := m.footer()
-	view := theme.Frame(m.width, "wiredrop", len(m.devList) > 0, m.tx.View(m.width), body+"\n"+footer)
+	body = theme.PadLines(body+"\n"+footer, wdBodyRows)
+	view := theme.FrameFixed(tuiWidth, "wiredrop", len(m.devList) > 0, m.tx.View(m.width), body, wdBodyRows)
 	return lipgloss.NewStyle().Width(m.width).Render(view)
 }
 
@@ -341,8 +347,14 @@ func (m *tuiModel) viewDevices() string {
 		b.WriteString(theme.Dimmed.Render("  no devices seen yet\n"))
 		b.WriteString(theme.Dimmed.Render("  the daemon announces every 30s — phones running\n"))
 		b.WriteString(theme.Dimmed.Render("  LocalSend appear here too."))
+		// Pad to wdMaxDevices lines.
+		for i := 0; i < wdMaxDevices-3; i++ {
+			b.WriteString("\n")
+		}
 	} else {
-		for i, p := range m.devList {
+		start, end := theme.ListWindow(len(m.devList), m.cursor, wdMaxDevices)
+		for i := start; i < end; i++ {
+			p := m.devList[i]
 			cursor := "  "
 			style := theme.Normal
 			if i == m.cursor {
@@ -364,6 +376,11 @@ func (m *tuiModel) viewDevices() string {
 			line := fmt.Sprintf("%s%s %s %s %s %s", cursor, dot, style.Render(p.Alias), via, theme.Dimmed.Render(seen), trust)
 			b.WriteString(line + "\n")
 		}
+		// Pad short lists.
+		for i := end - start; i < wdMaxDevices; i++ {
+			b.WriteString("\n")
+		}
+		b.WriteString(theme.ScrollHint(len(m.devList), start, end))
 	}
 	if m.notice != "" {
 		b.WriteString("\n" + theme.Error.Render(m.notice))
@@ -525,4 +542,32 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// --- headless --dump for visual checks ---
+
+func dumpSample() {
+	peers := NewPeerCache("")
+	m := &tuiModel{
+		cfg:     &Config{Alias: "test-machine"},
+		peers:   peers,
+		known:   &KnownHosts{},
+		screen:  screenDevices,
+		devList: []*Peer{},
+		width:   tuiWidth,
+	}
+	m.tx = theme.Transmission{}
+	fmt.Println("=== DEVICES (empty) ===")
+	fmt.Println(m.View())
+	// Sample with devices: add directly to devList, bypass refresh.
+	m.devList = []*Peer{
+		{Alias: "phone", Via: "mdns", LastSeen: time.Now()},
+		{Alias: "laptop", Via: "mdns", LastSeen: time.Now()},
+	}
+	// Temporarily disable refresh by setting peers to return our list.
+	fmt.Println("=== DEVICES (populated) ===")
+	// viewDevices calls refreshPeers which overwrites devList; for the
+	// sample we render directly.
+	body := "NEARBY DEVICES sample:\n  ● phone [mdns] now\n  ● laptop [mdns] now"
+	fmt.Println(theme.FrameFixed(tuiWidth, "wiredrop", true, "", theme.PadLines(body, wdBodyRows), wdBodyRows))
 }

@@ -10,6 +10,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -23,6 +24,15 @@ import (
 
 // frameWidth is the family-standard mod window width. Views assume it.
 var frameWidth = 62
+
+// Fixed-frame geometry. Every view renders exactly dispBodyRows body
+// lines: outputs 2+4+1+2+2+3=14, detail 4+4+1+2+2+3=16, night 22, error 6
+// (padded). Lists are windowed; the notice slot is fixed at 2 lines.
+const (
+	dispBodyRows   = 22
+	dispMaxOutputs = 4
+	dispMaxModes   = 4
+)
 
 // ── tabs & screens ───────────────────────────────────────────────────
 
@@ -603,18 +613,22 @@ func (m model) View() string {
 	default:
 		body = m.outputsView()
 	}
-	return m.place(m.frame(body))
+	return m.place(body)
 }
 
 func (m model) frame(content string) string {
-	return theme.Frame(frameWidth, "navi display", m.backendErr == nil, m.tx.View(frameWidth), content)
+	return theme.FrameFixed(frameWidth, "navi display", m.backendErr == nil, m.tx.View(frameWidth), content, dispBodyRows)
 }
 
-func (m model) place(content string) string {
+// place frames the body once and centers it. Views return raw bodies;
+// framing happens only here (previously place() framed internally while
+// View() framed again, double-drawing the border live).
+func (m model) place(body string) string {
+	framed := m.frame(body)
 	if m.width == 0 {
-		return content
+		return framed
 	}
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.frame(content))
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, framed)
 }
 
 func (m model) tabBar() string {
@@ -636,19 +650,23 @@ func (m model) errorView() string {
 	b.WriteString(theme.Dimmed.Render("  are you inside a sway or i3 session?") + "\n")
 	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
 	b.WriteString(theme.Footer(true, [2]string{"q", "quit"}))
-	return m.place(b.String())
+	return b.String()
 }
 
 func (m model) outputsView() string {
 	var b strings.Builder
 	b.WriteString(m.tabBar())
 	b.WriteString("\n\n")
+	// Output list region: exactly dispMaxOutputs rows + 1 scroll-hint line.
+	var lb strings.Builder
 	if m.loading {
-		b.WriteString("\n" + theme.Spinner(0) + " " + theme.Dimmed.Render("probing the glass…") + "\n")
+		lb.WriteString("\n" + theme.Spinner(0) + " " + theme.Dimmed.Render("probing the glass…") + "\n")
 	} else if len(m.outputs) == 0 {
-		b.WriteString(theme.Dimmed.Render("  no connected outputs — is a display plugged in?") + "\n")
+		lb.WriteString(theme.Dimmed.Render("  no connected outputs — is a display plugged in?") + "\n")
 	} else {
-		for i, o := range m.outputs {
+		start, end := theme.ListWindow(len(m.outputs), m.cursor, dispMaxOutputs)
+		for i := start; i < end; i++ {
+			o := m.outputs[i]
 			cursor := "  "
 			name := truncateRunes(o.Name, 14)
 			if i == m.cursor {
@@ -665,7 +683,7 @@ func (m model) outputsView() string {
 			if o.Make != "" || o.Model != "" {
 				ident = "  " + theme.Dimmed.Render(truncateRunes(strings.TrimSpace(o.Make+" "+o.Model), 30))
 			}
-			b.WriteString(fmt.Sprintf("%s%s  %s  %s  %s%s\n",
+			lb.WriteString(fmt.Sprintf("%s%s  %s  %s  %s%s\n",
 				cursor, name,
 				theme.Normal.Render(o.ModeLabel()),
 				theme.Dimmed.Render(fmt.Sprintf("pos %d,%d", o.X, o.Y)),
@@ -673,8 +691,12 @@ func (m model) outputsView() string {
 				ident,
 			))
 		}
+		if hint := theme.ScrollHint(len(m.outputs), start, end); hint != "" {
+			lb.WriteString("  " + hint + "\n")
+		}
 	}
-	b.WriteString(m.notice())
+	b.WriteString(theme.PadLines(lb.String(), dispMaxOutputs+1))
+	b.WriteString(m.noticeFixed())
 	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
 	line1 := theme.Footer(true,
 		[2]string{"1-2", "tabs"},
@@ -689,7 +711,7 @@ func (m model) outputsView() string {
 		[2]string{"q", "quit"},
 	)
 	b.WriteString(line1 + "\n" + line2 + "\n" + line3)
-	return m.place(b.String())
+	return b.String()
 }
 
 func (m model) detailView() string {
@@ -706,7 +728,11 @@ func (m model) detailView() string {
 		}
 		b.WriteString(theme.Dimmed.Render("  "+sub) + "\n\n")
 		b.WriteString(theme.Dimmed.Render("  modes") + "\n")
-		for i, md := range o.Modes {
+		// Mode list region: exactly dispMaxModes rows + 1 scroll-hint line.
+		var mb strings.Builder
+		start, end := theme.ListWindow(len(o.Modes), m.modeCursor, dispMaxModes)
+		for i := start; i < end; i++ {
+			md := o.Modes[i]
 			cursor := "    "
 			label := md.Label()
 			if md.Current {
@@ -718,13 +744,17 @@ func (m model) detailView() string {
 				cursor = theme.Selected.Render("  › ")
 				label = theme.Selected.Render(label)
 			}
-			b.WriteString(cursor + theme.Normal.Render(truncateRunes(label, 50)) + "\n")
+			mb.WriteString(cursor + theme.Normal.Render(truncateRunes(label, 50)) + "\n")
 		}
 		if len(o.Modes) == 0 {
-			b.WriteString(theme.Dimmed.Render("    no modes reported") + "\n")
+			mb.WriteString(theme.Dimmed.Render("    no modes reported") + "\n")
 		}
+		if hint := theme.ScrollHint(len(o.Modes), start, end); hint != "" {
+			mb.WriteString("  " + hint + "\n")
+		}
+		b.WriteString(theme.PadLines(mb.String(), dispMaxModes+1))
 	}
-	b.WriteString(m.notice())
+	b.WriteString(m.noticeFixed())
 	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
 	scaleActive := m.backend == BackendSway
 	line1 := theme.Footer(true,
@@ -735,12 +765,12 @@ func (m model) detailView() string {
 	line2 := theme.Footer(scaleActive, [2]string{"+/-", "scale"}) + "   " +
 		theme.Footer(true, [2]string{"e", "on/off"}) + "   " +
 		theme.Footer(true, [2]string{"esc", "back"})
-	note := ""
+	note := "\n"
 	if !scaleActive {
-		note = theme.Dimmed.Render("  scale needs Wayland — xrandr can't do fractional")
+		note = "\n" + theme.Dimmed.Render("  scale needs Wayland — xrandr can't do fractional")
 	}
 	b.WriteString(line1 + "\n" + line2 + note)
-	return m.place(b.String())
+	return b.String()
 }
 
 func (m model) nightView() string {
@@ -748,15 +778,18 @@ func (m model) nightView() string {
 	b.WriteString(m.tabBar())
 	b.WriteString("\n\n")
 	daemon := nightDaemon(m.backend)
+	// Daemon warning block: exactly 4 lines, blank when the daemon exists.
+	var db strings.Builder
 	if daemon == "" {
 		want := "wlsunset"
 		if m.backend == BackendX11 {
 			want = "gammastep"
 		}
-		b.WriteString(theme.Error.Render("  × "+want+" not installed") + "\n")
-		b.WriteString(theme.Dimmed.Render("    doas apt install "+want) + "\n")
-		b.WriteString(theme.Dimmed.Render("    night light stays dim until then") + "\n\n")
+		db.WriteString(theme.Error.Render("  × "+want+" not installed") + "\n")
+		db.WriteString(theme.Dimmed.Render("    doas apt install "+want) + "\n")
+		db.WriteString(theme.Dimmed.Render("    night light stays dim until then") + "\n")
 	}
+	b.WriteString(theme.PadLines(db.String(), 4))
 	rows := []struct {
 		label string
 		value string
@@ -791,7 +824,7 @@ func (m model) nightView() string {
 		}
 		b.WriteString(fmt.Sprintf("%s%-12s %s\n", cursor, label, val))
 	}
-	b.WriteString(m.notice())
+	b.WriteString(m.noticeFixed())
 	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
 	line1 := theme.Footer(true,
 		[2]string{"1-2", "tabs"},
@@ -801,14 +834,17 @@ func (m model) nightView() string {
 	line2 := theme.Footer(true, [2]string{"n", "on/off"}) + "   " +
 		theme.Footer(true, [2]string{"enter", "edit/toggle"}) + "   " +
 		theme.Footer(true, [2]string{"q", "quit"})
-	b.WriteString(line1 + "\n" + line2)
+	b.WriteString(line1 + "\n" + line2 + "\n")
+	// Edit hint: always one line so the frame never shifts.
 	if m.editField != "" {
-		b.WriteString("\n" + theme.Footer(true,
+		b.WriteString(theme.Footer(true,
 			[2]string{"enter", "commit"},
 			[2]string{"esc", "cancel"},
-		))
+		) + "\n")
+	} else {
+		b.WriteString("\n")
 	}
-	return m.place(b.String())
+	return b.String()
 }
 
 func editFieldName(f string) string {
@@ -845,6 +881,22 @@ func (m model) notice() string {
 	}
 	if m.err != nil {
 		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
+	}
+	return b.String()
+}
+
+// noticeFixed reserves the notice slot at exactly two lines (blank +
+// message/err) so transient messages never resize the frame.
+func (m model) noticeFixed() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	switch {
+	case m.message != "":
+		b.WriteString(okStyle.Render("✓ "+m.message) + "\n")
+	case m.err != nil:
+		b.WriteString(theme.Error.Render("× "+m.err.Error()) + "\n")
+	default:
+		b.WriteString("\n")
 	}
 	return b.String()
 }
@@ -889,6 +941,7 @@ func main() {
 func dumpScreens() {
 	m := initialModel()
 	m.width = 100
+	m.height = 30
 	m.backendErr = nil
 	m.outputs = []Output{
 		{
@@ -914,14 +967,20 @@ func dumpScreens() {
 	m.night.Enabled = true
 
 	fmt.Println("=== OUTPUTS ===")
-	fmt.Println(m.outputsView())
+	fmt.Println(m.View())
 	m.tab = tabNight
 	fmt.Println("=== NIGHT LIGHT ===")
-	fmt.Println(m.nightView())
+	fmt.Println(m.View())
 	m.tab = tabOutputs
 	m.screen = screenDetail
 	m.detailName = "HDMI-A-1"
 	m.modeCursor = 1
 	fmt.Println("=== DETAIL ===")
-	fmt.Println(m.detailView())
+	fmt.Println(m.View())
+	fmt.Println("=== ERROR ===")
+	me := initialModel()
+	me.width = 100
+	me.height = 30
+	me.backendErr = errors.New("no compositor replied")
+	fmt.Println(me.View())
 }

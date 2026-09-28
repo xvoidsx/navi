@@ -749,104 +749,160 @@ func (m *model) advanceFromModel() {
 // ---------------------------------------------------------------------------
 
 func frame(content string) string {
-	return theme.Border.Width(68).Render(content)
+	return theme.FrameFixed(64, "hey lain", false, "", content, lcBodyRows)
 }
+
+// Fixed-frame geometry: header(3) + screen(13) + footer(2) = 18 body lines.
+// List screens already render fixed heights; shorter screens are padded.
+const lcBodyRows = 18
+const lcScreenLines = 13
 
 func (m model) View() string {
 	var b strings.Builder
-	b.WriteString(theme.Logo.Render("∅ ") + theme.Title.Render("hey lain — brain config") + "\n")
 	cur := m.current
 	curDesc := cur.Backend + " / " + cur.Model
 	if cur.Backend == "" {
 		curDesc = "local / gemma3:270m (default)"
 	}
-	b.WriteString(theme.Dimmed.Render("current: "+curDesc) + "\n\n")
+	// Header: 3 lines (title is in the frame chrome).
+	b.WriteString(theme.Dimmed.Render("current: "+curDesc) + "\n\n\n")
 
+	var screen string
 	switch m.screen {
 	case screenBackend:
-		b.WriteString(m.blist.View() + "\n")
+		screen = m.blist.View() + "\n"
 	case screenModel:
-		b.WriteString(m.mlist.View() + "\n")
+		screen = m.mlist.View() + "\n"
 	case screenCustomURL:
-		b.WriteString(theme.Header.Render("endpoint URL for Custom endpoint") + "\n")
-		b.WriteString(theme.Dimmed.Render("the full chat endpoint — e.g. https://your-host/v1/chat/completions") + "\n\n")
-		b.WriteString(m.urlInput.View() + "\n")
+		screen = theme.Header.Render("endpoint URL for Custom endpoint") + "\n" +
+			theme.Dimmed.Render("the full chat endpoint — e.g. https://your-host/v1/chat/completions") + "\n\n" +
+			m.urlInput.View() + "\n"
 	case screenCustomStyle:
-		b.WriteString(m.slist.View() + "\n")
+		screen = m.slist.View() + "\n"
 	case screenModelCustom:
-		b.WriteString(theme.Header.Render("model for "+m.backend.name) + "\n")
-		b.WriteString(theme.Dimmed.Render(m.backend.modelHint) + "\n\n")
-		b.WriteString(m.modelInput.View() + "\n")
+		screen = theme.Header.Render("model for "+m.backend.name) + "\n" +
+			theme.Dimmed.Render(m.backend.modelHint) + "\n\n" +
+			m.modelInput.View() + "\n"
 	case screenKey:
 		if m.keyOptional {
-			b.WriteString(theme.Header.Render("API key (optional) for "+m.backend.name) + "\n")
-			b.WriteString(theme.Dimmed.Render("enter to skip — no key will be sent") + "\n\n")
+			screen = theme.Header.Render("API key (optional) for "+m.backend.name) + "\n" +
+				theme.Dimmed.Render("enter to skip — no key will be sent") + "\n\n"
 		} else {
-			b.WriteString(theme.Header.Render("API key for "+m.backend.name) + "\n")
-			b.WriteString(theme.Dimmed.Render("stored in ~/.config/hey-lain/brain.json (mode 0600) — never leaves this machine except to "+m.backend.name) + "\n\n")
+			screen = theme.Header.Render("API key for "+m.backend.name) + "\n" +
+				theme.Dimmed.Render("stored in ~/.config/hey-lain/brain.json (mode 0600)") + "\n\n"
 		}
-		b.WriteString(m.keyInput.View() + "\n")
+		screen += m.keyInput.View() + "\n"
 	case screenURL:
-		b.WriteString(theme.Header.Render("API URL override") + "\n")
-		b.WriteString(theme.Dimmed.Render("advanced: replace the default endpoint for "+m.backend.name) + "\n\n")
-		b.WriteString(m.urlInput.View() + "\n")
+		screen = theme.Header.Render("API URL override") + "\n" +
+			theme.Dimmed.Render("advanced: replace the default endpoint for "+m.backend.name) + "\n\n" +
+			m.urlInput.View() + "\n"
 	case screenReview:
-		cfg := m.pendingConfig()
-		b.WriteString(theme.Header.Render("review") + "\n\n")
-		b.WriteString(fmt.Sprintf("  backend   %s\n", theme.Normal.Render(m.backend.name)))
-		b.WriteString(fmt.Sprintf("  model     %s\n", theme.Selected.Render(m.chosenModel)))
-		b.WriteString(fmt.Sprintf("  api url   %s\n", theme.Normal.Render(cfg.APIURL)))
-		b.WriteString(fmt.Sprintf("  protocol  %s\n", theme.Normal.Render(cfg.APIStyle)))
-		if m.backend.needsKey || m.keyOptional {
-			keyNote := "•••••••• (set)"
-			if m.keyFromEnv {
-				keyNote = "•••••••• (from " + m.keyEnvName + ")"
-			} else if m.chosenKey == "" {
-				keyNote = "(not set)"
-			}
-			b.WriteString(fmt.Sprintf("  api key   %s\n", theme.Normal.Render(keyNote)))
-		}
-		b.WriteString("\n")
-		if m.backend.id != "local" {
-			b.WriteString(theme.Error.Render("  ⚠ transcripts leave this machine — your words go to "+m.backend.name) + "\n\n")
-		}
-		if m.backend.id == "local" && !modelInstalled(m.chosenModel) {
-			b.WriteString(theme.Error.Render("  ! "+m.chosenModel+" isn't installed — run: ollama pull "+m.chosenModel) + "\n\n")
-		}
-		if m.testing {
-			b.WriteString(theme.Dimmed.Render("  testing connection…") + "\n\n")
-		} else if m.testResult != "" {
-			style := theme.Selected
-			if !strings.HasPrefix(m.testResult, "ok") {
-				style = theme.Error
-			}
-			line := "  test: " + m.testResult
-			if m.testLatency != "" {
-				line += " (" + m.testLatency + ")"
-			}
-			b.WriteString(style.Render(line) + "\n\n")
-		}
-		b.WriteString(theme.Dimmed.Render("  enter save · t test connection · u override api url · esc back") + "\n")
+		screen = m.reviewScreen()
 	case screenDone:
-		b.WriteString(theme.Header.Render("saved ✓") + "\n\n")
-		b.WriteString(theme.Normal.Render("  ~/.config/hey-lain/brain.json") + "\n")
-		b.WriteString(theme.Dimmed.Render("  tap Alt+V and talk — the new brain is live on the next utterance") + "\n\n")
-		b.WriteString(theme.Dimmed.Render("  press any key to close") + "\n")
+		screen = theme.Header.Render("saved ✓") + "\n\n" +
+			theme.Normal.Render("  ~/.config/hey-lain/brain.json") + "\n" +
+			theme.Dimmed.Render("  tap Alt+V and talk — the new brain is live on the next utterance") + "\n\n" +
+			theme.Dimmed.Render("  press any key to close") + "\n"
 	}
+	// Screen region: fixed lcScreenLines.
+	b.WriteString(theme.PadLines(screen, lcScreenLines))
 
+	// Footer: always two lines.
 	if m.errMsg != "" {
 		b.WriteString("\n" + theme.Error.Render(m.errMsg) + "\n")
 	} else if m.screen != screenDone {
 		b.WriteString("\n" + theme.Dimmed.Render("enter select · esc back · q quit (no save)") + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
 
 	return frame(b.String())
 }
 
+// reviewScreen renders the review step with fixed slots so the frame
+// never shifts between backends and test states.
+func (m model) reviewScreen() string {
+	var b strings.Builder
+	cfg := m.pendingConfig()
+	b.WriteString(theme.Header.Render("review") + "\n\n")
+	b.WriteString(fmt.Sprintf("  backend   %s\n", theme.Normal.Render(m.backend.name)))
+	b.WriteString(fmt.Sprintf("  model     %s\n", theme.Selected.Render(m.chosenModel)))
+	b.WriteString(fmt.Sprintf("  api url   %s\n", theme.Normal.Render(cfg.APIURL)))
+	b.WriteString(fmt.Sprintf("  protocol  %s\n", theme.Normal.Render(cfg.APIStyle)))
+	// Key slot: always one line.
+	if m.backend.needsKey || m.keyOptional {
+		keyNote := "•••••••• (set)"
+		if m.keyFromEnv {
+			keyNote = "•••••••• (from " + m.keyEnvName + ")"
+		} else if m.chosenKey == "" {
+			keyNote = "(not set)"
+		}
+		b.WriteString(fmt.Sprintf("  api key   %s\n", theme.Normal.Render(keyNote)))
+	} else {
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	// Warning slot: always two lines.
+	if m.backend.id != "local" {
+		b.WriteString(theme.Error.Render("  ⚠ transcripts leave this machine — your words go to "+m.backend.name) + "\n\n")
+	} else if m.backend.id == "local" && !modelInstalled(m.chosenModel) {
+		b.WriteString(theme.Error.Render("  ! "+m.chosenModel+" isn't installed — run: ollama pull "+m.chosenModel) + "\n\n")
+	} else {
+		b.WriteString("\n\n")
+	}
+	// Test-result slot: always two lines.
+	if m.testing {
+		b.WriteString(theme.Dimmed.Render("  testing connection…") + "\n\n")
+	} else if m.testResult != "" {
+		style := theme.Selected
+		if !strings.HasPrefix(m.testResult, "ok") {
+			style = theme.Error
+		}
+		line := "  test: " + m.testResult
+		if m.testLatency != "" {
+			line += " (" + m.testLatency + ")"
+		}
+		b.WriteString(style.Render(line) + "\n\n")
+	} else {
+		b.WriteString("\n\n")
+	}
+	b.WriteString(theme.Dimmed.Render("  enter save · t test connection · u override api url · esc back") + "\n")
+	return b.String()
+}
+
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--dump" {
+		dumpSample()
+		return
+	}
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "navi-lain-config:", err)
 		os.Exit(1)
 	}
+}
+
+// --- headless --dump for visual checks ---
+
+func dumpSample() {
+	m := initialModel()
+	fmt.Println("=== BACKEND ===")
+	fmt.Println(m.View())
+	m.screen = screenKey
+	for i := range backends {
+		if backends[i].id == "openai" {
+			m.backend = &backends[i]
+			break
+		}
+	}
+	m.keyOptional = false
+	fmt.Println("=== KEY ===")
+	fmt.Println(m.View())
+	m.screen = screenReview
+	m.chosenModel = "gpt-4o-mini"
+	m.chosenKey = "sk-..."
+	m.testResult = "ok"
+	m.testLatency = "412ms"
+	fmt.Println("=== REVIEW ===")
+	fmt.Println(m.View())
 }

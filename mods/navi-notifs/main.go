@@ -26,6 +26,13 @@ import (
 // frameWidth is the family-standard mod window width.
 const frameWidth = 62
 
+// Fixed-frame geometry: the notification list is a viewport of exactly
+// ntListLines; the status slot is always two lines.
+const (
+	ntBodyRows  = 24
+	ntListLines = 15
+)
+
 // ---------------------------------------------------------------------------
 // dunst history
 // ---------------------------------------------------------------------------
@@ -255,14 +262,7 @@ func (m model) innerWidth() int {
 func (m model) vpWidth() int { return m.innerWidth() - 2 }
 
 func (m model) vpHeight() int {
-	h := m.height - 12 // frame chrome: border, header, tx, pinned, divider, footer
-	if h < 5 {
-		h = 5
-	}
-	if h > 22 {
-		h = 22
-	}
-	return h
+	return ntListLines
 }
 
 // renderBlock renders one notification as styled lines (no trailing newline).
@@ -852,9 +852,12 @@ func (m model) View() string {
 	b.WriteString(theme.Divider(m.innerWidth()))
 	b.WriteString("\n")
 	b.WriteString(m.listView())
+	// Status slot: always two lines.
 	if m.status != "" {
 		b.WriteString("\n")
 		b.WriteString(theme.Grayed.Render("  " + m.status))
+	} else {
+		b.WriteString("\n\n")
 	}
 	footer := theme.Footer(true,
 		[2]string{"↑↓/jk", "move"},
@@ -866,20 +869,42 @@ func (m model) View() string {
 		[2]string{"q", "quit"},
 	)
 	body := b.String() + "\n" + footer
-	return theme.Frame(m.width, "navi notifs", len(m.notifs) > 0, m.tx.View(m.width), body)
+	return theme.FrameFixed(m.width, "navi notifs", len(m.notifs) > 0, m.tx.View(m.width), body, ntBodyRows)
 }
 
-// ---------------------------------------------------------------------------
-// main
-// ---------------------------------------------------------------------------
+// --- headless --dump for visual checks ---
+
+func dumpSample() {
+	m := initialModel()
+	m.ready = true
+	m.loading = false
+	m.notifs = []notif{
+		{ID: 1, App: "navi-update", Summary: "system updated", Body: "12 packages upgraded, 0 failed.", Actions: map[string]string{}},
+		{ID: 2, App: "chromium", Summary: "download finished", Body: "navi-2.0-eiri-2026-09-28.iso (1.2 GB)", Actions: map[string]string{"open": "Open folder"}},
+		{ID: 3, App: "dunst", Summary: "low battery", Body: "14% remaining — plug in soon.", Actions: map[string]string{}},
+		{ID: 4, App: "calendar", Summary: "standup in 10 minutes", Body: "daily sync with the xvoidsx crew", Actions: map[string]string{"snooze": "Snooze"}},
+	}
+	m.vp = viewport.New(m.vpWidth(), m.vpHeight())
+	m.rebuildContent()
+	fmt.Println("=== NOTIFS ===")
+	fmt.Println(m.View())
+	m2 := initialModel()
+	m2.ready = true
+	m2.loading = false
+	fmt.Println("=== EMPTY ===")
+	fmt.Println(m2.View())
+}
 
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "--help", "-h":
-			fmt.Fprintln(os.Stderr, "usage: navi-notifs")
+			fmt.Fprintln(os.Stderr, "usage: navi-notifs [--dump]")
 			fmt.Fprintln(os.Stderr, "  browse dunst notification history, invoke actions, dismiss, clear.")
 			os.Exit(0)
+		case "--dump":
+			dumpSample()
+			return
 		default:
 			fmt.Fprintln(os.Stderr, "usage: navi-notifs")
 			os.Exit(2)

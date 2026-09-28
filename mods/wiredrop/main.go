@@ -12,6 +12,10 @@ import (
 const version = "1.0.0"
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--dump" {
+		dumpSample()
+		return
+	}
 	if len(os.Args) < 2 {
 		// Bare `wiredrop`: TUI when interactive, help otherwise.
 		if isTTY() {

@@ -24,6 +24,16 @@ import (
 
 const frameWidth = 62
 
+// Fixed-frame geometry: every screen renders exactly remBodyRows body
+// lines. The list shows at most remMaxItems reminders (windowed around
+// the cursor); section headers add at most 2×2 lines. Footer and status
+// live inside the frame; the footer slot is fixed at 2 lines.
+const (
+	remBodyRows  = 19
+	remMaxItems  = 5
+	remListLines = 10 // remMaxItems + 2 headers×2 + 1 scroll-hint line
+)
+
 type screen int
 
 const (
@@ -375,23 +385,39 @@ func (m model) View() string {
 	default:
 		body = m.viewList()
 	}
-	out := theme.Frame(frameWidth, "navi reminders", m.mgrAlive, m.tx.View(frameWidth), body)
-	out += "\n" + m.footer()
+	// Status: always one line.
 	if m.status != "" {
-		out += "\n" + theme.Dimmed.Render("  "+truncateRunes(m.status, 56))
+		body += theme.Dimmed.Render("  "+truncateRunes(m.status, 56)) + "\n"
+	} else {
+		body += "\n"
 	}
-	return out
+	body += theme.Divider(frameWidth) + "\n"
+	body += m.footerFixed() + "\n"
+	return theme.FrameFixed(frameWidth, "navi reminders", m.mgrAlive, m.tx.View(frameWidth), body, remBodyRows)
+}
+
+// footerFixed pads the footer to exactly two lines.
+func (m model) footerFixed() string {
+	f := m.footer()
+	if strings.Count(f, "\n") == 0 {
+		f += "\n"
+	}
+	return f
 }
 
 func (m model) viewList() string {
 	var b strings.Builder
 	if len(m.items) == 0 {
 		b.WriteString("\n" + theme.Glow("  ○ no reminders — press a to add one", time.Now()) + "\n")
-		return b.String()
+		return theme.PadLines(b.String(), remListLines)
 	}
+	// Window the items around the cursor; headers render for visible sections.
+	start, end := theme.ListWindow(len(m.items), m.cursor, remMaxItems)
+	var lb strings.Builder
 	now := time.Now()
 	sec := ""
-	for i, r := range m.items {
+	for i := start; i < end; i++ {
+		r := m.items[i]
 		wantSec := "UPCOMING"
 		if r.Missed {
 			wantSec = "MISSED"
@@ -402,7 +428,7 @@ func (m model) viewList() string {
 			if sec == "MISSED" {
 				style = lipgloss.NewStyle().Foreground(theme.Red).Bold(true)
 			}
-			b.WriteString("\n" + style.Render("  "+sec) + "\n")
+			lb.WriteString("\n" + style.Render("  "+sec) + "\n")
 		}
 		cursor := "  "
 		title := theme.Normal.Render(truncateRunes(r.Title, 30))
@@ -420,17 +446,23 @@ func (m model) viewList() string {
 		if r.Repeat != reminders.RepeatOnce {
 			rep = theme.Dimmed.Render(" · " + repeatLabels[r.Repeat])
 		}
-		b.WriteString(fmt.Sprintf("%s%s  %s%s\n", cursor, title, when, rep))
+		lb.WriteString(fmt.Sprintf("%s%s  %s%s\n", cursor, title, when, rep))
 	}
-	return b.String()
+	if hint := theme.ScrollHint(len(m.items), start, end); hint != "" {
+		lb.WriteString("  " + hint + "\n")
+	}
+	return theme.PadLines(lb.String(), remListLines)
 }
 
 func (m model) viewAdd() string {
 	var b strings.Builder
 	b.WriteString("\n" + theme.Header.Render("  NEW REMINDER") + "\n\n")
 	b.WriteString("  " + m.input.View() + "\n\n")
+	// Error slot: always two lines so the frame never shifts.
 	if m.addErr != "" {
 		b.WriteString("  " + theme.Error.Render("× "+m.addErr) + "\n\n")
+	} else {
+		b.WriteString("\n\n")
 	}
 	b.WriteString(theme.Dimmed.Render("  e.g. dentist tomorrow 9am · standup friday 8:30 · gym mon 7a\n"))
 	return b.String()
@@ -441,8 +473,11 @@ func (m model) viewConfirm() string {
 	b.WriteString("\n" + theme.Header.Render("  CONFIRM") + "\n\n")
 	b.WriteString("  " + theme.Normal.Render(truncateRunes(m.parsed.title, 44)) + "\n")
 	b.WriteString("  " + theme.Header.Render(m.parsed.at.Format("Mon 02 Jan 2006 · 15:04")) + "\n\n")
+	// Past-warning slot: always two lines so the frame never shifts.
 	if reminders.IsPast(m.parsed.at, time.Now()) && !m.pastAck {
 		b.WriteString("  " + theme.Error.Render("! "+reminders.PastWarning()) + "\n\n")
+	} else {
+		b.WriteString("\n\n")
 	}
 	b.WriteString(theme.Dimmed.Render("  repeats:") + "\n")
 	for i, k := range repeatKinds {
@@ -563,6 +598,9 @@ func dump() {
 	fmt.Println(m.View())
 	m.screen = scrSnooze
 	fmt.Println("=== snooze ===")
+	fmt.Println(m.View())
+	m.screen = scrDelete
+	fmt.Println("=== delete ===")
 	fmt.Println(m.View())
 }
 

@@ -25,6 +25,16 @@ import (
 // frameWidth is the family-standard mod window width. Views assume it.
 var frameWidth = 62
 
+// Fixed-frame geometry: every screen renders exactly btBodyRows body
+// lines, so the rounded frame never jumps. The device list shows at most
+// btMaxDevices devices (windowed around the cursor); headers add at most
+// 3×2 lines, so the list region is exactly btListLines.
+const (
+	btBodyRows   = 20
+	btListLines  = 11
+	btMaxDevices = 5
+)
+
 // ── screens ─────────────────────────────────────────────────────────
 
 type screen int
@@ -571,45 +581,94 @@ func (m model) View() string {
 	case screenTrustAsk:
 		body = m.viewTrustAsk()
 	}
-	return theme.Frame(frameWidth, "navi bluetooth", m.adapter.powered, m.tx.View(frameWidth), body)
+	return theme.FrameFixed(frameWidth, "navi bluetooth", m.adapter.powered, m.tx.View(frameWidth), body, btBodyRows)
 }
 
 func (m model) viewMain() string {
 	var b strings.Builder
 
-	if !m.adapter.powered {
+	// Adapter line: always exactly one line so the frame never shifts.
+	switch {
+	case !m.adapter.powered:
 		b.WriteString(theme.Error.Render("  ○ adapter is off — press P to power on") + "\n")
-	} else if m.adapter.discoverable {
+	case m.adapter.discoverable:
 		b.WriteString(theme.Dimmed.Render("  ◉ discoverable — nearby devices can see this machine") + "\n")
+	default:
+		b.WriteString("\n")
 	}
 
-	if m.loading && len(m.rows) == 0 {
-		b.WriteString("\n" + theme.Spinner(0) + " " + theme.Dimmed.Render("listening to the radio…") + "\n")
-	} else if len(m.rows) == 0 {
-		b.WriteString("\n" + theme.Dimmed.Render("  no devices yet — press s to scan") + "\n")
-	}
-
-	for _, r := range m.rows {
-		if r.dev < 0 {
-			b.WriteString("\n" + theme.Header.Render("  "+r.header) + "\n")
-			continue
-		}
-		b.WriteString("  " + m.viewDeviceRow(r.dev) + "\n")
-	}
+	// Device list region: exactly btListLines, windowed around the cursor.
+	entries := m.devEntries()
+	start, end := theme.ListWindow(len(entries), m.cursor, btMaxDevices)
+	b.WriteString(theme.PadLines(m.listRegion(entries, start, end), btListLines) + "\n")
 
 	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
+
+	// Status line: always one line.
 	if m.status != "" {
 		st := theme.Dimmed.Render("  " + m.status)
 		if m.statusErr {
 			st = theme.Error.Render("  " + m.status)
 		}
 		b.WriteString(st + "\n")
+	} else {
+		b.WriteString("\n")
 	}
-	if m.working {
+
+	// Scroll/working line: always one line.
+	if hint := theme.ScrollHint(len(entries), start, end); hint != "" {
+		b.WriteString("  " + hint + "\n")
+	} else if m.working {
 		b.WriteString("  " + theme.Spinner(0) + "\n")
+	} else {
+		b.WriteString("\n")
 	}
+
 	b.WriteString(theme.Dimmed.Render("  audio output switching lives in navi-audio →") + "\n")
 	b.WriteString(m.viewFooter() + "\n")
+	return b.String()
+}
+
+// devEntry is a selectable device with its section header.
+type devEntry struct {
+	section string
+	dev     int
+}
+
+func (m model) devEntries() []devEntry {
+	var out []devEntry
+	cur := ""
+	for _, r := range m.rows {
+		if r.dev < 0 {
+			cur = r.header
+			continue
+		}
+		out = append(out, devEntry{section: cur, dev: r.dev})
+	}
+	return out
+}
+
+// listRegion renders the windowed device list with section headers.
+// Headers cost 2 lines, devices 1 — at most btMaxDevices devices and 3
+// headers, so the region never exceeds btListLines.
+func (m model) listRegion(entries []devEntry, start, end int) string {
+	var b strings.Builder
+	if m.loading && len(entries) == 0 {
+		b.WriteString("\n" + theme.Spinner(0) + " " + theme.Dimmed.Render("listening to the radio…") + "\n")
+		return b.String()
+	}
+	if len(entries) == 0 {
+		b.WriteString("\n" + theme.Dimmed.Render("  no devices yet — press s to scan") + "\n")
+		return b.String()
+	}
+	lastSection := ""
+	for _, e := range entries[start:end] {
+		if e.section != lastSection {
+			b.WriteString("\n" + theme.Header.Render("  "+e.section) + "\n")
+			lastSection = e.section
+		}
+		b.WriteString("  " + m.viewDeviceRow(e.dev) + "\n")
+	}
 	return b.String()
 }
 
@@ -804,6 +863,17 @@ func dumpSample() {
 	m3.screen = screenConfirmRemove
 	m3.removeDev = m.devs[1]
 	fmt.Println(m3.View())
+	fmt.Println("\n── PIN entry ──")
+	m4 := m
+	m4.screen = screenPIN
+	m4.pairDev = m.devs[2]
+	m4.pinBuf = "12"
+	fmt.Println(m4.View())
+	fmt.Println("\n── trust ask ──")
+	m5 := m
+	m5.screen = screenTrustAsk
+	m5.trustDev = m.devs[1]
+	fmt.Println(m5.View())
 }
 
 // ── main ────────────────────────────────────────────────────────────

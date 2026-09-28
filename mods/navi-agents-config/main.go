@@ -472,7 +472,14 @@ type model struct {
 	jumpTarget string
 }
 
-const frameWidth = 64
+const frameWidth = 80
+
+// Fixed-frame geometry: tabbar(3) + tab(15) + status(2) + testing(2) = 22.
+// Tab views are padded to acTabLines; the status/testing slots are fixed.
+const (
+	acBodyRows = 22
+	acTabLines = 15
+)
 
 type pItem struct {
 	p      agentenv.Provider
@@ -1366,27 +1373,35 @@ func (m model) tabBar() string {
 func (m model) View() string {
 	var b strings.Builder
 	b.WriteString(m.tabBar() + "\n\n")
+	var tab string
 	switch m.tab {
 	case tabStatus:
-		b.WriteString(m.statusView())
+		tab = m.statusView()
 	case tabModels:
-		b.WriteString(m.modelsView())
+		tab = m.modelsView()
 	case tabHarnesses:
-		b.WriteString(m.harnessView())
+		tab = m.harnessView()
 	case tabAutonomy:
-		b.WriteString(m.autonomyView())
+		tab = m.autonomyView()
 	case tabEvals:
-		b.WriteString(m.evalsView())
+		tab = m.evalsView()
 	case tabProviders:
-		b.WriteString(m.providerView())
+		tab = m.providerView()
 	}
+	b.WriteString(theme.PadLines(tab, acTabLines))
+	// Status slot: always two lines.
 	if m.status != "" {
-		b.WriteString("\n" + theme.Normal.Render(m.status))
+		b.WriteString("\n" + theme.Normal.Render(m.status) + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
+	// Testing slot: always two lines.
 	if m.testing {
-		b.WriteString("\n" + theme.Dimmed.Render("testing…"))
+		b.WriteString("\n" + theme.Dimmed.Render("testing…") + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
-	return theme.Frame(frameWidth, "navi agent center", m.anyLive(), "", b.String())
+	return theme.FrameFixed(frameWidth, "navi agent center", m.anyLive(), "", b.String(), acBodyRows)
 }
 
 func (m model) statusView() string {
@@ -1570,6 +1585,10 @@ func min(a, b int) int {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--dump" {
+		dumpSample()
+		return
+	}
 	m := initialModel()
 	prog = tea.NewProgram(m, tea.WithAltScreen())
 	final, err := prog.Run()
@@ -1582,6 +1601,18 @@ func main() {
 		if p, err := exec.LookPath("herdr"); err == nil {
 			_ = syscall.Exec(p, []string{"herdr", "agent", "attach", fm.jumpTarget}, os.Environ())
 		}
+	}
+}
+
+// --- headless --dump for visual checks ---
+
+func dumpSample() {
+	tabs := []tab{tabStatus, tabModels, tabHarnesses, tabAutonomy, tabEvals, tabProviders}
+	for _, t := range tabs {
+		m := initialModel()
+		m.tab = t
+		fmt.Printf("=== %s ===\n", tabNames[t])
+		fmt.Println(m.View())
 	}
 }
 
@@ -1802,13 +1833,17 @@ func (m model) handleAutonomyKey(key string) (tea.Model, tea.Cmd) {
 func (m model) autonomyView() string {
 	var b strings.Builder
 	b.WriteString(theme.Header.Render("opencode autonomy") + "\n")
-	b.WriteString(theme.Dimmed.Render("what needs approval, what just happens — written to ~/.config/opencode/opencode.json") + "\n\n")
+	b.WriteString(theme.Dimmed.Render("what needs approval, what just happens") + "\n\n")
 	for i, pr := range autonomyProfiles {
 		mark := "  "
 		if pr.name == m.autonomyCurrent {
 			mark = lipgloss.NewStyle().Foreground(theme.Pink).Render("★ ")
 		}
-		row := fmt.Sprintf("%s%-10s %s", mark, pr.name, pr.desc)
+		desc := pr.desc
+		if len(desc) > 58 {
+			desc = desc[:57] + "…"
+		}
+		row := fmt.Sprintf("%s%-10s %s", mark, pr.name, desc)
 		if i == m.autonomyCursor {
 			b.WriteString(theme.Selected.Render("> "+row) + "\n")
 		} else {

@@ -28,6 +28,16 @@ import (
 
 const frameWidth = 62
 
+// Fixed-frame geometry: every view renders exactly wxBodyRows body lines.
+// The main forecast reserves fixed slots for the banner and the stale
+// indicator; lists (locations, alerts) are windowed; the alert detail
+// keeps its 14-line scroll window.
+const (
+	wxBodyRows  = 20
+	wxMaxLocs   = 6
+	wxMaxAlerts = 6
+)
+
 // ---------------------------------------------------------------------------
 // config — shared with wired/waybar/weather.sh
 // ---------------------------------------------------------------------------
@@ -101,19 +111,19 @@ type wttrDesc struct {
 }
 
 type wttrCurrent struct {
-	TempC          string     `json:"temp_C"`
-	TempF          string     `json:"temp_F"`
-	FeelsLikeC     string     `json:"FeelsLikeC"`
-	FeelsLikeF     string     `json:"FeelsLikeF"`
-	Humidity       string     `json:"humidity"`
-	WeatherCode    string     `json:"weatherCode"`
-	WeatherDesc    []wttrDesc `json:"weatherDesc"`
-	WindKmph       string     `json:"windspeedKmph"`
-	WindMph        string     `json:"windspeedMiles"`
-	WindDir        string     `json:"winddir16Point"`
-	VisibilityMi   string     `json:"visibilityMiles"`
-	VisibilityKm   string     `json:"visibility"`
-	ObservationTime string    `json:"observation_time"`
+	TempC           string     `json:"temp_C"`
+	TempF           string     `json:"temp_F"`
+	FeelsLikeC      string     `json:"FeelsLikeC"`
+	FeelsLikeF      string     `json:"FeelsLikeF"`
+	Humidity        string     `json:"humidity"`
+	WeatherCode     string     `json:"weatherCode"`
+	WeatherDesc     []wttrDesc `json:"weatherDesc"`
+	WindKmph        string     `json:"windspeedKmph"`
+	WindMph         string     `json:"windspeedMiles"`
+	WindDir         string     `json:"winddir16Point"`
+	VisibilityMi    string     `json:"visibilityMiles"`
+	VisibilityKm    string     `json:"visibility"`
+	ObservationTime string     `json:"observation_time"`
 }
 
 type wttrAreaName struct {
@@ -734,14 +744,18 @@ func nextSlots(w *wttrResp, n int) []wttrHourly {
 	return slots
 }
 
+func (m model) frame(content string) string {
+	return theme.FrameFixed(frameWidth, "navi weather", true, "", content, wxBodyRows)
+}
+
 func (m model) viewMain() string {
 	if m.loading && m.data == nil {
-		return theme.Frame(frameWidth, "navi weather", true, "",
-			theme.Grayed.Render("  asking the sky…"))
+		return m.frame(theme.PadLines(theme.Grayed.Render("  asking the sky…"), wxBodyRows))
 	}
 	if m.data == nil {
-		return theme.Frame(frameWidth, "navi weather", false, "",
-			theme.Error.Render("  couldn't reach wttr.in — check your connection and press r to retry."))
+		return m.frame(theme.PadLines(
+			theme.Error.Render("  couldn't reach wttr.in — check your connection and press r to retry."),
+			wxBodyRows))
 	}
 
 	w := m.data
@@ -750,10 +764,12 @@ func (m model) viewMain() string {
 
 	var b strings.Builder
 	// location
-	b.WriteString(theme.Header.Render("  " + areaLabel(w, m.activeLocation())) + "\n")
-	// severe-weather banner (or the honest US-only note)
+	b.WriteString(theme.Header.Render("  "+areaLabel(w, m.activeLocation())) + "\n")
+	// severe-weather banner slot: always one line.
 	if line := m.bannerLine(); line != "" {
 		b.WriteString(line + "\n")
+	} else {
+		b.WriteString("\n")
 	}
 	// current conditions, big
 	b.WriteString("  " + theme.Normal.Render(emojiFor(cur.WeatherCode, day)+"  "+m.temp(cur.TempF, cur.TempC)) +
@@ -800,6 +816,8 @@ func (m model) viewMain() string {
 
 	if m.fetchErr != "" {
 		b.WriteString("\n" + theme.Error.Render("  stale — couldn't refresh ("+shortErr(m.fetchErr)+")") + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
 
 	unitKey := "°F/°C"
@@ -811,7 +829,7 @@ func (m model) viewMain() string {
 		[2]string{"l", "saved"},
 		[2]string{"tab", "next"},
 	)
-	return theme.Frame(frameWidth, "navi weather", true, "", b.String()+footer)
+	return m.frame(b.String() + footer)
 }
 
 func shortErr(s string) string {
@@ -824,35 +842,49 @@ func shortErr(s string) string {
 func (m model) viewLocations() string {
 	var b strings.Builder
 	b.WriteString(theme.Header.Render("  saved locations") + "\n\n")
-	for i, loc := range m.cfg.Locations {
+	// Locations: windowed around the cursor, fixed wxMaxLocs+1 region.
+	var lb strings.Builder
+	start, end := theme.ListWindow(len(m.cfg.Locations), m.locCursor, wxMaxLocs)
+	for i := start; i < end; i++ {
+		loc := m.cfg.Locations[i]
 		marker := "  "
 		if loc == m.cfg.DefaultLocation {
 			marker = "● "
 		}
 		line := marker + locationLabel(loc)
 		if i == m.locCursor {
-			b.WriteString("  " + theme.Selected.Render("▸ "+line) + "\n")
+			lb.WriteString("  " + theme.Selected.Render("▸ "+line) + "\n")
 		} else {
-			b.WriteString("  " + theme.Normal.Render("  "+line) + "\n")
+			lb.WriteString("  " + theme.Normal.Render("  "+line) + "\n")
 		}
 	}
+	if hint := theme.ScrollHint(len(m.cfg.Locations), start, end); hint != "" {
+		lb.WriteString("  " + hint + "\n")
+	}
+	b.WriteString(theme.PadLines(lb.String(), wxMaxLocs+1))
 	b.WriteString("\n")
+	// Add-form slot: always two lines.
 	if m.adding {
 		b.WriteString("  " + theme.Grayed.Render("add location:") + "\n")
 		b.WriteString("  " + m.input.View() + "\n")
-		footer := theme.Footer(false,
+	} else {
+		b.WriteString("\n\n")
+	}
+	var footer string
+	if m.adding {
+		footer = theme.Footer(false,
 			[2]string{"enter", "save"},
 			[2]string{"esc", "cancel"},
 		)
-		return theme.Frame(frameWidth, "navi weather", true, "", b.String()+footer)
+	} else {
+		footer = theme.Footer(false,
+			[2]string{"enter", "select"},
+			[2]string{"a", "add"},
+			[2]string{"d", "delete"},
+			[2]string{"esc", "back"},
+		)
 	}
-	footer := theme.Footer(false,
-		[2]string{"enter", "select"},
-		[2]string{"a", "add"},
-		[2]string{"d", "delete"},
-		[2]string{"esc", "back"},
-	)
-	return theme.Frame(frameWidth, "navi weather", true, "", b.String()+footer)
+	return m.frame(b.String() + footer)
 }
 
 // ---------------------------------------------------------------------------
@@ -906,40 +938,51 @@ func (m *model) openRadar() {
 func (m model) viewAlerts() string {
 	var b strings.Builder
 	b.WriteString(theme.Header.Render("  weather alerts") + "\n\n")
+	// Alert list: windowed, fixed wxMaxAlerts+2 region.
+	var ab strings.Builder
 	switch {
 	case m.alertsUnsupported:
-		b.WriteString(theme.Dimmed.Render("  alerts unavailable outside the US") + "\n")
-		b.WriteString(theme.Grayed.Render("  api.weather.gov only covers US territories —") + "\n")
-		b.WriteString(theme.Grayed.Render("  the forecast itself is unaffected.") + "\n")
+		ab.WriteString(theme.Dimmed.Render("  alerts unavailable outside the US") + "\n")
+		ab.WriteString(theme.Grayed.Render("  api.weather.gov only covers US territories —") + "\n")
+		ab.WriteString(theme.Grayed.Render("  the forecast itself is unaffected.") + "\n")
 	case len(m.alerts) == 0:
-		b.WriteString("  " + lipgloss.NewStyle().Foreground(theme.Green).Render("✓ all clear") + "\n")
-		b.WriteString(theme.Grayed.Render("  no active alerts for this location.") + "\n")
+		ab.WriteString("  " + lipgloss.NewStyle().Foreground(theme.Green).Render("✓ all clear") + "\n")
+		ab.WriteString(theme.Grayed.Render("  no active alerts for this location.") + "\n")
 	default:
 		if m.alertsFromCache {
-			b.WriteString(theme.Grayed.Render("  cached "+m.alertsFetchedAt.Local().Format("15:04")+" — press r on the main screen to refresh") + "\n\n")
+			ab.WriteString(theme.Grayed.Render("  cached "+m.alertsFetchedAt.Local().Format("15:04")+" — press r on the main screen to refresh") + "\n\n")
 		}
-		for i, a := range m.alerts {
+		start, end := theme.ListWindow(len(m.alerts), m.alertCursor, wxMaxAlerts)
+		for i := start; i < end; i++ {
+			a := m.alerts[i]
 			chip := severityStyle(a.Severity).Render("[" + strings.ToUpper(strings.TrimSpace(a.Severity)) + "]")
 			line := chip + " " + a.Event
 			if exp := expiresShort(a.Expires); exp != "" {
 				line += theme.Grayed.Render(" · expires " + exp)
 			}
 			if i == m.alertCursor {
-				b.WriteString("  " + theme.Selected.Render("▸ "+line) + "\n")
+				ab.WriteString("  " + theme.Selected.Render("▸ "+line) + "\n")
 			} else {
-				b.WriteString("  " + theme.Normal.Render("  "+line) + "\n")
+				ab.WriteString("  " + theme.Normal.Render("  "+line) + "\n")
 			}
 		}
+		if hint := theme.ScrollHint(len(m.alerts), start, end); hint != "" {
+			ab.WriteString("  " + hint + "\n")
+		}
 	}
+	b.WriteString(theme.PadLines(ab.String(), wxMaxAlerts+2))
+	// Error slot: always two lines.
 	if m.alertsErr != "" {
 		b.WriteString("\n" + theme.Error.Render("  couldn't refresh alerts ("+shortErr(m.alertsErr)+")") + "\n")
+	} else {
+		b.WriteString("\n\n")
 	}
 	footer := theme.Footer(false,
 		[2]string{"enter", "details"},
 		[2]string{"r", "radar"},
 		[2]string{"esc", "back"},
 	)
-	return theme.Frame(frameWidth, "navi weather", true, "", b.String()+footer)
+	return m.frame(b.String() + footer)
 }
 
 // detailLines assembles the full-text alert body as plain lines; the view
@@ -1016,8 +1059,11 @@ func (m model) viewAlertDetail() string {
 	if m.detailOffset < 0 {
 		m.detailOffset = 0
 	}
+	// Scroll-hint slots: always two lines (one above, one below).
 	if m.detailOffset > 0 {
 		b.WriteString(theme.Dimmed.Render("  ▲ more above") + "\n")
+	} else {
+		b.WriteString("\n")
 	}
 	end := m.detailOffset + winLines
 	if end > len(lines) {
@@ -1032,8 +1078,14 @@ func (m model) viewAlertDetail() string {
 			b.WriteString("  " + theme.Normal.Render(ln) + "\n")
 		}
 	}
+	// Pad the window to exactly winLines so short alerts don't shift the footer.
+	for i := end - m.detailOffset; i < winLines; i++ {
+		b.WriteString("\n")
+	}
 	if end < len(lines) {
 		b.WriteString(theme.Dimmed.Render("  ▼ more below") + "\n")
+	} else {
+		b.WriteString("\n")
 	}
 
 	footer := theme.Footer(false,
@@ -1041,7 +1093,7 @@ func (m model) viewAlertDetail() string {
 		[2]string{"r", "radar"},
 		[2]string{"esc", "back"},
 	)
-	return theme.Frame(frameWidth, "navi weather", true, "", b.String()+footer)
+	return m.frame(b.String() + footer)
 }
 
 func (m model) View() string {
@@ -1057,13 +1109,67 @@ func (m model) View() string {
 	}
 }
 
+// --- headless --dump for visual checks ---
+
+func sampleData() *wttrResp {
+	desc := func(s string) []wttrDesc { return []wttrDesc{{Value: s}} }
+	hourly := func(t, f, code, rain string) wttrHourly {
+		return wttrHourly{Time: t, TempF: f, TempC: "20", WeatherCode: code, WeatherDesc: desc("Partly cloudy"), ChanceOfRain: rain}
+	}
+	return &wttrResp{
+		Current: []wttrCurrent{{
+			TempF: "72", TempC: "22", FeelsLikeF: "74", FeelsLikeC: "23",
+			Humidity: "55", WeatherCode: "116", WeatherDesc: desc("Partly cloudy"),
+			WindKmph: "15", WindMph: "9", WindDir: "SW",
+			VisibilityKm: "16", VisibilityMi: "10",
+		}},
+		Areas: []wttrArea{{AreaName: []wttrAreaName{{Value: "Mena"}}, Region: []wttrAreaName{{Value: "Arkansas"}}}},
+		Days: []wttrDay{
+			{Date: "2026-09-28", MaxTempF: "78", MaxTempC: "26", MinTempF: "62", MinTempC: "17",
+				Hourly: []wttrHourly{hourly("0", "65", "113", "0"), hourly("300", "64", "113", "0"), hourly("600", "66", "116", "10"), hourly("900", "72", "116", "10"), hourly("1200", "77", "113", "0")}},
+			{Date: "2026-09-29", MaxTempF: "80", MaxTempC: "27", MinTempF: "63", MinTempC: "17",
+				Hourly: []wttrHourly{hourly("0", "66", "113", "0"), hourly("300", "65", "113", "0"), hourly("600", "68", "116", "20"), hourly("900", "74", "116", "20"), hourly("1200", "79", "113", "0")}},
+			{Date: "2026-09-30", MaxTempF: "75", MaxTempC: "24", MinTempF: "60", MinTempC: "16",
+				Hourly: []wttrHourly{hourly("0", "63", "116", "30"), hourly("300", "62", "116", "30"), hourly("600", "64", "119", "40"), hourly("900", "70", "119", "40"), hourly("1200", "74", "116", "20")}},
+		},
+	}
+}
+
+func dumpSample() {
+	m := newModel()
+	m.loading = false
+	m.data = sampleData()
+	m.cfg.Locations = []string{"Mena, AR", "Austin, TX", "Portland, OR"}
+	m.cfg.DefaultLocation = "Mena, AR"
+	m.alerts = []nwsAlert{
+		{Event: "Heat Advisory", Severity: "Moderate", Headline: "Heat Advisory for Polk County",
+			Description: "Hot temperatures expected.", Instruction: "Stay hydrated.",
+			SenderName: "NWS Little Rock", Expires: "2026-09-28T20:00:00-05:00"},
+	}
+
+	fmt.Println("=== MAIN ===")
+	fmt.Println(m.View())
+	m.view = "locations"
+	m.adding = true
+	m.input.SetValue("Denver, CO")
+	fmt.Println("=== LOCATIONS ===")
+	fmt.Println(m.View())
+	m.view = "alerts"
+	fmt.Println("=== ALERTS ===")
+	fmt.Println(m.View())
+	m.view = "alertdetail"
+	m.alertCursor = 0
+	fmt.Println("=== ALERT DETAIL ===")
+	fmt.Println(m.View())
+}
+
 func main() {
 	dump := flag.Bool("dump", false, "print the initial view and exit")
 	flag.Parse()
 
 	m := newModel()
 	if *dump {
-		fmt.Println(m.View())
+		dumpSample()
 		return
 	}
 

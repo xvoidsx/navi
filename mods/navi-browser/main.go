@@ -41,6 +41,10 @@ import (
 
 const frameWidth = 68
 
+// Fixed-frame geometry: 25 body lines. The 7 browsers render 2 lines
+// each. Frame is 29 rows total.
+const nbBodyRows = 25
+
 // ---------------------------------------------------------------------------
 // browser table
 // ---------------------------------------------------------------------------
@@ -781,26 +785,24 @@ func (m model) browseView() string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\n")
+	// Status slot: always two lines.
 	if m.status != "" {
 		if m.ok {
 			b.WriteString(theme.Grayed.Render("  " + m.status))
 		} else {
 			b.WriteString(theme.Error.Render("  " + m.status))
 		}
+		b.WriteString("\n\n")
+	} else {
 		b.WriteString("\n")
 	}
-	st := m.selected()
-	var keys [][2]string
-	keys = append(keys, [2]string{"↑↓", "move"}, [2]string{"enter", "set default"})
-	if st != nil && st.installed {
-		keys = append(keys, [2]string{"p", "deploy policy"})
-	}
-	if st != nil && !st.installed && st.def.ExtrasID != "" {
-		keys = append(keys, [2]string{"i", "install via extras"})
-	}
-	keys = append(keys, [2]string{"r", "re-probe"}, [2]string{"q", "quit"})
-	b.WriteString(theme.Footer(true, keys...))
+	// Footer: fixed keys (contextual keys shown in status instead).
+	b.WriteString(theme.Footer(true,
+		[2]string{"↑↓", "move"},
+		[2]string{"enter", "set default"},
+		[2]string{"r", "re-probe"},
+		[2]string{"q", "quit"},
+	))
 	return b.String()
 }
 
@@ -883,13 +885,13 @@ func (m model) View() string {
 	var b strings.Builder
 	switch m.screen {
 	case screenConfirm:
-		b.WriteString(m.confirmView())
+		b.WriteString(theme.PadLines(m.confirmView(), nbBodyRows))
 	case screenResult:
-		b.WriteString(m.resultView())
+		b.WriteString(theme.PadLines(m.resultView(), nbBodyRows))
 	default:
-		b.WriteString(m.browseView())
+		b.WriteString(theme.PadLines(m.browseView(), nbBodyRows))
 	}
-	frame := theme.Frame(frameWidth, "navi-browser", false, "", b.String())
+	frame := theme.FrameFixed(frameWidth, "navi-browser", false, "", b.String(), nbBodyRows)
 	if m.width == 0 {
 		return frame
 	}
@@ -979,6 +981,9 @@ func runCLI(args []string) (bool, int) {
 		return false, 0
 	}
 	switch args[0] {
+	case "--dump":
+		dumpSample()
+		return true, 0
 	case "--list", "-l":
 		cliList()
 		return true, 0
@@ -1062,4 +1067,20 @@ func main() {
 		fmt.Fprintf(os.Stderr, "navi-browser: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// --- headless --dump for visual checks ---
+
+func dumpSample() {
+	m := newModel()
+	// Mark a couple as installed for the sample.
+	for i := range m.states {
+		if m.states[i].def.ID == "chromium" || m.states[i].def.ID == "brave" {
+			m.states[i].installed = true
+			m.states[i].binPath = "/usr/bin/" + m.states[i].def.ID
+			m.states[i].probe = probeOK
+		}
+	}
+	fmt.Println("=== BROWSE ===")
+	fmt.Println(m.View())
 }

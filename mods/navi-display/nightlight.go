@@ -122,7 +122,7 @@ func applyNightLight(b Backend, cfg NightConfig) error {
 		// gammastep has no manual dawn/dusk flags — it always derives
 		// the schedule from location, so manual mode falls back to auto.
 		args = []string{"-t", fmt.Sprintf("%d:%d", cfg.DayTemp, cfg.NightTemp),
-			"-l", cfg.Lat+":"+cfg.Lon}
+			"-l", cfg.Lat + ":" + cfg.Lon}
 	}
 	cmd := exec.Command(daemon, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil

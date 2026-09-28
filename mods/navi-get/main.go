@@ -31,6 +31,10 @@ import (
 const frameWidth = 68
 const pageSize = 10
 
+// Fixed-frame geometry: 34 body lines (browse list + fixed slots;
+// confirm/result padded to match). Frame is 38 rows total.
+const ngBodyRows = 34
+
 // ---------------------------------------------------------------------------
 // catalog
 // ---------------------------------------------------------------------------
@@ -498,14 +502,14 @@ func (m model) View() string {
 
 	switch m.screen {
 	case screenConfirmInstall, screenConfirmRemove:
-		b.WriteString(m.confirmView())
+		b.WriteString(theme.PadLines(m.confirmView(), ngBodyRows))
 	case screenResult:
-		b.WriteString(m.resultView())
+		b.WriteString(theme.PadLines(m.resultView(), ngBodyRows))
 	default:
 		b.WriteString(m.browseView())
 	}
 
-	frame := theme.Frame(frameWidth, "navi-get", false, "", b.String())
+	frame := theme.FrameFixed(frameWidth, "navi-get", false, "", b.String(), ngBodyRows)
 	if m.width == 0 {
 		return frame
 	}
@@ -524,6 +528,10 @@ func (m model) browseView() string {
 	if len(m.filtered) == 0 {
 		b.WriteString(theme.Dimmed.Render("  nothing in the catalog matches."))
 		b.WriteString("\n")
+		// Pad to pageSize entries (2 lines each).
+		for i := 0; i < pageSize; i++ {
+			b.WriteString("\n\n")
+		}
 	} else {
 		end := m.offset + pageSize
 		if end > len(m.filtered) {
@@ -544,24 +552,32 @@ func (m model) browseView() string {
 			b.WriteString(fmt.Sprintf("%s%s %s  %s\n", cursor, icon, name, badge(m.inst[a.ID])))
 			b.WriteString(fmt.Sprintf("    %s\n", theme.Dimmed.Render(trunc(a.Summary, frameWidth-10))))
 		}
+		// Pad short pages to pageSize entries.
+		for i := end - m.offset; i < pageSize; i++ {
+			b.WriteString("\n\n")
+		}
+		// Paging slot: always two lines.
 		if len(m.filtered) > pageSize {
 			b.WriteString(theme.Dimmed.Render(fmt.Sprintf("  showing %d–%d of %d", m.offset+1, end, len(m.filtered))))
-			b.WriteString("\n")
+			b.WriteString("\n\n")
+		} else {
+			b.WriteString("\n\n")
 		}
 	}
 
 	b.WriteString("\n")
+	// Status slot: always two lines.
 	if m.status != "" {
 		b.WriteString(theme.Grayed.Render("  " + m.status))
-		b.WriteString("\n")
+		b.WriteString("\n\n")
+	} else {
+		b.WriteString("\n\n")
 	}
 	b.WriteString(theme.Footer(true,
 		[2]string{"↑↓", "move"},
 		[2]string{"enter", "install"},
 		[2]string{"u", "remove"},
-		[2]string{"r", "refresh"},
 		[2]string{"q", "quit"},
-		[2]string{"tab", "focus search"},
 	))
 	return b.String()
 }
@@ -614,6 +630,10 @@ func (m model) resultView() string {
 // ---------------------------------------------------------------------------
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--dump" {
+		dumpSample()
+		return
+	}
 	apps, _, err := loadCatalog()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "navi-get: %v\n", err)
@@ -624,4 +644,23 @@ func main() {
 		fmt.Fprintf(os.Stderr, "navi-get: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// --- headless --dump for visual checks ---
+
+func dumpSample() {
+	apps := []app{
+		{ID: "firefox", Name: "Firefox", Summary: "the people's browser", Icon: "🦊", Install: "apt install firefox"},
+		{ID: "gimp", Name: "GIMP", Summary: "image manipulation program", Icon: "🎨", Install: "apt install gimp"},
+		{ID: "vlc", Name: "VLC", Summary: "plays everything", Icon: "🎬", Install: "apt install vlc"},
+		{ID: "code", Name: "VS Code", Summary: "code editor", Icon: "💻", Install: "flatpak install flathub com.visualstudio.code"},
+	}
+	m := newModel(apps)
+	m.filtered = apps
+	fmt.Println("=== BROWSE ===")
+	fmt.Println(m.View())
+	m.screen = screenConfirmInstall
+	m.target = &apps[0]
+	fmt.Println("=== CONFIRM ===")
+	fmt.Println(m.View())
 }

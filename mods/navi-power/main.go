@@ -25,6 +25,10 @@ import (
 // frameWidth is the family-standard mod window width. Views assume it.
 var frameWidth = 62
 
+// Fixed-frame geometry: profile 4 + battery 6 + thresholds 5 + note 2 +
+// divider 2 + footer 2 = 21 body lines on every screen.
+const pwBodyRows = 21
+
 // ── rows ────────────────────────────────────────────────────────────
 
 const (
@@ -85,10 +89,10 @@ type model struct {
 
 func initialModel() model {
 	return model{
-		tx:         theme.Transmission{},
-		loading:    true,
-		editStart:  75,
-		editStop:   85,
+		tx:        theme.Transmission{},
+		loading:   true,
+		editStart: 75,
+		editStop:  85,
 	}
 }
 
@@ -278,7 +282,7 @@ func (m model) nudge(dir int) (tea.Model, tea.Cmd) {
 	}
 	if m.cursor == rowThresholds && m.thOK {
 		if m.editingStop {
-			m.editStop = clamp5(m.editStop+dir*5)
+			m.editStop = clamp5(m.editStop + dir*5)
 		} else {
 			m.editStart = clamp5(m.editStart + dir*5)
 		}
@@ -328,14 +332,18 @@ func (m model) View() string {
 		b.WriteString(m.profileSection())
 		b.WriteString(m.batterySection())
 		b.WriteString(m.thresholdSection())
+		// Note: always two lines (blank + note) so the frame never shifts.
+		b.WriteString("\n")
 		if m.note != "" {
-			b.WriteString("\n" + noteStyle(m.note) + "\n")
+			b.WriteString(noteStyle(m.note) + "\n")
+		} else {
+			b.WriteString("\n")
 		}
 	}
 	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
 	b.WriteString(m.footer())
 
-	return theme.Frame(frameWidth, "navi power", m.ppd.ok, m.tx.View(frameWidth), b.String())
+	return theme.FrameFixed(frameWidth, "navi power", m.ppd.ok, m.tx.View(frameWidth), b.String(), pwBodyRows)
 }
 
 func noteStyle(s string) string {
@@ -372,8 +380,10 @@ func (m model) profileSection() string {
 	b.WriteString("  " + strings.Join(parts, "    ") + "\n")
 	if m.ppd.driver != "" {
 		b.WriteString(theme.Dimmed.Render("  driver: "+m.ppd.driver) + "\n")
+	} else {
+		b.WriteString("\n")
 	}
-	return b.String()
+	return theme.PadLines(b.String(), 4)
 }
 
 func (m model) batterySection() string {
@@ -381,16 +391,19 @@ func (m model) batterySection() string {
 	b.WriteString("\n" + theme.Header.Render("  BATTERY") + "\n")
 	if len(m.batteries) == 0 {
 		b.WriteString(theme.Dimmed.Render("  no battery found") + "\n")
-		return b.String()
+		return theme.PadLines(b.String(), 6)
 	}
-	for _, bat := range m.batteries {
+	// Display-only section: show at most two batteries.
+	for _, bat := range m.batteries[:min(2, len(m.batteries))] {
 		b.WriteString("  " + m.batteryLine(bat) + "\n")
 		if bat.health > 0 {
 			b.WriteString(theme.Dimmed.Render(
 				fmt.Sprintf("  health %d%% of design capacity", bat.health)) + "\n")
+		} else {
+			b.WriteString("\n")
 		}
 	}
-	return b.String()
+	return theme.PadLines(b.String(), 6)
 }
 
 func (m model) batteryLine(bat battery) string {
@@ -420,19 +433,19 @@ func (m model) thresholdSection() string {
 	b.WriteString("\n" + theme.Header.Render("  CHARGE THRESHOLDS") + "\n")
 	if len(m.batteries) == 0 {
 		b.WriteString(theme.Dimmed.Render("  no battery found") + "\n")
-		return b.String()
+		return theme.PadLines(b.String(), 5)
 	}
 	if !m.thOK {
 		b.WriteString(theme.Dimmed.Render("  not supported on this hardware") + "\n")
 		b.WriteString(theme.Dimmed.Render("  needs thinkpad_acpi charge_control_*") + "\n")
-		return b.String()
+		return theme.PadLines(b.String(), 5)
 	}
 	b.WriteString(theme.Dimmed.Render("  thinkpad_acpi — the battery idles in its comfort zone") + "\n")
 	startBox := thresholdBox("start", m.editStart, m.cursor == rowThresholds && !m.editingStop)
 	stopBox := thresholdBox("stop", m.editStop, m.cursor == rowThresholds && m.editingStop)
 	b.WriteString("  " + startBox + "  " + stopBox + "\n")
 	b.WriteString(theme.Dimmed.Render("  ←/→ adjust · tab picks start/stop · enter applies") + "\n")
-	return b.String()
+	return theme.PadLines(b.String(), 5)
 }
 
 // thresholdBox renders one threshold value; focused boxes get the
@@ -442,7 +455,7 @@ func thresholdBox(label string, val int, focused bool) string {
 	if focused {
 		return theme.Selected.Render("▸ " + inner)
 	}
-	return theme.Normal.Render("  "+inner)
+	return theme.Normal.Render("  " + inner)
 }
 
 func (m model) footer() string {

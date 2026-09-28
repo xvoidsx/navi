@@ -67,15 +67,15 @@ func ppdList() ppdState {
 
 // parsePPDList reads the human output of `powerprofilesctl list`:
 //
-//	* performance:
-//	    Driver:     intel_pstate
-//	    Degraded:   no
+//   - performance:
+//     Driver:     intel_pstate
+//     Degraded:   no
 //
-//	  balanced:
-//	    Driver:     intel_pstate
+//     balanced:
+//     Driver:     intel_pstate
 //
-//	  power-saver:
-//	    Driver:     intel_pstate
+//     power-saver:
+//     Driver:     intel_pstate
 //
 // The active profile carries the `* ` marker. Profile lines sit at
 // indent 2; the Driver/Degraded detail lines sit deeper, so indent

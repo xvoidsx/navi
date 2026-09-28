@@ -222,8 +222,8 @@ func TestSeverityColor(t *testing.T) {
 		{"Severe", "#ff9f1c"},
 		{"Moderate", "#ffd60a"},
 		{"Minor", "#00ffff"},
-		{"Unknown", "#5c4a5c"},  // dims out
-		{"weird", "#5c4a5c"},    // unknown severity degrades to dim
+		{"Unknown", "#5c4a5c"}, // dims out
+		{"weird", "#5c4a5c"},   // unknown severity degrades to dim
 		{"", "#5c4a5c"},
 	}
 	for _, c := range cases {
