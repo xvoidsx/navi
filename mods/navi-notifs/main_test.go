@@ -11,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/muesli/termenv"
 	theme "github.com/rav3ndust/navi-theme"
 )
@@ -184,4 +185,59 @@ func TestNoNestedRender(t *testing.T) {
 		t.Errorf("expected 1 cursor marker, got %d", c)
 	}
 	_ = theme.Pink // keep theme import used if styles change
+}
+
+func TestDismissGlitch(t *testing.T) {
+	m := testModel(t)
+	m.cursor = 0
+	_ = m.dismissSelected() // returns a batch cmd; we drive the ticks manually
+	if !m.dismissing || m.dismissIdx != 0 {
+		t.Fatal("dismissSelected did not start the animation on the cursor row")
+	}
+	// input must be locked while the row glitches away
+	um, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	m = um.(model)
+	if m.cursor != 0 {
+		t.Error("cursor moved during the dismiss animation")
+	}
+	// every frame renders full height with real ANSI under TrueColor
+	for f := 0; f < dismissFrames; f++ {
+		m.dismissN = f
+		v := m.dismissGlitchView()
+		if strings.Count(v, "\n")+1 != m.vp.Height {
+			t.Errorf("frame %d: dismiss view is %d lines, want %d", f, strings.Count(v, "\n")+1, m.vp.Height)
+		}
+	}
+	m.dismissN = 2
+	if !strings.Contains(m.dismissGlitchView(), "\x1b[") {
+		t.Error("dismiss glitch view has no ANSI sequences under TrueColor")
+	}
+	// drive the ticks to completion: the row splices out, cursor stays valid
+	m.dismissN = 0
+	for i := 0; i < dismissFrames; i++ {
+		um, _ := m.Update(dismissTickMsg{})
+		m = um.(model)
+	}
+	if m.dismissing {
+		t.Error("dismiss animation did not finish")
+	}
+	if len(m.notifs) != 1 || m.notifs[0].ID != 2 {
+		t.Errorf("wrong row spliced: %d notifs left", len(m.notifs))
+	}
+	if m.cursor != 0 || m.status != "dismissed" {
+		t.Errorf("cursor=%d status=%q after dismiss", m.cursor, m.status)
+	}
+	// dismissing the last one leaves a valid empty state
+	m.cursor = 0
+	_ = m.dismissSelected()
+	for i := 0; i < dismissFrames; i++ {
+		um, _ := m.Update(dismissTickMsg{})
+		m = um.(model)
+	}
+	if len(m.notifs) != 0 || m.cursor != 0 {
+		t.Errorf("empty state wrong: %d notifs, cursor=%d", len(m.notifs), m.cursor)
+	}
+	if !strings.Contains(m.View(), "no notifications") {
+		t.Error("empty state lost the pinned header count")
+	}
 }

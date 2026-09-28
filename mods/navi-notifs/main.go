@@ -185,6 +185,10 @@ type clearTickMsg struct{}
 
 type clearDoneMsg struct{ err error }
 
+type dismissTickMsg struct{}
+
+type dismissDoneMsg struct{ err error }
+
 type statusMsg struct{ text string }
 
 type model struct {
@@ -205,6 +209,10 @@ type model struct {
 	loading  bool
 	clearing bool
 	clearN   int // glitch animation frame
+
+	dismissing bool
+	dismissN   int // single-dismiss glitch frame
+	dismissIdx int // which notification is glitching away
 
 	tx theme.Transmission
 }
@@ -462,6 +470,66 @@ func (m model) glitchView() string {
 }
 
 // ---------------------------------------------------------------------------
+// glitch single-dismiss
+// ---------------------------------------------------------------------------
+
+// dismissFrames is shorter than the clear-all: one row glitching away
+// should feel snappy, not ceremonial.
+const dismissFrames = 5
+
+func dismissTickCmd() tea.Cmd {
+	return tea.Tick(60*time.Millisecond, func(time.Time) tea.Msg { return dismissTickMsg{} })
+}
+
+// dismissGlitchView renders the list mid-dismiss: every block renders
+// plain except the target, which scrambles into glitch glyphs with
+// pink/cyan flicker and then crumples away.
+func (m model) dismissGlitchView() string {
+	w := m.vpWidth()
+	intensity := 0.3 + 0.6*float64(m.dismissN)/float64(dismissFrames)
+	flicker := lipgloss.NewStyle().Foreground(theme.Pink)
+	if m.dismissN%2 == 1 {
+		flicker = lipgloss.NewStyle().Foreground(theme.Cyan)
+	}
+	var out []string
+	for i, n := range m.notifs {
+		lines := strings.Split(m.plainBlock(i, n), "\n")
+		if i == m.dismissIdx {
+			var g []string
+			for li, l := range lines {
+				gl := theme.Glitch(l, intensity)
+				// slice offset: shove a few rows sideways for the tear effect
+				if (li*7+m.dismissN*3)%11 < 3 && strings.TrimSpace(gl) != "" {
+					gl = strings.Repeat(" ", 2+(li+m.dismissN)%5) + gl
+					if len([]rune(gl)) > w {
+						gl = string([]rune(gl)[:w])
+					}
+				}
+				g = append(g, flicker.Render(gl))
+			}
+			// crumple: the row collapses as the animation finishes
+			if m.dismissN >= dismissFrames-2 {
+				keep := len(g) * (dismissFrames - m.dismissN) / 3
+				if keep < 0 {
+					keep = 0
+				}
+				g = g[:keep]
+			}
+			lines = g
+		}
+		out = append(out, lines...)
+		out = append(out, "")
+	}
+	for len(out) < m.vp.Height {
+		out = append(out, "")
+	}
+	if len(out) > m.vp.Height {
+		out = out[:m.vp.Height]
+	}
+	return strings.Join(out, "\n")
+}
+
+// ---------------------------------------------------------------------------
 // Update
 // ---------------------------------------------------------------------------
 
@@ -527,6 +595,45 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case dismissTickMsg:
+		if !m.dismissing {
+			return m, nil
+		}
+		m.dismissN++
+		if m.dismissN >= dismissFrames {
+			m.dismissing = false
+			m.dismissN = 0
+			if m.dismissIdx >= 0 && m.dismissIdx < len(m.notifs) {
+				m.notifs = append(m.notifs[:m.dismissIdx], m.notifs[m.dismissIdx+1:]...)
+			}
+			if m.cursor >= len(m.notifs) {
+				m.cursor = len(m.notifs) - 1
+			}
+			if m.cursor < 0 {
+				m.cursor = 0
+			}
+			m.status = "dismissed"
+			m.rebuildContent()
+			return m, nil
+		}
+		return m, dismissTickCmd()
+
+	case dismissDoneMsg:
+		if msg.err != nil {
+			if m.dismissing {
+				// animation still running: cancel it, the row comes back
+				m.dismissing = false
+				m.dismissN = 0
+				m.status = "dismiss failed"
+				m.rebuildContent()
+			} else {
+				// the row already glitched away: resync with dunst
+				m.status = "dismiss failed"
+				return m, m.refresh()
+			}
+		}
+		return m, nil
+
 	case statusMsg:
 		m.status = msg.text
 		return m, nil
@@ -537,7 +644,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.KeyMsg:
-		if m.clearing {
+		if m.clearing || m.dismissing {
 			// let the glitch play out undisturbed
 			return m, nil
 		}
@@ -577,7 +684,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// route to the viewport for any other scrolling input (mouse wheel etc.)
-	if m.ready && !m.clearing {
+	if m.ready && !m.clearing && !m.dismissing {
 		var cmd tea.Cmd
 		m.vp, cmd = m.vp.Update(msg)
 		return m, cmd
@@ -618,18 +725,28 @@ func (m *model) invokeAction() tea.Cmd {
 }
 
 func (m *model) dismissSelected() tea.Cmd {
-	if len(m.notifs) == 0 || m.cursor >= len(m.notifs) {
-		m.status = "nothing selected"
+	if len(m.notifs) == 0 || m.cursor >= len(m.notifs) || m.dismissing || m.clearing {
+		if len(m.notifs) == 0 || m.cursor >= len(m.notifs) {
+			m.status = "nothing selected"
+		}
 		return nil
 	}
 	id := m.notifs[m.cursor].ID
-	m.status = "dismissed"
-	return func() tea.Msg {
-		ctx, cancel := opCtx()
-		defer cancel()
-		_ = dunstDismiss(ctx, id)
-		return m.refresh()()
-	}
+	m.dismissing = true
+	m.dismissN = 0
+	m.dismissIdx = m.cursor
+	m.status = ""
+	return tea.Batch(
+		dismissTickCmd(),
+		func() tea.Msg {
+			ctx, cancel := opCtx()
+			defer cancel()
+			if err := dunstDismiss(ctx, id); err != nil {
+				return dismissDoneMsg{err: err}
+			}
+			return dismissDoneMsg{}
+		},
+	)
 }
 
 func (m *model) clearAll() tea.Cmd {
@@ -701,6 +818,10 @@ func (m model) pinnedHeader() string {
 func (m model) listView() string {
 	if m.clearing {
 		body := m.glitchView()
+		return lipgloss.JoinHorizontal(lipgloss.Top, body, " "+m.scrollBar())
+	}
+	if m.dismissing {
+		body := m.dismissGlitchView()
 		return lipgloss.JoinHorizontal(lipgloss.Top, body, " "+m.scrollBar())
 	}
 	if m.loadErr != nil {
