@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=wiredrop
+Comment=Drop files to nearby devices — LAN + Tailscale, LocalSend-compatible
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "wiredrop" wiredrop
+Icon=network-wireless
+Terminal=false
+Categories=System;Network;FileTransfer;
+NoDisplay=false

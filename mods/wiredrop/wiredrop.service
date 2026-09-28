@@ -1,0 +1,17 @@
+[Unit]
+Description=wiredrop — xvoidsx's own LocalSend (LAN + Tailscale file drops)
+Documentation=https://github.com/xvoidsx/navi
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/wiredrop daemon
+Restart=on-failure
+RestartSec=5
+# The daemon only binds RFC1918 + tailnet + loopback addresses itself;
+# this is defense in depth, not the primary control.
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

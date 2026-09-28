@@ -611,6 +611,31 @@ setup_mods() {
   install_mod "navi-display"    "navi-display"
   install_mod "navi-reminders"  "navi-reminders"
   install_mod "navi-reminders"  "navi-reminder-fire"
+  install_mod "wiredrop"        "wiredrop"
+
+  # wiredrop: the receiver only receives while the daemon listens, so it
+  # runs as a per-user systemd service. Installed to the user's own
+  # systemd dir (no root needed — install.sh runs as the user); enabled
+  # so it starts on login, started now. linger (enabled below for the
+  # reminder timers) also keeps it alive from boot.
+  setup_wiredrop_service() {
+    local unit_dir="$HOME/.config/systemd/user"
+    local src="$REPO_DIR/mods/wiredrop/wiredrop.service"
+    [ -f "$src" ] || { warn "missing wiredrop.service — skipping daemon setup"; return 0; }
+    mkdir -p "$unit_dir"
+    install -m 0644 "$src" "$unit_dir/wiredrop.service"
+    if ! command -v systemctl >/dev/null 2>&1; then
+      warn "systemctl not found — enable the wiredrop daemon by hand: systemctl --user enable --now wiredrop"
+      return 0
+    fi
+    systemctl --user daemon-reload >/dev/null 2>&1
+    if systemctl --user enable --now wiredrop.service >/dev/null 2>&1; then
+      ok "wiredrop daemon enabled and started (systemctl --user status wiredrop)"
+    else
+      warn "wiredrop.service could not be enabled — run: systemctl --user enable --now wiredrop"
+    fi
+  }
+  setup_wiredrop_service
 
   # navi-reminders runs on systemd user timers — they only fire from boot
   # (before first login) with lingering enabled for the installing user.

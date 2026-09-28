@@ -20,6 +20,7 @@ We include 3 default **navi mods**:
 - `navi-reminders`: Reminders that fire reliably — natural-language add (`dentist tomorrow 9am`), snooze, done. Backed by systemd user timers (`Persistent=true`, linger at deploy) with a `navi-reminder-fire` helper; undeliverable reminders surface as MISSED, never silently dropped.
 - `navi-lain-config`: Hey Lain brain settings — pick a local or cloud model, manage the key for the chosen provider.
 - `navi-agents-config`: **Navi Agent Configuration** — the system-wide API key manager for every AI provider navi knows about. Keys live in `~/.config/navi/agents.env` (mode `0600`, never logged); interactive shells export them via `wired/bashrc`, panel/rofi-launched apps inherit them through `wired/waybar/mod-open.sh`, and Hey Lain resolves them per-backend at runtime (local needs no key). The provider table is shared from `mods/agentenv` so every mod agrees on which variable each provider uses.
+- `wiredrop`: xvoidsx's own LocalSend — drop files to nearby devices over LAN or Tailscale, speaking the LocalSend v2.2 protocol both ways (official phone apps interoperate). Runs as a per-user systemd service (`wiredrop daemon`); the floating TUI shows nearby devices, a six-word fingerprint ceremony pins each new device (TOFU — a changed fingerprint is a hard refusal), and incoming transfers ask via dunst with a 60-second default-decline (or `wiredrop ctl accept|decline <session>` over SSH). HTTPS only, loopback/RFC1918/tailnet binds only.
 
 ### agent keys
 
