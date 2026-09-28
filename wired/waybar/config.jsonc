@@ -75,9 +75,10 @@
     },
 
     "custom/volume": {
-        // navi-audio volume module: live volume + short output-device
-        // label ("HDMI", "Speakers"). audio-status.sh is long-running and
-        // re-emits on `pactl subscribe` events — no polling.
+        // navi-audio volume module: live volume ("🔊 74%"). the device
+        // label ("Line Out", "HDMI", …) lives in the tooltip so the module
+        // stays compact. audio-status.sh is long-running and re-emits on
+        // `pactl subscribe` events — no polling.
         "format": "{}",
         "return-type": "json",
         "exec": "/usr/share/navi/wired/waybar/audio-status.sh",

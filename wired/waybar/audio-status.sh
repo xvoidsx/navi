@@ -5,7 +5,8 @@
 # it up on deploy; the content is python3, for the JSON parsing.
 #
 # Long-running: prints one waybar-JSON object per line — the default sink's
-# volume plus a short output-device label ("HDMI", "Speakers", ...).
+# volume. The device label lives in the tooltip only, keeping the module
+# itself compact ("🔊 74%") so the bar never crowds the clock.
 # Re-emits on `pactl subscribe` events; no polling.
 #
 # Short-label rule mirrors deviceShortName in mods/navi-audio/audio.go:
@@ -78,12 +79,15 @@ def render(st):
         })
     icon = "🔇" if st["muted"] else "🔊"
     if st["muted"]:
-        text = icon + " mute · " + st["short"]
+        text = icon + " mute"
     elif st["vol"] < 0:
-        text = icon + " -- · " + st["short"]
+        text = icon + " --"
     else:
-        text = icon + " " + str(st["vol"]) + "% · " + st["short"]
-    tip = st["full"] if st["full"] else st["short"]
+        text = icon + " " + str(st["vol"]) + "%"
+    # device identity lives in the tooltip, not the module text
+    tip = st["short"]
+    if st["full"] and st["full"] != st["short"]:
+        tip = tip + "\n" + st["full"]
     if not st["muted"] and st["vol"] >= 0:
         tip = tip + "\nvolume " + str(st["vol"]) + "%"
     return json.dumps({

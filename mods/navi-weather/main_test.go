@@ -384,3 +384,56 @@ func TestWrapText(t *testing.T) {
 		t.Errorf("wrapText paragraph break = %q", lines)
 	}
 }
+
+func TestAlertExpiry(t *testing.T) {
+	past := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)
+	future := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
+	cases := []struct {
+		name    string
+		expires string
+		want    bool
+	}{
+		{"expired an hour ago", time.Now().Add(-time.Hour).UTC().Format(time.RFC3339), true},
+		{"expires in an hour", time.Now().Add(time.Hour).UTC().Format(time.RFC3339), false},
+		{"empty expiry stays live", "", false},
+		{"garbage expiry stays live", "not-a-time", false},
+	}
+	for _, c := range cases {
+		if got := (nwsAlert{Expires: c.expires}).expired(time.Now()); got != c.want {
+			t.Errorf("%s: expired = %v, want %v", c.name, got, c.want)
+		}
+	}
+	// the Sept-21-statement shape: long past expiry must not survive
+	in := []nwsAlert{
+		{Event: "Special Weather Statement", Expires: past},
+		{Event: "Heat Advisory", Expires: future},
+		{Event: "No Expiry Field"},
+	}
+	live := liveAlerts(in)
+	if len(live) != 2 {
+		t.Fatalf("liveAlerts kept %d, want 2", len(live))
+	}
+	for _, a := range live {
+		if a.Event == "Special Weather Statement" {
+			t.Error("liveAlerts kept the expired statement")
+		}
+	}
+}
+
+func TestEffectiveShort(t *testing.T) {
+	if got := effectiveShort("2026-09-21T14:00:00-05:00"); got != "21 Sep" {
+		t.Errorf("effectiveShort = %q, want %q", got, "21 Sep")
+	}
+	if got := effectiveShort("garbage"); got != "" {
+		t.Errorf("effectiveShort(garbage) = %q, want empty", got)
+	}
+}
+
+func TestRadarLoopURL(t *testing.T) {
+	if got := radarLoopURL("shv"); got != "https://radar.weather.gov/ridge/standard/SHV_loop.gif" {
+		t.Errorf("radarLoopURL = %q", got)
+	}
+	if got := radarLoopURL(" KLWX "); got != "https://radar.weather.gov/ridge/standard/KLWX_loop.gif" {
+		t.Errorf("radarLoopURL trims/cases = %q", got)
+	}
+}

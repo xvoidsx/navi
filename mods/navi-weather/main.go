@@ -545,6 +545,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.detailOffset = 0
 				}
 				return m, nil
+			case "r":
+				m.openRadar()
+				return m, nil
 			}
 			return m, nil
 
@@ -579,6 +582,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.detailOffset < 0 {
 					m.detailOffset = 0
 				}
+				return m, nil
+			case "r":
+				m.openRadar()
 				return m, nil
 			}
 			return m, nil
@@ -873,6 +879,30 @@ func (m model) bannerLine() string {
 	return "  " + severityStyle(a.Severity).Render(txt)
 }
 
+// openRadar opens the NEXRAD loop for the current location in a chromium
+// webapp view. Failures land in alertsErr — honest, never silent.
+func (m *model) openRadar() {
+	if m.alertsUnsupported {
+		m.alertsErr = "radar unavailable outside the US"
+		return
+	}
+	lat, lon, ok := coordsOf(m.data)
+	if !ok {
+		m.alertsErr = "no coordinates yet — wait for the forecast to load"
+		return
+	}
+	station, err := radarStationFor(lat, lon)
+	if err != nil {
+		m.alertsErr = "couldn't find your radar station (" + shortErr(err.Error()) + ")"
+		return
+	}
+	if err := openRadarLoop(station); err != nil {
+		m.alertsErr = err.Error()
+		return
+	}
+	m.alertsErr = ""
+}
+
 func (m model) viewAlerts() string {
 	var b strings.Builder
 	b.WriteString(theme.Header.Render("  weather alerts") + "\n\n")
@@ -906,6 +936,7 @@ func (m model) viewAlerts() string {
 	}
 	footer := theme.Footer(false,
 		[2]string{"enter", "details"},
+		[2]string{"r", "radar"},
 		[2]string{"esc", "back"},
 	)
 	return theme.Frame(frameWidth, "navi weather", true, "", b.String()+footer)
@@ -968,6 +999,9 @@ func (m model) viewAlertDetail() string {
 	var b strings.Builder
 	b.WriteString("  " + severityStyle(a.Severity).Render("▲ "+strings.ToUpper(a.Event)) + "\n")
 	meta := "  " + a.SenderName
+	if eff := effectiveShort(a.Effective); eff != "" {
+		meta += "   ·   issued " + eff
+	}
 	if exp := expiresShort(a.Expires); exp != "" {
 		meta += "   ·   expires " + exp
 	}
@@ -1004,6 +1038,7 @@ func (m model) viewAlertDetail() string {
 
 	footer := theme.Footer(false,
 		[2]string{"up/down", "scroll"},
+		[2]string{"r", "radar"},
 		[2]string{"esc", "back"},
 	)
 	return theme.Frame(frameWidth, "navi weather", true, "", b.String()+footer)

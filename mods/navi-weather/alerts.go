@@ -121,6 +121,45 @@ func cacheFresh(env alertsEnvelope) bool {
 	return time.Since(env.FetchedAt) < alertsCacheTTL
 }
 
+// expired reports whether the alert's NWS expiry has passed. An empty or
+// unparseable expiry is treated as live — we never drop an alert on bad
+// data, only on a real timestamp that is behind us.
+func (a nwsAlert) expired(now time.Time) bool {
+	s := strings.TrimSpace(a.Expires)
+	if s == "" {
+		return false
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return false
+	}
+	return now.After(t)
+}
+
+// liveAlerts drops alerts whose NWS expiry has passed. NWS sometimes leaves
+// long-tail statements in the feed past their useful life; the feed is
+// "active" but the sky has moved on. Applied at serve time (not fetch
+// time) so an alert that expires mid-cache still disappears on schedule.
+func liveAlerts(in []nwsAlert) []nwsAlert {
+	now := time.Now()
+	out := make([]nwsAlert, 0, len(in))
+	for _, a := range in {
+		if !a.expired(now) {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// effectiveShort renders an NWS RFC3339 timestamp as a day-first date
+// ("21 Sep") so old-but-active alerts show their age honestly.
+func effectiveShort(s string) string {
+	if t, err := time.Parse(time.RFC3339, strings.TrimSpace(s)); err == nil {
+		return t.Local().Format("02 Jan")
+	}
+	return ""
+}
+
 // isOutOfBoundsBody reports whether an NWS error body is the
 // "this point is outside our coverage" shape (HTTP 400, InvalidParameter,
 // detail mentioning "out of bounds"). Anything else is a real failure.
@@ -186,16 +225,16 @@ func fetchNWSAlerts(lat, lon string) (alerts []nwsAlert, unsupported bool, err e
 func getAlerts(lat, lon string) alertsResult {
 	dir := alertsCacheDir()
 	if env, ok := loadAlertsCacheFrom(dir, lat, lon); ok && cacheFresh(env) {
-		return alertsResult{Alerts: env.Alerts, Unsupported: env.Unsupported, FromCache: true, FetchedAt: env.FetchedAt}
+		return alertsResult{Alerts: liveAlerts(env.Alerts), Unsupported: env.Unsupported, FromCache: true, FetchedAt: env.FetchedAt}
 	}
 	alerts, unsupported, err := fetchNWSAlerts(lat, lon)
 	if err == nil {
 		env := alertsEnvelope{FetchedAt: time.Now(), Unsupported: unsupported, Alerts: alerts}
 		_ = saveAlertsCacheTo(dir, lat, lon, env) // cache is best-effort; a miss just costs a refetch
-		return alertsResult{Alerts: alerts, Unsupported: unsupported, FetchedAt: env.FetchedAt}
+		return alertsResult{Alerts: liveAlerts(alerts), Unsupported: unsupported, FetchedAt: env.FetchedAt}
 	}
 	if env, ok := loadAlertsCacheFrom(dir, lat, lon); ok {
-		return alertsResult{Alerts: env.Alerts, Unsupported: env.Unsupported, FromCache: true, FetchedAt: env.FetchedAt}
+		return alertsResult{Alerts: liveAlerts(env.Alerts), Unsupported: env.Unsupported, FromCache: true, FetchedAt: env.FetchedAt}
 	}
 	return alertsResult{Err: err}
 }
