@@ -84,13 +84,13 @@ func TestIsInstalledWebapp(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := app{ID: "web-navi-radio", Source: "webapp", Package: "navi-radio"}
-	if isInstalled(a, nil) {
+	if isInstalled(a, nil, nil) {
 		t.Fatal("should not be installed yet")
 	}
 	if err := os.WriteFile(filepath.Join(appDir, "navi-radio.desktop"), []byte("[Desktop Entry]"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if !isInstalled(a, nil) {
+	if !isInstalled(a, nil, nil) {
 		t.Fatal("should detect the .desktop launcher")
 	}
 }
@@ -98,13 +98,13 @@ func TestIsInstalledWebapp(t *testing.T) {
 func TestIsInstalledAgent(t *testing.T) {
 	// the package field names the binary the install produces, no
 	// matter how the install command is spelled.
-	if !isInstalled(app{Source: "agent", Package: "sh", Install: "doas npm install -g sh-thing"}, nil) {
+	if !isInstalled(app{Source: "agent", Package: "sh", Install: "doas npm install -g sh-thing"}, nil, nil) {
 		t.Fatal("sh should resolve via LookPath through the package field")
 	}
-	if isInstalled(app{Source: "agent", Package: "definitely-not-a-real-binary", Install: "doas npm install -g some-thing"}, nil) {
+	if isInstalled(app{Source: "agent", Package: "definitely-not-a-real-binary", Install: "doas npm install -g some-thing"}, nil, nil) {
 		t.Fatal("missing binary must not claim installed")
 	}
-	if isInstalled(app{Source: "agent", Install: "coming soon"}, nil) {
+	if isInstalled(app{Source: "agent", Install: "coming soon"}, nil, nil) {
 		t.Fatal("empty package must not claim installed")
 	}
 }
@@ -112,16 +112,36 @@ func TestIsInstalledAgent(t *testing.T) {
 func TestIsInstalledNativeExtras(t *testing.T) {
 	extras := map[string]string{"edge": "installed", "yandex": "missing"}
 	a := app{Source: "native", Install: "navi-extras --install edge", Package: "edge"}
-	if !isInstalled(a, extras) {
+	if !isInstalled(a, extras, nil) {
 		t.Fatal("edge should read installed from extras state")
 	}
 	a.Install = "navi-extras --install yandex"
-	if isInstalled(a, extras) {
+	if isInstalled(a, extras, nil) {
 		t.Fatal("yandex should read missing from extras state")
 	}
 	// nil extras (navi-extras unusable) never claims installed
-	if isInstalled(a, nil) {
+	if isInstalled(a, nil, nil) {
 		t.Fatal("nil extras state must not claim installed")
+	}
+}
+
+func TestIsInstalledFlatpak(t *testing.T) {
+	flatpaks := map[string]bool{"sh.ppy.osu": true, "org.gimp.GIMP": true}
+	a := app{ID: "flatpak-osu-lazer", Source: "flatpak", Package: "sh.ppy.osu"}
+	if !isInstalled(a, nil, flatpaks) {
+		t.Fatal("sh.ppy.osu should read installed from flatpak state")
+	}
+	a.Package = "com.example.Missing"
+	if isInstalled(a, nil, flatpaks) {
+		t.Fatal("unknown flatpak id should read not installed")
+	}
+	// empty flatpak state (flatpak unusable) never claims installed
+	if isInstalled(app{Source: "flatpak", Package: "sh.ppy.osu"}, nil, map[string]bool{}) {
+		t.Fatal("empty flatpak state must not claim installed")
+	}
+	// nil flatpak state also never claims installed
+	if isInstalled(app{Source: "flatpak", Package: "sh.ppy.osu"}, nil, nil) {
+		t.Fatal("nil flatpak state must not claim installed")
 	}
 }
 

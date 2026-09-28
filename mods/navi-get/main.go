@@ -3,9 +3,11 @@
 // search + install + remove over the naviApps catalog (apps.json).
 // every catalog entry carries its own install/remove shell commands,
 // so navi-get is the action surface and the catalog is the data:
-// webapps, native extras installers, and agents all flow through the
-// same list. apt and flatpak sources are the next milestone; the
-// curated catalog comes first.
+// webapps, flatpaks, native extras installers, and agents all flow
+// through the same list. installed state comes from the launcher
+// on disk (webapps), `flatpak list` (flatpaks), `navi-extras --list`
+// (native), and PATH (agents); apt-native detection is the next
+// milestone, the curated catalog comes first.
 //
 // install/remove commands run with the real terminal attached (the
 // ReleaseTerminal pattern), so doas password prompts and installer
@@ -83,6 +85,23 @@ func loadCatalog() ([]app, string, error) {
 // installed detection
 // ---------------------------------------------------------------------------
 
+// flatpakApps shells to `flatpak list --app` once and returns the set of
+// installed application IDs (covers system and user installs alike).
+// Empty when flatpak isn't installed or the call fails.
+func flatpakApps() map[string]bool {
+	out, err := exec.Command("flatpak", "list", "--app", "--columns=application").Output()
+	if err != nil {
+		return map[string]bool{}
+	}
+	m := map[string]bool{}
+	for _, line := range strings.Split(string(out), "\n") {
+		if id := strings.TrimSpace(line); id != "" {
+			m[id] = true
+		}
+	}
+	return m
+}
+
 // extrasState shells to `navi-extras --list` once and maps extra id ->
 // "installed"/"missing". nil when navi-extras isn't usable.
 func extrasState() map[string]string {
@@ -100,7 +119,7 @@ func extrasState() map[string]string {
 	return m
 }
 
-func isInstalled(a app, extras map[string]string) bool {
+func isInstalled(a app, extras map[string]string, flatpaks map[string]bool) bool {
 	switch a.Source {
 	case "webapp":
 		// navi-webapp drops the launcher here on install.
@@ -110,6 +129,9 @@ func isInstalled(a app, extras map[string]string) bool {
 		}
 		_, err = os.Stat(filepath.Join(home, ".local", "share", "applications", a.Package+".desktop"))
 		return err == nil
+	case "flatpak":
+		// the package field is the flatpak application ID.
+		return flatpaks[a.Package]
 	case "native":
 		if strings.HasPrefix(a.Install, "navi-extras --install ") && extras != nil {
 			id := strings.TrimPrefix(a.Install, "navi-extras --install ")
@@ -166,6 +188,7 @@ type model struct {
 	filtered []app
 	inst     map[string]bool // app id -> installed
 	extras   map[string]string
+	flatpaks map[string]bool // flatpak app id -> installed
 
 	input  textinput.Model
 	cursor int
@@ -189,11 +212,12 @@ func newModel(apps []app) model {
 	ti.CharLimit = 64
 
 	extras := extrasState()
+	flatpaks := flatpakApps()
 	inst := map[string]bool{}
 	for _, a := range apps {
-		inst[a.ID] = isInstalled(a, extras)
+		inst[a.ID] = isInstalled(a, extras, flatpaks)
 	}
-	m := model{apps: apps, filtered: apps, inst: inst, extras: extras, input: ti}
+	m := model{apps: apps, filtered: apps, inst: inst, extras: extras, flatpaks: flatpaks, input: ti}
 	return m
 }
 
@@ -233,7 +257,7 @@ func (m *model) selected() *app {
 func (m *model) refreshOne(id string) {
 	for _, a := range m.apps {
 		if a.ID == id {
-			m.inst[id] = isInstalled(a, m.extras)
+			m.inst[id] = isInstalled(a, m.extras, m.flatpaks)
 			return
 		}
 	}
@@ -271,6 +295,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ok = msg.err == nil
 		if m.target != nil {
 			m.extras = extrasState() // installers may have changed things
+			m.flatpaks = flatpakApps()
 			m.refreshOne(m.target.ID)
 		}
 		if m.ok {
@@ -389,8 +414,9 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		// refresh installed states
 		m.extras = extrasState()
+		m.flatpaks = flatpakApps()
 		for _, a := range m.apps {
-			m.inst[a.ID] = isInstalled(a, m.extras)
+			m.inst[a.ID] = isInstalled(a, m.extras, m.flatpaks)
 		}
 		m.status = "states refreshed."
 		return m, nil
