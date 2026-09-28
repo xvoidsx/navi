@@ -3,12 +3,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -72,6 +75,22 @@ var dnsPresets = []DNSPreset{
 	{Name: "Custom"},
 }
 
+// speedEntry is one completed speed test, persisted to
+// ~/.local/share/navi/navi-networking/speed-history.json (cap 50).
+type speedEntry struct {
+	Time     time.Time `json:"time"`
+	PingMs   float64   `json:"ping_ms"`
+	DownMbps float64   `json:"down_mbps"`
+	UpMbps   float64   `json:"up_mbps"`
+}
+
+// vpnProfile is one NetworkManager WireGuard connection.
+type vpnProfile struct {
+	Name   string
+	UUID   string
+	Active bool
+}
+
 type screen int
 
 const (
@@ -85,6 +104,9 @@ const (
 	screenShare
 	screenForgetConfirm
 	screenSpeedTest
+	screenHotspot
+	screenVPN
+	screenSpeedHistory
 )
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -113,6 +135,27 @@ type shareMsg struct {
 type forgetMsg struct{ err error }
 type speedTestDoneMsg speedTestResult
 type speedTickMsg struct{}
+
+// wifiDevMsg carries the first Wi-Fi device name ("" when none exists).
+type wifiDevMsg struct{ dev string }
+
+// vpnMsg carries the WireGuard profile list.
+type vpnMsg struct {
+	profiles []vpnProfile
+	err      error
+}
+
+// vpnToggleMsg reports a tunnel up/down attempt.
+type vpnToggleMsg struct{ err error }
+
+// vpnImportMsg reports a .conf import attempt.
+type vpnImportMsg struct{ err error }
+
+// hotspotOpMsg reports a hotspot start/stop attempt.
+type hotspotOpMsg struct{ err error }
+
+// hotspotStatusMsg reports whether the Hotspot connection is active.
+type hotspotStatusMsg struct{ active bool }
 
 // transTickMsg drives the static-dissolve screen transition.
 type transTickMsg struct{}
@@ -177,6 +220,33 @@ type model struct {
 	speedProgress *speedProgress
 	speedResult   speedTestResult
 	speedRunning  bool
+
+	// wifiDev is the first Wi-Fi device name ("" when the machine has
+	// no Wi-Fi hardware). Hotspot needs it for the ifname argument.
+	wifiDev string
+
+	// Speed-test history, loaded from disk when the history screen
+	// opens and appended after every successful test.
+	history            []speedEntry
+	historyConfirmClear bool
+
+	// WireGuard profiles, refreshed at startup and after every
+	// toggle/import.
+	vpnProfiles  []vpnProfile
+	vpnCursor    int
+	vpnImporting bool
+	vpnImportPath string
+
+	// Hotspot state.
+	hotspotActive   bool
+	hotspotSSID     string
+	hotspotPW       string
+	hotspotCursor   int // 0 = SSID, 1 = password
+	hotspotConfirm  bool // "disconnect wifi and start hotspot?" confirm
+
+	// returnTo is where esc goes from the hotspot/vpn/history
+	// screens (whichever of networks/dashboard opened them).
+	returnTo screen
 }
 
 func initialModel() model {
@@ -454,6 +524,213 @@ func getPassword(ctx context.Context, info ConnectionInfo) (string, error) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Wi-Fi device, WireGuard, hotspot, speed history
+// ─────────────────────────────────────────────────────────────────────────
+
+// parseWifiDevice returns the first device whose TYPE is wifi, from
+// `nmcli -t -f DEVICE,TYPE device status` output.
+func parseWifiDevice(output string) string {
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		f := splitTerse(line)
+		if len(f) >= 2 && f[1] == "wifi" && f[0] != "" {
+			return f[0]
+		}
+	}
+	return ""
+}
+
+func wifiDeviceName(ctx context.Context) (string, error) {
+	out, err := runNmcli(ctx, "-t", "-f", "DEVICE,TYPE", "device", "status")
+	if err != nil {
+		return "", err
+	}
+	return parseWifiDevice(string(out)), nil
+}
+
+// parseVPNProfiles builds the WireGuard profile list from
+// `nmcli -t -f NAME,UUID,TYPE connection show` output, marking the ones
+// present in `connection show --active` output (NAME per line).
+func parseVPNProfiles(connShow, activeShow string) []vpnProfile {
+	active := map[string]bool{}
+	for _, line := range strings.Split(strings.TrimSpace(activeShow), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			active[line] = true
+		}
+	}
+	var profiles []vpnProfile
+	for _, line := range strings.Split(strings.TrimSpace(connShow), "\n") {
+		if line == "" {
+			continue
+		}
+		f := splitTerse(line)
+		if len(f) < 3 || f[2] != "wireguard" {
+			continue
+		}
+		profiles = append(profiles, vpnProfile{Name: f[0], UUID: f[1], Active: active[f[0]]})
+	}
+	return profiles
+}
+
+func listVPNProfiles(ctx context.Context) ([]vpnProfile, error) {
+	conns, err := runNmcli(ctx, "-t", "-f", "NAME,UUID,TYPE", "connection", "show")
+	if err != nil {
+		return nil, fmt.Errorf("could not list connections: %w", err)
+	}
+	activeOut, err := runNmcli(ctx, "-t", "-f", "NAME", "connection", "show", "--active")
+	if err != nil {
+		// Active list failing shouldn't hide the profiles; just mark
+		// nothing active.
+		activeOut = nil
+	}
+	return parseVPNProfiles(string(conns), string(activeOut)), nil
+}
+
+func vpnSetState(ctx context.Context, uuid string, up bool) error {
+	verb := "up"
+	if !up {
+		verb = "down"
+	}
+	_, err := runNmcli(ctx, "connection", verb, uuid)
+	return err
+}
+
+func vpnImportConn(ctx context.Context, path string) error {
+	p := path
+	if strings.HasPrefix(p, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			p = filepath.Join(home, p[2:])
+		}
+	}
+	if _, err := os.Stat(p); err != nil {
+		return fmt.Errorf("cannot read %s", path)
+	}
+	_, err := runNmcli(ctx, "connection", "import", "type", "wireguard", "file", p)
+	return err
+}
+
+// hotspotStart brings up an AP via `nmcli device wifi hotspot`. The wifi
+// device must not be connected as a client; the caller confirms the
+// disconnect first.
+func hotspotStart(ctx context.Context, ssid, pw, ifname string) error {
+	_, err := runNmcli(ctx, "device", "wifi", "hotspot", "ssid", ssid, "password", pw, "ifname", ifname)
+	return err
+}
+
+func hotspotStop(ctx context.Context) error {
+	_, err := runNmcli(ctx, "connection", "down", "Hotspot")
+	return err
+}
+
+// parseHotspotActive reports whether a "Hotspot" profile is active, from
+// `nmcli -t -f NAME,TYPE connection show --active` output.
+func parseHotspotActive(output string) bool {
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		f := splitTerse(line)
+		if len(f) >= 1 && f[0] == "Hotspot" {
+			return true
+		}
+	}
+	return false
+}
+
+func hotspotIsActive(ctx context.Context) (bool, error) {
+	out, err := runNmcli(ctx, "-t", "-f", "NAME,TYPE", "connection", "show", "--active")
+	if err != nil {
+		return false, err
+	}
+	return parseHotspotActive(string(out)), nil
+}
+
+const maxSpeedHistory = 50
+
+func speedHistoryPath() string {
+	dir := os.Getenv("XDG_DATA_HOME")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		dir = filepath.Join(home, ".local", "share")
+	}
+	return filepath.Join(dir, "navi", "navi-networking", "speed-history.json")
+}
+
+// loadSpeedHistory is tolerant: missing or corrupt files read as empty
+// history rather than an error screen.
+func loadSpeedHistory() []speedEntry {
+	path := speedHistoryPath()
+	if path == "" {
+		return nil
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var entries []speedEntry
+	if err := json.Unmarshal(raw, &entries); err != nil {
+		return nil
+	}
+	return entries
+}
+
+func appendSpeedHistory(e speedEntry) {
+	path := speedHistoryPath()
+	if path == "" {
+		return
+	}
+	entries := loadSpeedHistory()
+	entries = append(entries, e)
+	if len(entries) > maxSpeedHistory {
+		entries = entries[len(entries)-maxSpeedHistory:]
+	}
+	raw, err := json.Marshal(entries)
+	if err != nil {
+		return
+	}
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	os.WriteFile(path, raw, 0o644)
+}
+
+func clearSpeedHistory() {
+	path := speedHistoryPath()
+	if path == "" {
+		return
+	}
+	os.Remove(path)
+}
+
+func defaultHotspotSSID() string {
+	if h, err := os.Hostname(); err == nil && h != "" {
+		return h
+	}
+	return "navi-hotspot"
+}
+
+// genHotspotPassword makes a 12-char unambiguous-alphabet password so the
+// hotspot has a sane default the user can read off the QR code or change.
+func genHotspotPassword() string {
+	const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789"
+	b := make([]byte, 12)
+	if _, err := rand.Read(b); err != nil {
+		return "navi-wired-0000"
+	}
+	for i := range b {
+		b[i] = chars[int(b[i])%len(chars)]
+	}
+	return string(b)
+}
+
+// qrLines renders a QR payload to half-block terminal lines, shared by the
+// network share screen and the hotspot screen.
+func qrLines(payload string) []string {
+	var buf bytes.Buffer
+	cfg := qrterminal.Config{Level: qrterminal.M, Writer: &buf, HalfBlocks: true, QuietZone: 1}
+	qrterminal.GenerateWithConfig(payload, cfg)
+	return strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Speed test
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -670,6 +947,38 @@ func speedTestCmd(ctx context.Context, progress *speedProgress) tea.Cmd {
 func speedTickCmd() tea.Cmd {
 	return tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg { return speedTickMsg{} })
 }
+func wifiDevCmd(ctx context.Context) tea.Cmd {
+	return func() tea.Msg { d, _ := wifiDeviceName(ctx); return wifiDevMsg{d} }
+}
+func vpnListCmd(ctx context.Context) tea.Cmd {
+	return func() tea.Msg { p, e := listVPNProfiles(ctx); return vpnMsg{p, e} }
+}
+func vpnToggleCmd(ctx context.Context, uuid string, up bool) tea.Cmd {
+	return func() tea.Msg { return vpnToggleMsg{vpnSetState(ctx, uuid, up)} }
+}
+func vpnImportCmd(ctx context.Context, path string) tea.Cmd {
+	return func() tea.Msg { return vpnImportMsg{vpnImportConn(ctx, path)} }
+}
+func hotspotStartCmd(ctx context.Context, ssid, pw, ifname string) tea.Cmd {
+	return func() tea.Msg { return hotspotOpMsg{hotspotStart(ctx, ssid, pw, ifname)} }
+}
+
+// hotspotStartAfterDisconnectCmd drops the wifi client link first (the
+// device can't hotspot while joined as a client), then starts the AP.
+func hotspotStartAfterDisconnectCmd(ctx context.Context, info ConnectionInfo, ssid, pw, ifname string) tea.Cmd {
+	return func() tea.Msg {
+		if err := disconnectNetwork(ctx, info); err != nil {
+			return hotspotOpMsg{err}
+		}
+		return hotspotOpMsg{hotspotStart(ctx, ssid, pw, ifname)}
+	}
+}
+func hotspotStopCmd(ctx context.Context) tea.Cmd {
+	return func() tea.Msg { return hotspotOpMsg{hotspotStop(ctx)} }
+}
+func hotspotStatusCmd(ctx context.Context) tea.Cmd {
+	return func() tea.Msg { a, _ := hotspotIsActive(ctx); return hotspotStatusMsg{a} }
+}
 
 // startOp creates a fresh cancellable context, stashes its cancel func on
 // the model so a subsequent esc can abort the operation, and returns the
@@ -726,7 +1035,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case startMsg:
 		ctx := m.startOp()
-		return m, tea.Batch(scanCmd(ctx), infoCmd(ctx))
+		return m, tea.Batch(scanCmd(ctx), infoCmd(ctx), wifiDevCmd(ctx), vpnListCmd(ctx), hotspotStatusCmd(ctx))
 
 	case networkMsg:
 		m.loading = false
@@ -845,6 +1154,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cancel = nil
 		m.speedResult = res
 		m.err = nil
+		if res.err == nil {
+			appendSpeedHistory(speedEntry{Time: time.Now(), PingMs: res.latencyMs, DownMbps: res.downloadMbps, UpMbps: res.uploadMbps})
+		}
 
 	case speedTickMsg:
 		if m.speedRunning && m.speedProgress != nil {
@@ -861,6 +1173,75 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, speedTickCmd()
 		}
+
+	case wifiDevMsg:
+		m.wifiDev = msg.dev
+
+	case vpnMsg:
+		m.loading = false
+		if errors.Is(msg.err, context.Canceled) {
+			return m, nil
+		}
+		m.cancel = nil
+		if msg.err == nil {
+			m.vpnProfiles = msg.profiles
+			if m.vpnCursor >= len(m.vpnProfiles) {
+				m.vpnCursor = len(m.vpnProfiles) - 1
+			}
+			if m.vpnCursor < 0 {
+				m.vpnCursor = 0
+			}
+		} else if m.screen == screenVPN {
+			m.err = msg.err
+		}
+
+	case vpnToggleMsg:
+		m.loading = false
+		if errors.Is(msg.err, context.Canceled) {
+			return m, nil
+		}
+		m.cancel = nil
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		m.loading = true
+		ctx := m.startOp()
+		return m, vpnListCmd(ctx)
+
+	case vpnImportMsg:
+		m.loading = false
+		if errors.Is(msg.err, context.Canceled) {
+			return m, nil
+		}
+		m.cancel = nil
+		if msg.err != nil {
+			m.err = msg.err
+			m.vpnImporting = false
+			return m, nil
+		}
+		m.vpnImporting = false
+		m.vpnImportPath = ""
+		m.message = "wireguard profile imported"
+		ctx := m.startOp()
+		return m, vpnListCmd(ctx)
+
+	case hotspotOpMsg:
+		m.loading = false
+		if errors.Is(msg.err, context.Canceled) {
+			return m, nil
+		}
+		m.cancel = nil
+		m.hotspotConfirm = false
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		ctx := m.startOp()
+		return m, tea.Batch(hotspotStatusCmd(ctx), infoCmd(ctx))
+
+	case hotspotStatusMsg:
+		m.hotspotActive = msg.active
 
 	case theme.TxShowMsg, theme.TxGlitchTickMsg, theme.TxHoldDoneMsg, theme.TxFlickerMsg:
 		var cmd tea.Cmd
@@ -927,6 +1308,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			nm, cmd = m.updateForget(msg)
 		case screenSpeedTest:
 			nm, cmd = m.updateSpeedTest(msg)
+		case screenHotspot:
+			nm, cmd = m.updateHotspot(msg)
+		case screenVPN:
+			nm, cmd = m.updateVPN(msg)
+		case screenSpeedHistory:
+			nm, cmd = m.updateHistory(msg)
 		}
 		if mm, ok := nm.(model); ok {
 			m = mm
@@ -1018,6 +1405,12 @@ func (m model) updateNetworks(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = screenForgetConfirm
 	case "t":
 		return m.startSpeedTest()
+	case "H":
+		return m.openExtra(screenHotspot)
+	case "V":
+		return m.openExtra(screenVPN)
+	case "Y":
+		return m.openExtra(screenSpeedHistory)
 	}
 	return m, nil
 }
@@ -1092,6 +1485,12 @@ func (m model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.loading = true
 		ctx := m.startOp()
 		return m, scanCmd(ctx)
+	case "H":
+		return m.openExtra(screenHotspot)
+	case "V":
+		return m.openExtra(screenVPN)
+	case "Y":
+		return m.openExtra(screenSpeedHistory)
 	}
 	return m, nil
 }
@@ -1187,6 +1586,182 @@ func (m model) updateSpeedTest(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// hotspotField returns the field the cursor is on. While the hotspot is
+// active the fields are locked (config mode only when inactive).
+func (m *model) hotspotField() *string {
+	if m.hotspotCursor == 0 {
+		return &m.hotspotSSID
+	}
+	return &m.hotspotPW
+}
+
+func (m model) updateHotspot(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	k := msg.String()
+	if m.hotspotConfirm {
+		switch k {
+		case "enter", "y":
+			m.loading = true
+			m.err = nil
+			ctx := m.startOp()
+			return m, hotspotStartAfterDisconnectCmd(ctx, m.info, m.hotspotSSID, m.hotspotPW, m.wifiDev)
+		case "esc", "n":
+			m.hotspotConfirm = false
+		}
+		return m, nil
+	}
+	switch k {
+	case "esc":
+		m.screen = m.returnTo
+	case "up", "down", "tab":
+		// Field navigation is arrows/tab only — every letter key types,
+		// so SSIDs and passwords can contain anything.
+		if m.hotspotActive {
+			break
+		}
+		if k == "up" && m.hotspotCursor > 0 {
+			m.hotspotCursor--
+		} else if k != "up" && m.hotspotCursor < 1 {
+			m.hotspotCursor++
+		}
+	case "ctrl+r":
+		if !m.hotspotActive {
+			m.hotspotPW = genHotspotPassword()
+		}
+	case "enter":
+		if m.hotspotActive {
+			return m, nil
+		}
+		if strings.TrimSpace(m.hotspotSSID) == "" {
+			m.err = fmt.Errorf("hotspot SSID cannot be empty")
+			return m, nil
+		}
+		if len(m.hotspotPW) < 8 {
+			m.err = fmt.Errorf("hotspot password needs at least 8 characters")
+			return m, nil
+		}
+		if m.info.SSID != "" {
+			// The wifi device is joined as a client; it can't hotspot
+			// until it disconnects. Confirm before dropping the link.
+			m.hotspotConfirm = true
+			return m, nil
+		}
+		m.loading = true
+		m.err = nil
+		ctx := m.startOp()
+		return m, hotspotStartCmd(ctx, m.hotspotSSID, m.hotspotPW, m.wifiDev)
+	case "x":
+		if m.hotspotActive {
+			m.loading = true
+			m.err = nil
+			ctx := m.startOp()
+			return m, hotspotStopCmd(ctx)
+		}
+		m.hotspotEditAppend("x")
+	case "backspace":
+		if !m.hotspotActive {
+			f := m.hotspotField()
+			if len(*f) > 0 {
+				*f = (*f)[:len(*f)-1]
+			}
+		}
+	default:
+		if !m.hotspotActive && len(msg.Runes) > 0 {
+			m.hotspotEditAppend(string(msg.Runes))
+		}
+	}
+	return m, nil
+}
+
+func (m *model) hotspotEditAppend(s string) {
+	f := m.hotspotField()
+	*f += s
+}
+
+func (m model) updateVPN(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	k := msg.String()
+	if m.vpnImporting {
+		switch k {
+		case "esc":
+			m.vpnImporting = false
+			m.vpnImportPath = ""
+		case "enter":
+			if strings.TrimSpace(m.vpnImportPath) == "" {
+				m.err = fmt.Errorf("enter a path to a .conf file")
+				return m, nil
+			}
+			m.loading = true
+			m.err = nil
+			ctx := m.startOp()
+			return m, vpnImportCmd(ctx, strings.TrimSpace(m.vpnImportPath))
+		case "backspace":
+			if len(m.vpnImportPath) > 0 {
+				m.vpnImportPath = m.vpnImportPath[:len(m.vpnImportPath)-1]
+			}
+		default:
+			if len(msg.Runes) > 0 {
+				m.vpnImportPath += string(msg.Runes)
+			}
+		}
+		return m, nil
+	}
+	switch k {
+	case "esc", "q":
+		m.screen = m.returnTo
+	case "up", "k":
+		if m.vpnCursor > 0 {
+			m.vpnCursor--
+		}
+	case "down", "j":
+		if m.vpnCursor < len(m.vpnProfiles)-1 {
+			m.vpnCursor++
+		}
+	case "enter":
+		if len(m.vpnProfiles) == 0 {
+			return m, nil
+		}
+		p := m.vpnProfiles[m.vpnCursor]
+		m.loading = true
+		m.err = nil
+		ctx := m.startOp()
+		return m, vpnToggleCmd(ctx, p.UUID, !p.Active)
+	case "i":
+		m.vpnImporting = true
+		m.vpnImportPath = ""
+		m.err = nil
+	case "r":
+		m.loading = true
+		m.err = nil
+		ctx := m.startOp()
+		return m, vpnListCmd(ctx)
+	}
+	return m, nil
+}
+
+func (m model) updateHistory(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	k := msg.String()
+	if m.historyConfirmClear {
+		switch k {
+		case "enter", "y":
+			clearSpeedHistory()
+			m.history = nil
+			m.historyConfirmClear = false
+			m.message = "speed history cleared"
+		case "esc", "n":
+			m.historyConfirmClear = false
+		}
+		return m, nil
+	}
+	switch k {
+	case "esc", "q":
+		m.screen = m.returnTo
+	case "x":
+		if len(m.history) > 0 {
+			m.historyConfirmClear = true
+		}
+	}
+	return m, nil
+}
+
 func (m model) startSpeedTest() (tea.Model, tea.Cmd) {
 	m.speedProgress = newSpeedProgress()
 	m.speedResult = speedTestResult{}
@@ -1197,6 +1772,50 @@ func (m model) startSpeedTest() (tea.Model, tea.Cmd) {
 	m.err = nil
 	ctx := m.startOp()
 	return m, tea.Batch(speedTestCmd(ctx, m.speedProgress), speedTickCmd())
+}
+
+// openExtra jumps to one of the new screens (hotspot/vpn/history),
+// remembering where esc should return to.
+func (m model) openExtra(s screen) (tea.Model, tea.Cmd) {
+	m.returnTo = m.screen
+	m.err = nil
+	m.message = ""
+	switch s {
+	case screenHotspot:
+		if m.wifiDev == "" {
+			m.err = fmt.Errorf("no Wi-Fi device found")
+			return m, nil
+		}
+		if m.hotspotSSID == "" {
+			m.hotspotSSID = defaultHotspotSSID()
+			m.hotspotPW = genHotspotPassword()
+		}
+		m.hotspotCursor = 0
+		m.hotspotConfirm = false
+		m.screen = screenHotspot
+	case screenVPN:
+		m.vpnCursor = 0
+		m.vpnImporting = false
+		m.vpnImportPath = ""
+		m.screen = screenVPN
+		m.loading = true
+		ctx := m.startOp()
+		return m, vpnListCmd(ctx)
+	case screenSpeedHistory:
+		m.history = loadSpeedHistory()
+		m.historyConfirmClear = false
+		m.screen = screenSpeedHistory
+	}
+	return m, nil
+}
+
+func (m model) activeVPNName() string {
+	for _, p := range m.vpnProfiles {
+		if p.Active {
+			return p.Name
+		}
+	}
+	return ""
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1223,6 +1842,12 @@ func (m model) View() string {
 		return m.forgetView()
 	case screenSpeedTest:
 		return m.speedTestView()
+	case screenHotspot:
+		return m.hotspotView()
+	case screenVPN:
+		return m.vpnView()
+	case screenSpeedHistory:
+		return m.historyView()
 	default:
 		return m.networkView()
 	}
@@ -1267,7 +1892,22 @@ func (m model) networksFooter() string {
 		[2]string{"f", "forget"},
 		[2]string{"t", "speed"},
 	)
-	return line1 + "\n" + line2 + "\n" + line3 + "\n" + theme.Dimmed.Render("q quit")
+	return line1 + "\n" + line2 + "\n" + line3 + "\n" + m.extraFooter() + "\n" + theme.Dimmed.Render("q quit")
+}
+
+// extraFooter is the hotspot/vpn/history key row. Items dim individually:
+// hotspot needs a Wi-Fi device, vpn dims with no profiles (the screen
+// still opens, offering import). The keymap never shifts.
+func (m model) extraFooter() string {
+	hotspot := theme.Dimmed.Render("H hotspot")
+	if m.wifiDev == "" {
+		hotspot = theme.Fainted.Render("H hotspot")
+	}
+	vpn := theme.Dimmed.Render("V vpn")
+	if len(m.vpnProfiles) == 0 {
+		vpn = theme.Fainted.Render("V vpn")
+	}
+	return hotspot + "   " + vpn + "   " + theme.Dimmed.Render("Y history")
 }
 
 func (m model) networkView() string {
@@ -1363,6 +2003,9 @@ func (m model) dashboardView() string {
 		b.WriteString(theme.Dimmed.Render("  no active Wi-Fi connection"))
 	} else {
 		b.WriteString(okStyle.Render("  ● "+m.info.SSID) + "\n\n")
+		if vpn := m.activeVPNName(); vpn != "" {
+			b.WriteString(okStyle.Render("  ▲ VPN "+vpn) + "\n\n")
+		}
 		b.WriteString(theme.Normal.Render("  Signal    ") + signalBars(m.info.Signal) + "\n")
 		b.WriteString(theme.Normal.Render("  Security  ") + m.info.Security + "\n")
 		b.WriteString(theme.Normal.Render("  Device    ") + m.info.Device + "\n")
@@ -1449,10 +2092,7 @@ func (m model) shareView() string {
 	b.WriteString(okStyle.Render("  "+m.info.SSID) + "\n")
 	b.WriteString(theme.Dimmed.Render("  scan this QR code with your phone") + "\n\n")
 	if m.qr != "" {
-		var buf bytes.Buffer
-		cfg := qrterminal.Config{Level: qrterminal.M, Writer: &buf, HalfBlocks: true, QuietZone: 1}
-		qrterminal.GenerateWithConfig(m.qr, cfg)
-		for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		for _, line := range qrLines(m.qr) {
 			b.WriteString("  " + line + "\n")
 		}
 	}
@@ -1529,6 +2169,149 @@ func (m model) speedTestView() string {
 	return m.place(b.String())
 }
 
+func (m model) hotspotView() string {
+	var b strings.Builder
+	b.WriteString(theme.Header.Render("HOTSPOT"))
+	b.WriteString("\n\n")
+	if m.loading {
+		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("working...") + "\n")
+		return m.place(b.String())
+	}
+	if m.hotspotConfirm {
+		b.WriteString(theme.Normal.Render("  Wi-Fi is currently joined to ") + theme.Selected.Render(m.info.SSID) + "\n\n")
+		b.WriteString(theme.Normal.Render("  Starting a hotspot disconnects it first.\n\n"))
+		b.WriteString(theme.Selected.Render("  [ enter ] disconnect & start"))
+		b.WriteString("   " + theme.Dimmed.Render("[ esc ] cancel"))
+		return m.place(b.String())
+	}
+	if m.hotspotActive {
+		b.WriteString(okStyle.Render("  ● hotspot active") + "\n\n")
+		b.WriteString(theme.Normal.Render("  SSID      ") + theme.Selected.Render(m.hotspotSSID) + "\n")
+		b.WriteString(theme.Normal.Render("  Password  ") + theme.Normal.Render(m.hotspotPW) + "\n\n")
+		b.WriteString(theme.Dimmed.Render("  scan to join:") + "\n\n")
+		for _, line := range qrLines(wifiQR(m.hotspotSSID, "WPA2", m.hotspotPW)) {
+			b.WriteString("  " + line + "\n")
+		}
+		b.WriteString("\n" + theme.Dimmed.Render("  x stop hotspot   esc back"))
+	} else {
+		fields := [][2]string{{"SSID", m.hotspotSSID}, {"Password", m.hotspotPW}}
+		for i, f := range fields {
+			cursor := "  "
+			if i == m.hotspotCursor {
+				cursor = theme.Selected.Render("› ")
+			}
+			val := f[1]
+			if val == "" {
+				val = theme.Dimmed.Render("enter " + strings.ToLower(f[0]))
+			}
+			b.WriteString(cursor + theme.Normal.Render(fmt.Sprintf("%-9s", f[0])) + val + "\n")
+		}
+		b.WriteString("\n" + theme.Dimmed.Render("  device "+m.wifiDev) + "\n")
+		b.WriteString("\n" + theme.Dimmed.Render("  ↑↓/tab field   ctrl+r new password   enter start   esc back"))
+	}
+	if m.err != nil {
+		b.WriteString("\n\n" + theme.Error.Render("× "+m.err.Error()))
+	}
+	return m.place(b.String())
+}
+
+func (m model) vpnView() string {
+	var b strings.Builder
+	b.WriteString(theme.Header.Render("WIREGUARD VPN"))
+	b.WriteString("\n\n")
+	if m.loading {
+		b.WriteString(theme.Spinner(m.spinFrame) + " " + theme.Dimmed.Render("talking to NetworkManager...") + "\n")
+		return m.place(b.String())
+	}
+	if m.vpnImporting {
+		b.WriteString(theme.Normal.Render("  Import a WireGuard .conf file:") + "\n\n")
+		val := m.vpnImportPath
+		if val == "" {
+			val = theme.Dimmed.Render("~/.config/wireguard/tunnel.conf")
+		}
+		b.WriteString(theme.Input.Render("  > " + val))
+		if m.err != nil {
+			b.WriteString("\n\n" + theme.Error.Render("  × "+m.err.Error()))
+		}
+		b.WriteString("\n\n" + theme.Dimmed.Render("  enter import   esc cancel"))
+		return m.place(b.String())
+	}
+	if len(m.vpnProfiles) == 0 {
+		b.WriteString(theme.Dimmed.Render("  no WireGuard profiles saved") + "\n\n")
+		b.WriteString(theme.Dimmed.Render("  press i to import one from a .conf file"))
+	} else {
+		for i, p := range m.vpnProfiles {
+			cursor := "  "
+			if i == m.vpnCursor {
+				cursor = theme.Selected.Render("› ")
+			}
+			name := p.Name
+			if i == m.vpnCursor {
+				name = theme.Selected.Render(name)
+			}
+			b.WriteString(cursor + name)
+			if p.Active {
+				b.WriteString("  " + okStyle.Render("● active"))
+			}
+			b.WriteString("\n")
+		}
+	}
+	if m.message != "" {
+		b.WriteString("\n" + okStyle.Render("✓ "+m.message) + "\n")
+	}
+	if m.err != nil {
+		b.WriteString("\n" + theme.Error.Render("× "+m.err.Error()) + "\n")
+	}
+	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
+	if len(m.vpnProfiles) == 0 {
+		b.WriteString(theme.Dimmed.Render("i import .conf   esc back"))
+	} else {
+		b.WriteString(theme.Dimmed.Render("enter toggle   i import   r refresh   esc back"))
+	}
+	return m.place(b.String())
+}
+
+func (m model) historyView() string {
+	var b strings.Builder
+	b.WriteString(theme.Header.Render("SPEED HISTORY"))
+	b.WriteString("\n\n")
+	if m.historyConfirmClear {
+		b.WriteString(theme.Normal.Render("  Clear all recorded speed tests?\n\n"))
+		b.WriteString(theme.Selected.Render("  [ enter ] clear"))
+		b.WriteString("   " + theme.Dimmed.Render("[ esc ] keep"))
+		return m.place(b.String())
+	}
+	if len(m.history) == 0 {
+		b.WriteString(theme.Dimmed.Render("  no speed tests recorded yet") + "\n\n")
+		b.WriteString(theme.Dimmed.Render("  run one with t from the dashboard"))
+	} else {
+		// Newest first, cap the visible rows.
+		n := len(m.history)
+		shown := 12
+		if n < shown {
+			shown = n
+		}
+		for i := 0; i < shown; i++ {
+			e := m.history[n-1-i]
+			b.WriteString(fmt.Sprintf("  %s  %5.0f ms   ↓ %6.1f   ↑ %6.1f\n",
+				e.Time.Format("02 Jan 15:04"), e.PingMs, e.DownMbps, e.UpMbps))
+		}
+		var downs []float64
+		for _, e := range m.history {
+			downs = append(downs, e.DownMbps)
+		}
+		b.WriteString("\n  " + theme.Dimmed.Render("download Mbps:") + "\n")
+		b.WriteString("  " + theme.Sparkline(downs, 40, theme.Cyan) + "\n")
+	}
+	b.WriteString("\n" + theme.Divider(frameWidth) + "\n")
+	if len(m.history) > 0 {
+		b.WriteString(theme.Dimmed.Render("x clear history   esc back"))
+	} else {
+		b.WriteString(theme.Dimmed.Render("esc back"))
+	}
+	return m.place(b.String())
+}
+
 func signalBars(signal int) string {
 	switch {
 	case signal >= 80:
@@ -1584,5 +2367,29 @@ func dumpSample() {
 	m.speedProgress.bytesDone.Store(25_000_000)
 	m.speedProgress.totalBytes.Store(speedTestDownloadBytes)
 	m.samples = []float64{12, 18, 24, 31, 28, 35, 42, 38, 45, 51, 47, 55}
+	fmt.Println(m.View())
+
+	m.screen = screenSpeedHistory
+	now := time.Now()
+	m.history = []speedEntry{
+		{Time: now.Add(-72 * time.Hour), PingMs: 31, DownMbps: 88.4, UpMbps: 9.1},
+		{Time: now.Add(-48 * time.Hour), PingMs: 24, DownMbps: 112.5, UpMbps: 11.2},
+		{Time: now.Add(-24 * time.Hour), PingMs: 27, DownMbps: 104.9, UpMbps: 10.4},
+		{Time: now, PingMs: 22, DownMbps: 121.7, UpMbps: 12.0},
+	}
+	fmt.Println(m.View())
+
+	m.screen = screenVPN
+	m.vpnProfiles = []vpnProfile{
+		{Name: "mullvad-se", UUID: "11111111-2222-3333-4444-555555555555", Active: true},
+		{Name: "office-wg", UUID: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"},
+	}
+	fmt.Println(m.View())
+
+	m.screen = screenHotspot
+	m.wifiDev = "wlan0"
+	m.hotspotSSID = "navi-cloudbook"
+	m.hotspotPW = "wired-drop-01"
+	m.hotspotActive = true
 	fmt.Println(m.View())
 }
