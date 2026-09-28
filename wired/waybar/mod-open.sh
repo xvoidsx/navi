@@ -38,22 +38,23 @@ shift
 # tallest dumped screen plus one grace row; list-y mods get room for
 # real-world data (audio streams, calendar events). viewports (notifs)
 # and self-hugging frames (wiredrop: width-4) fill whatever they're given.
+# Dimensions are frame width+4 x frame height+1 (tight around the fixed frames).
 case "$(basename "$1")" in
-navi-nowplaying) DIMS="66x20" ;;
-navi-networking) DIMS="66x34" ;;
-navi-calendar) DIMS="66x26" ;;
-navi-audio) DIMS="66x19" ;;
-navi-bluetooth) DIMS="66x23" ;;
-navi-weather) DIMS="66x22" ;;
-navi-power) DIMS="66x24" ;;
-navi-display) DIMS="66x24" ;;
-navi-get) DIMS="72x32" ;;
-navi-browser) DIMS="72x23" ;;
-navi-reminders) DIMS="66x19" ;;
-navi-notifs) DIMS="70x30" ;; # viewport list — fills the window, tall is right
-navi-lain-config) DIMS="68x20" ;;
-navi-agents-config) DIMS="68x24" ;;
-wiredrop) DIMS="66x21" ;; # self-hugging: frame renders at (terminal width - 4)
+navi-nowplaying) DIMS="66x21" ;;
+navi-networking) DIMS="66x38" ;;
+navi-calendar) DIMS="66x30" ;;
+navi-audio) DIMS="66x20" ;;
+navi-bluetooth) DIMS="66x25" ;;
+navi-weather) DIMS="66x25" ;;
+navi-power) DIMS="66x26" ;;
+navi-display) DIMS="66x27" ;;
+navi-get) DIMS="72x39" ;;
+navi-browser) DIMS="72x31" ;;
+navi-reminders) DIMS="66x24" ;;
+navi-notifs) DIMS="66x29" ;;
+navi-lain-config) DIMS="68x23" ;;
+navi-agents-config) DIMS="84x27" ;;
+wiredrop) DIMS="66x23" ;;
 *) DIMS="" ;;
 esac
 
