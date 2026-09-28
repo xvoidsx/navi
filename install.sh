@@ -609,6 +609,18 @@ setup_mods() {
   install_mod "navi-browser"    "navi-browser"
   install_mod "navi-power"      "navi-power"
   install_mod "navi-display"    "navi-display"
+  install_mod "navi-reminders"  "navi-reminders"
+  install_mod "navi-reminders"  "navi-reminder-fire"
+
+  # navi-reminders runs on systemd user timers — they only fire from boot
+  # (before first login) with lingering enabled for the installing user.
+  if command -v loginctl >/dev/null 2>&1; then
+    if $DOAS loginctl enable-linger "$USER" >/dev/null 2>&1; then
+      ok "linger enabled for $USER (reminder timers run from boot)"
+    else
+      warn "could not enable linger for $USER — reminders only fire while logged in"
+    fi
+  fi
 }
 
 # Local brain model guard for Hey Lain. This runs on EVERY setup_heylain —
