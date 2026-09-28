@@ -25,7 +25,6 @@
     "modules-right": [
 	"custom/weather",
 	"custom/update",
-        "custom/nowplaying",
 	"custom/volume",
         "network",
         "battery",
