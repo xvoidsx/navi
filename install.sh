@@ -1304,6 +1304,9 @@ setup_webapps() {
   step "default webapps (${#DEFAULT_WEBAPPS[@]} launchers)"
   if command -v navi-webapp >/dev/null 2>&1; then
     navi-webapp install "${DEFAULT_WEBAPPS[@]}"
+    # refresh launchers + icons for webapps the user installed themselves
+    # (icons/launchers that shipped after first install otherwise never land)
+    navi-webapp repair
     ok "default webapps installed for $USER"
   else
     warn "navi-webapp not on PATH — skipping default webapp install"

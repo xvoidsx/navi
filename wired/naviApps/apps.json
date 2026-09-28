@@ -101,7 +101,8 @@
     "downloadUrl": "webapps/youtubemusic.desktop",
     "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=YouTube Music\nExec=navi-browser-run --force-dark-mode --app=https://music.youtube.com\nComment=YouTube Music as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-youtubemusic\nStartupNotify=true\nCategories=AudioVideo;Audio;",
     "homepage": "https://music.youtube.com",
-    "icon": "🎶"
+    "icon": "🎶",
+    "logo": "icons/youtubemusic.png"
   },
   {
     "id": "web-x",

@@ -29,7 +29,7 @@ declare -A ICON_SRC=(
 )
 
 usage() {
-  echo "usage: $(basename "$0") <name>... | --all | --uninstall <name>... | --uninstall-all | --list | --doctor"
+  echo "usage: $(basename "$0") <name>... | --all | --repair | --uninstall <name>... | --uninstall-all | --list | --doctor"
 }
 
 # Launchers only trust an icon theme dir that has an index.theme.
@@ -258,6 +258,24 @@ uninstall_one() {
   echo "removed ${name}"
 }
 
+# repair: re-copy the .desktop launcher and icon for every catalog webapp
+# the user already has installed. Icons and launchers sometimes ship after
+# the webapp was first installed (or predate navi-browser-run); without
+# this, existing installs never pick them up.
+repair() {
+  ensure_index_theme
+  local app n=0
+  while IFS= read -r app; do
+    if [[ -f "${APP_DIR}/${app}.desktop" ]]; then
+      install_one "$app" >/dev/null
+      n=$((n + 1))
+    fi
+  done < <(list_apps)
+  migrate_launchers
+  refresh_caches
+  echo "repaired ${n} installed webapps"
+}
+
 if [[ $# -eq 0 ]]; then
   usage >&2
   exit 1
@@ -274,6 +292,9 @@ case "$1" in
     done < <(list_apps)
     migrate_launchers
     refresh_caches
+    ;;
+  --repair)
+    repair
     ;;
   --uninstall|--remove|-r)
     shift

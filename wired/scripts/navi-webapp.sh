@@ -3,6 +3,7 @@
 #
 #   navi-webapp install <name>...   install one or more webapps
 #   navi-webapp install all         install every webapp in the catalog
+#   navi-webapp repair              refresh launchers + icons for installed webapps
 #   navi-webapp uninstall <name>... remove one or more webapps
 #   navi-webapp uninstall --all     remove every installed navi webapp
 #   navi-webapp list                list available webapps
@@ -23,6 +24,7 @@ usage: navi-webapp <command> [args]
 commands:
   install <name>...   install one or more webapps
   install all         install every webapp in the catalog
+  repair              refresh launchers + icons for installed webapps
   uninstall <name>... remove one or more webapps
   uninstall --all     remove every installed navi webapp
   list                list available webapps
@@ -49,6 +51,9 @@ case "$cmd" in
       exec "$BACKEND" --all
     fi
     exec "$BACKEND" "$@"
+    ;;
+  repair)
+    exec "$BACKEND" --repair
     ;;
   uninstall|remove)
     if [[ $# -eq 0 ]]; then
