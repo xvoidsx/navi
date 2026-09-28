@@ -32,24 +32,28 @@ shift
 [ "$#" -ge 1 ] || { echo "usage: mod-open.sh <window-title> <command> [args...]" >&2; exit 1; }
 
 # family geometry: COLSxLINES per mod, matched on the command's basename.
-# sized to each mod's frame plus a small margin — the mods center their
-# frames, so a row or two of slack is invisible, but an ocean isn't.
+# the window hugs the frame's rounding: width is the frame's true width
+# (frameWidth + 4: border + padding), height is the frame's true height
+# (body lines + 4 chrome) plus one row of grace for status lines that
+# come and go. dynamic lists (networking, bluetooth, calendar agenda,
+# reminders) get a little more room; the notifs viewport fills whatever
+# it's given, so it stays tall. tweak a number here, never at the callers.
 case "$(basename "$1")" in
-navi-nowplaying) DIMS="68x21" ;;
-navi-networking) DIMS="70x28" ;;
-navi-calendar) DIMS="70x28" ;;
-navi-audio) DIMS="70x22" ;;
-navi-bluetooth) DIMS="70x22" ;;
-navi-weather) DIMS="70x26" ;;
-navi-power) DIMS="70x22" ;;
-navi-display) DIMS="70x20" ;;
-navi-get) DIMS="76x25" ;;
-navi-browser) DIMS="76x25" ;;
-navi-reminders) DIMS="70x24" ;;
-navi-notifs) DIMS="70x34" ;; # viewport list — tall is right
-navi-lain-config) DIMS="70x28" ;;
-navi-agents-config) DIMS="72x30" ;;
-wiredrop) DIMS="70x26" ;;
+navi-nowplaying) DIMS="66x20" ;;
+navi-networking) DIMS="66x27" ;;
+navi-calendar) DIMS="66x26" ;;
+navi-audio) DIMS="66x19" ;;
+navi-bluetooth) DIMS="66x21" ;;
+navi-weather) DIMS="66x23" ;;
+navi-power) DIMS="66x19" ;;
+navi-display) DIMS="66x17" ;;
+navi-get) DIMS="72x22" ;;
+navi-browser) DIMS="72x22" ;;
+navi-reminders) DIMS="66x23" ;;
+navi-notifs) DIMS="70x30" ;; # viewport list — fills the window, tall is right
+navi-lain-config) DIMS="68x24" ;;
+navi-agents-config) DIMS="68x27" ;;
+wiredrop) DIMS="66x21" ;;
 *) DIMS="" ;;
 esac
 

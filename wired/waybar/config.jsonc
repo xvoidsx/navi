@@ -23,9 +23,9 @@
         "clock#3"
     ],
     "modules-right": [
-        "custom/nowplaying",
 	"custom/weather",
 	"custom/update",
+        "custom/nowplaying",
 	"custom/volume",
         "network",
         "battery",
