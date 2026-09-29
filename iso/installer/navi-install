@@ -84,11 +84,19 @@ TIPS=(
   "sddm is the front door: pick wayland or x11, then your password."
   "timezone is guessed from your network — type to overrule it."
   "∅ is the empty set. it is also the navi logo. both mean: nothing missing."
-  "the wired ships with agents — ollama, opencode, omp. everybody has already entered."
+  "the wired ships with agents — ollama, opencode, omp, goose. everybody has already entered."
+  "click the waybar modules — each one opens a navi mod. the panel is the control room."
+  "navi-audio grew a PLAYING tab — every media player, one floating window."
+  "blackice ships in chromium — xvoidsx's adblocker. the web, minus the noise."
+  "navi-browser picks your chromium — brave, edge, helium, chrome, all welcome."
+  "navi-get is the software center — apt, flatpak, and webapps in one place."
+  "wiredrop flings files across the LAN — no cloud, no account, just the wire."
+  "alt+v wakes lain — the voice assistant. your voice never leaves the machine."
+  "super+ctrl+h opens herdr — your agents, tiled and ready."
   "if a download host is down, the installer skips it and carries on. the wired provides. eventually."
   "thirteen phases. lucky number thirteen."
   "that stopwatch is timing your wifi, not you. probably."
-  "the ∅ breathes while it works. watch it. it's calming."
+  "the ∅ cycles magenta → cyan → green while it works. watch it. it's calming."
   "experimental eiri build: the cohesion release. note what glows, report what breaks."
   "the wired will provide."
 )
@@ -167,15 +175,21 @@ _ui_draw() {
   el=$(tput el 2>/dev/null || true)
 
   # pinned header: wordmark + progress bar. never scrolls away.
-  # the empty set breathes: magenta/cyan pulse, one breath per second.
-  if [ $(( $(date +%s) % 2 )) -eq 0 ]; then empty_c="$N_MAGENTA"; else empty_c="$N_CYAN"; fi
-  printf '%s%s\n' "${empty_c}                       ∅${N_OFF}" "$el"
+  # the empty set breathes: cycles magenta → cyan → green, one color
+  # per two seconds. the NAVI wordmark rides the same cycle, synced —
+  # the whole header breathes as one neon organism.
+  case $(( $(date +%s) / 2 % 3 )) in
+    0) neon_c="$N_MAGENTA";;
+    1) neon_c="$N_CYAN";;
+    *) neon_c="$N_GREEN";;
+  esac
+  printf '%s%s\n' "${neon_c}                       ∅${N_OFF}" "$el"
   printf '%s\n' "$el"
-  printf '%s%s\n' "${N_GREEN}  █   █   ███   █   █  █████${N_OFF}" "$el"
-  printf '%s%s\n' "${N_GREEN}  ██  █  █   █  █   █    █${N_OFF}" "$el"
-  printf '%s%s\n' "${N_GREEN}  █ █ █  █████  █   █    █${N_OFF}" "$el"
-  printf '%s%s\n' "${N_GREEN}  █  ██  █   █   █ █     █${N_OFF}" "$el"
-  printf '%s%s\n' "${N_GREEN}  █   █  █   █    █    █████${N_OFF}" "$el"
+  printf '%s%s\n' "${neon_c}  █   █   ███   █   █  █████${N_OFF}" "$el"
+  printf '%s%s\n' "${neon_c}  ██  █  █   █  █   █    █${N_OFF}" "$el"
+  printf '%s%s\n' "${neon_c}  █ █ █  █████  █   █    █${N_OFF}" "$el"
+  printf '%s%s\n' "${neon_c}  █  ██  █   █   █ █     █${N_OFF}" "$el"
+  printf '%s%s\n' "${neon_c}  █   █  █   █    █    █████${N_OFF}" "$el"
   # live stopwatch: total elapsed since the installer started, ticking
   # once per second with the frame redraw.
   _t0=$(cat "$UI_DIR/t0" 2>/dev/null || echo 0)

@@ -44,7 +44,7 @@ cp -a "$HERE/config" "$BUILD/config"
 mkdir -p "$BUILD/config/includes.chroot/opt/navi-iso"
 cp -a "$REPO/install.sh" "$REPO/wired" "$REPO/scripts" "$REPO/mods" "$REPO/iso/installer" \
   "$BUILD/config/includes.chroot/opt/navi-iso/"
-for m in navi-networking/navi-networking navi-calendar/navi-calendar navi-audio/navi-audio navi-weather/navi-weather navi-power/navi-power navi-display/navi-display navi-bluetooth/navi-bluetooth navi-reminders/navi-reminders navi-reminders/navi-reminder-fire wiredrop/wiredrop; do
+for m in navi-networking/navi-networking navi-calendar/navi-calendar navi-audio/navi-audio navi-weather/navi-weather navi-power/navi-power navi-display/navi-display navi-bluetooth/navi-bluetooth navi-reminders/navi-reminders navi-reminders/navi-reminder-fire navi-lain-config/navi-lain-config navi-agents-config/navi-agents-config navi-get/navi-get navi-browser/navi-browser navi-notifs/navi-notifs navi-nowplaying/navi-nowplaying wiredrop/wiredrop; do
   # the payload must carry EXECUTABLE binaries. git doesn't always preserve
   # the +x bit (gh-push-mika stored these as 100644 once and red-lit an ISO
   # build), so enforce it here instead of trusting the checkout mode.
