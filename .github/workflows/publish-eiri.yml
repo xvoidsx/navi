@@ -102,6 +102,11 @@ jobs:
         run: |
           set -euo pipefail
           sha="${{ steps.meta.outputs.sha }}"
+          if [ -z "$sha" ]; then
+            # fallback: resolve from the run directly
+            sha="$(gh run view '${{ steps.meta.outputs.run_id }}' --repo xvoidsx/navi \
+              --json headSha -q .headSha)"
+          fi
           echo "target sha: [$sha]"
           [ -n "$sha" ] || { echo "empty sha output"; exit 1; }
           # drop the previous rolling release if any (tag goes with --cleanup-tag)
