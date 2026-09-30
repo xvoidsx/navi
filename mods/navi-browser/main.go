@@ -9,8 +9,10 @@
 // brave-browser --app.
 //
 // Switching the binary alone would silently drop navi's managed policy
-// (theme, blackice, Proton Pass), so the picker also deploys navi.json to
-// the chosen browser's managed-policy directory. Policy directories differ
+// (theme, blackice), so the picker also deploys navi.json to
+// the chosen browser's managed-policy directory — except Brave, which
+// gets navi's light touch instead: no managed policy, no force-installed
+// extensions (Raven's call, 2026-09-29). Policy directories differ
 // across Chromium forks, so the picker probes each browser binary for its
 // compiled-in policy path and falls back to the known table when the probe
 // finds nothing.
@@ -50,18 +52,27 @@ const nbBodyRows = 25
 // ---------------------------------------------------------------------------
 
 type browserDef struct {
-	ID        string   // config id, written to ~/.config/navi/default-browser
-	Name      string   // display name
-	Blurb     string   // one-liner for the picker
-	Binaries  []string // detection candidates, in preference order
-	PolicyDir string   // managed-policy dir fallback (probe may refine)
-	ExtrasID  string   // navi-extras id for installing when missing ("" = n/a)
+	ID         string   // config id, written to ~/.config/navi/default-browser
+	Name       string   // display name
+	Blurb      string   // one-liner for the picker
+	Binaries   []string // detection candidates, in preference order
+	PolicyDir  string   // managed-policy dir fallback (probe may refine)
+	ExtrasID   string   // navi-extras id for installing when missing ("" = n/a)
+	SkipPolicy bool     // true: never offer navi's managed policy (Brave gets the light touch)
 }
 
 var browserTable = []browserDef{
 	{
+		ID: "brave", Name: "Brave",
+		Blurb:      "navi's default — Shields, Leo AI, sync; private out of the box.",
+		Binaries:   []string{"brave-browser", "brave-browser-beta", "brave-browser-nightly"},
+		PolicyDir:  "/etc/brave/policies/managed",
+		ExtrasID:   "brave-nightly",
+		SkipPolicy: true,
+	},
+	{
 		ID: "chromium", Name: "Chromium",
-		Blurb:     "Debian's Chromium — the default baseline.",
+		Blurb:     "Debian's Chromium — the vanilla alternative.",
 		Binaries:  []string{"chromium", "chromium-browser"},
 		PolicyDir: "/etc/chromium/policies/managed",
 		ExtrasID:  "",
@@ -81,18 +92,12 @@ var browserTable = []browserDef{
 		ExtrasID:  "edge",
 	},
 	{
-		ID: "brave", Name: "Brave",
-		Blurb:     "Privacy as the product — Shields, fingerprinting resistance, no account.",
-		Binaries:  []string{"brave-browser-nightly", "brave-browser", "brave-browser-beta"},
-		PolicyDir: "/etc/brave/policies/managed",
-		ExtrasID:  "brave-nightly",
-	},
-	{
 		ID: "brave-origin", Name: "Brave Origin",
-		Blurb:     "Brave stripped to its essentials — Shields and speed, none of the crypto/AI/VPN extras.",
-		Binaries:  []string{"brave-origin-stable", "brave-origin"},
-		PolicyDir: "/etc/brave/policies/managed",
-		ExtrasID:  "brave-origin",
+		Blurb:      "Brave stripped to its essentials — Shields and speed, none of the crypto/AI/VPN extras.",
+		Binaries:   []string{"brave-origin-stable", "brave-origin"},
+		PolicyDir:  "/etc/brave/policies/managed",
+		ExtrasID:   "brave-origin",
+		SkipPolicy: true,
 	},
 	{
 		ID: "chrome", Name: "Google Chrome",
@@ -306,6 +311,11 @@ func resolveBinary() (string, string) {
 			if bin := firstBinary(def); bin != "" {
 				return id, bin
 			}
+		}
+	}
+	if def := findDef("brave"); def != nil {
+		if bin := firstBinary(def); bin != "" {
+			return "brave", bin
 		}
 	}
 	if def := findDef("chromium"); def != nil {
@@ -632,7 +642,13 @@ func (m model) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				st.def.Name, filepath.Base(st.binPath))
 			m.ok = true
 			m.screen = screenResult
-			m.pendingPolicy = st
+			if st.def.SkipPolicy {
+				// Brave gets navi's light touch: no managed policy, no
+				// force-installed extensions. Don't even offer it.
+				m.pendingPolicy = nil
+			} else {
+				m.pendingPolicy = st
+			}
 			m.pendingXdg = st
 			return m, nil
 		case confirmDeployPolicy:
@@ -733,7 +749,7 @@ func (m model) browseView() string {
 	}
 	b.WriteString(theme.Header.Render(fmt.Sprintf("BROWSER RUNTIME  ·  %d of %d installed", nInstalled, len(m.states))))
 	b.WriteString("\n")
-	currentName := "none — Chromium is the fallback"
+	currentName := "none — Brave is the fallback"
 	if def := findDef(m.current); def != nil {
 		currentName = def.Name
 	}
@@ -865,7 +881,7 @@ func (m model) resultView() string {
 	if m.pendingPolicy != nil {
 		b.WriteString(theme.Dimmed.Render(fmt.Sprintf("  %s is the default but doesn't have navi's policy yet.", m.pendingPolicy.def.Name)))
 		b.WriteString("\n")
-		b.WriteString(theme.Dimmed.Render("  Without it, webapps lose the theme, blackice, and Proton Pass."))
+		b.WriteString(theme.Dimmed.Render("  Without it, webapps lose the theme and blackice."))
 		b.WriteString("\n\n")
 		keys = append(keys, [2]string{"p", "deploy policy now"})
 	}

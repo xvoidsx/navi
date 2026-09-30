@@ -1460,6 +1460,177 @@ setup_chromium() {
   fi
 }
 
+# ---------------------------------------------------------------- brave
+
+# Brave is navi's default browser (Raven's call, 2026-09-29): the most
+# private Chromium out of the box, with Leo AI, Brave Wallet, sync, and
+# Shields built in. Stock Chromium stays installed as the vanilla
+# alternative; the user can switch the default browser + webapp runtime
+# anytime with navi-browser. We experiment with this setup on bench
+# installs first — reverting is one commit.
+#
+# navi's touch is deliberately light: Brave's own ultradark look is
+# beautiful as-is, so we seed two config files with user-overridable
+# defaults and stop there. No managed policy (no "Managed by your
+# organization" banner), no force-installed extensions, no imposed
+# password manager — Shields covers ad/tracker blocking, so blackice
+# stays Chromium-only. The OS suggests, the user decides.
+#
+# Seeded keys (verified against brave-core source, 2026-09-30):
+#   Default/Preferences: browser.theme.color_scheme2=2 (dark),
+#     brave.darker_mode=true (ultradark), brave.location_bar_is_wide=true
+#   Local State: brave.tabs.compact_horizontal_tabs=true
+#     (compact tabs is a Local State pref — seeding it in Preferences
+#     silently does nothing)
+# Both land in /etc/skel (future users) and the invoking user's $HOME
+# (this install). Existing files are never overwritten, and Brave must
+# not be running while seeding — it rewrites Preferences on exit.
+setup_brave() {
+  step "brave (navi's default browser)"
+  # Brave's official apt repo — same keyring/sources pattern as
+  # scripts/installers/brave-origin-installer.sh.
+  if [ ! -f /etc/apt/sources.list.d/brave-browser-release.sources ]; then
+    $DOAS curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
+      https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+    $DOAS curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources \
+      https://brave-browser-apt-release.s3.brave.com/brave-browser.sources
+    $DOAS apt-get update
+    ok "Brave apt repository added"
+  else
+    info "Brave apt repository already present"
+  fi
+  if ! command -v brave-browser >/dev/null 2>&1; then
+    $DOAS apt-get install -y brave-browser
+    ok "brave-browser installed"
+  else
+    info "brave-browser already installed"
+  fi
+
+  seed_brave_profile /etc/skel doas
+  seed_brave_profile "$HOME"
+
+  # navi's browser runtime defaults to Brave: ~/.config/navi/default-browser
+  # drives navi-browser-run (webapps). Only write when absent or still
+  # holding the old chromium default — an explicit user choice is sacred.
+  seed_default_browser /etc/skel doas
+  seed_default_browser "$HOME"
+
+  # system default browser (xdg): Brave. Same rule — only flip when unset
+  # or still on the old chromium default. Runs as the user; harmless if it
+  # fails (e.g. no session during install).
+  local xdg_cur=""
+  xdg_cur="$(xdg-settings get default-web-browser 2>/dev/null || true)"
+  if [ -z "$xdg_cur" ] || [ "$xdg_cur" = "chromium.desktop" ]; then
+    if xdg-settings set default-web-browser brave-browser.desktop 2>/dev/null; then
+      ok "system default browser: Brave"
+    else
+      warn "could not set xdg default browser (no session?)"
+    fi
+  else
+    info "xdg default browser already '$xdg_cur' — left alone"
+  fi
+}
+
+# seed_brave_profile <base> [doas] — write Brave's navi defaults under
+# <base>/.config/BraveSoftware/Brave-Browser/. Existing files are left
+# alone. Pass "doas" to elevate (for /etc/skel).
+seed_brave_profile() {
+  local base="$1" priv="${2:-}"
+  local dir="$base/.config/BraveSoftware/Brave-Browser"
+  if pgrep -x brave >/dev/null 2>&1 || pgrep -x brave-browser >/dev/null 2>&1; then
+    warn "Brave is running — skipping config seed (it rewrites Preferences on exit)"
+    return 0
+  fi
+  if [ -n "$priv" ]; then
+    $DOAS install -d -m 755 "$dir/Default"
+  else
+    install -d -m 755 "$dir/Default"
+  fi
+  if [ ! -f "$dir/Default/Preferences" ]; then
+    if [ -n "$priv" ]; then
+      $DOAS tee "$dir/Default/Preferences" >/dev/null <<'EOF'
+{
+  "browser": {
+    "theme": {
+      "color_scheme2": 2
+    }
+  },
+  "brave": {
+    "darker_mode": true,
+    "location_bar_is_wide": true
+  }
+}
+EOF
+    else
+      tee "$dir/Default/Preferences" >/dev/null <<'EOF'
+{
+  "browser": {
+    "theme": {
+      "color_scheme2": 2
+    }
+  },
+  "brave": {
+    "darker_mode": true,
+    "location_bar_is_wide": true
+  }
+}
+EOF
+    fi
+    ok "Brave Preferences seeded ($dir/Default/Preferences)"
+  else
+    info "Brave Preferences already exists — left alone"
+  fi
+  if [ ! -f "$dir/Local State" ]; then
+    if [ -n "$priv" ]; then
+      $DOAS tee "$dir/Local State" >/dev/null <<'EOF'
+{
+  "brave": {
+    "tabs": {
+      "compact_horizontal_tabs": true
+    }
+  }
+}
+EOF
+    else
+      tee "$dir/Local State" >/dev/null <<'EOF'
+{
+  "brave": {
+    "tabs": {
+      "compact_horizontal_tabs": true
+    }
+  }
+}
+EOF
+    fi
+    ok "Brave Local State seeded ($dir/Local State)"
+  else
+    info "Brave Local State already exists — left alone"
+  fi
+}
+
+# seed_default_browser <base> [doas] — default the navi browser runtime to
+# Brave. Writes only when absent or still on the old chromium default.
+seed_default_browser() {
+  local base="$1" priv="${2:-}"
+  local cfg="$base/.config/navi/default-browser"
+  local cur=""
+  if [ -f "$cfg" ]; then
+    cur="$(cat "$cfg" 2>/dev/null || true)"
+  fi
+  if [ -z "$cur" ] || [ "$cur" = "chromium" ]; then
+    if [ -n "$priv" ]; then
+      $DOAS install -d -m 755 "$base/.config/navi"
+      printf 'brave\n' | $DOAS tee "$cfg" >/dev/null
+    else
+      install -d -m 755 "$base/.config/navi"
+      printf 'brave\n' >"$cfg"
+    fi
+    ok "navi browser runtime default: brave ($cfg)"
+  else
+    info "navi browser runtime already '$cur' — left alone"
+  fi
+}
+
 # ---------------------------------------------------------------- fonts
 
 # JetBrainsMono Nerd Font: Debian ships no nerd-fonts packages, so we
@@ -1605,6 +1776,7 @@ main() {
     setup_dirs
     setup_sddm
     setup_chromium
+    setup_brave
     setup_fonts
     setup_webapps
     setup_telegram
@@ -1642,6 +1814,7 @@ main() {
   setup_dirs
   setup_sddm
   setup_chromium
+  setup_brave
   setup_fonts
   setup_webapps
   setup_telegram

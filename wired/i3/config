@@ -231,7 +231,7 @@ bindsym $mod+Shift+h exec --no-startup-id "learn"
 # firefox-esr
 bindsym Mod1+b exec --no-startup-id "firefox-esr"
 
-# default Chromium browser (follows navi-browser)
+# default browser (follows navi-browser — Brave unless changed)
 bindsym Mod1+Shift+b exec --no-startup-id "navi-browser-run"
 
 

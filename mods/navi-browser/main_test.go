@@ -38,8 +38,23 @@ func TestTableValid(t *testing.T) {
 			t.Errorf("browser %q policy dir %q should end in managed", def.ID, def.PolicyDir)
 		}
 	}
+	if findDef("brave") == nil {
+		t.Error("table must contain a brave entry (the default runtime)")
+	}
 	if findDef("chromium") == nil {
-		t.Error("table must contain a chromium entry (the fallback)")
+		t.Error("table must contain a chromium entry (the secondary fallback)")
+	}
+	// brave is first: it is navi's default browser and webapp runtime.
+	if browserTable[0].ID != "brave" {
+		t.Errorf("browserTable[0] = %q, want brave first", browserTable[0].ID)
+	}
+	// Brave gets the light touch: no managed policy, ever.
+	for _, id := range []string{"brave", "brave-origin"} {
+		if def := findDef(id); def == nil {
+			t.Errorf("table must contain a %q entry", id)
+		} else if !def.SkipPolicy {
+			t.Errorf("browser %q must have SkipPolicy set", id)
+		}
 	}
 }
 

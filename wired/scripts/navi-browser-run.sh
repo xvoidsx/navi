@@ -7,9 +7,9 @@
 # webapp runs under brave-browser --app.
 #
 # Resolution lives in `navi-browser --print-binary` (configured default,
-# then chromium, then the first installed Chromium-family browser). If the
-# picker is missing or nothing is installed, fall back to bare `chromium`
-# and let exec report the real error.
+# then brave, then chromium, then the first installed Chromium-family
+# browser). If the picker is missing or nothing is installed, fall back to
+# bare `chromium` and let exec report the real error.
 set -u
 
 BIN="$(navi-browser --print-binary 2>/dev/null)"

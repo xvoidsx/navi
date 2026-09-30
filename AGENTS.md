@@ -99,6 +99,41 @@ human-facing is derived from it at deploy time:
 section). Follow it every release. It exists because every item on it was
 once a shipped bug.
 
+## Browser strategy (Raven's call, 2026-09-29)
+
+**Brave is navi's default browser** — full Brave, not Origin. Stock
+Chromium stays installed out of the box as the vanilla alternative.
+Firefox ESR ships too. The OS suggests, the user decides.
+
+- `install.sh`'s `setup_brave` adds Brave's official apt repo, installs
+  `brave-browser`, and seeds navi's appearance defaults: **ultradark
+  theme** (`brave.darker_mode`), **dark color scheme**
+  (`browser.theme.color_scheme2: 2`), **wide address bar**
+  (`brave.location_bar_is_wide`) in `Default/Preferences`, and
+  **compact horizontal tabs** (`brave.tabs.compact_horizontal_tabs`) in
+  `Local State`. Compact tabs is a Local State pref — seeding it in
+  Preferences silently does nothing. Both files land in `/etc/skel`
+  (future users) and the invoking user's `$HOME`; existing files are
+  never overwritten, and seeding is skipped while Brave is running (it
+  rewrites Preferences on exit).
+- **Brave gets the light touch, always:** no managed policy, no
+  force-installed extensions. Shields covers ad/tracker blocking, so
+  **blackice stays Chromium-only**. The forcelist
+  (`wired/chromium/policies/managed/navi.json`) is just the nightshadeNeon
+  theme + blackice — **Proton Pass was removed 2026-09-29**; no password
+  manager is imposed anywhere, users bring their own (Proton Pass remains
+  a one-click webapp in naviApps).
+- The **navi-browser** picker (`mods/navi-browser`, prebuilt binary
+  committed) is how users switch the default browser *and* the webapp
+  runtime: it writes `~/.config/navi/default-browser`, offers the xdg
+  system default, and deploys navi's managed policy to the chosen
+  browser — except Brave/brave-origin, which are `SkipPolicy` and never
+  get the policy offer. `navi-browser-run` (what webapp launchers Exec)
+  resolves `navi-browser --print-binary`: configured default, then brave,
+  then chromium, then first installed.
+- This arrangement is **experimental**: Raven is bench-testing it on new
+  installs first, and it reverts in one commit if they don't like it.
+
 ## install.sh — installer and deployer
 
 `install.sh` does double duty: fresh installs *and* redeploys onto a live
