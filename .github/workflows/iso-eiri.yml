@@ -31,9 +31,9 @@ name: navi ISO (2.0 "eiri" experimental)
 #                                        navi-networking/calendar/audio)
 env:
   RELEASE: 2.0
-  ISO_BASENAME: navi-2.0-eiri-2026-09-28
+  ISO_BASENAME: navi-2.0-eiri-2026-09-29
   # bump to cut a fresh ISO (push trigger watches this file)
-  EIRI_BUILD: 13
+  EIRI_BUILD: 14
 
 on:
   # NOTE: workflow_dispatch requires the workflow file to exist on the
@@ -114,7 +114,7 @@ jobs:
             --memtest none \
             --iso-application "navi" \
             --iso-publisher "xvoidsx" \
-            --iso-volume "navi 2.0 eiri 2026-09-18" \
+            --iso-volume "navi 2.0 eiri 2026-09-29" \
             --image-name "$ISO_BASENAME"
           lb build
 
