@@ -116,16 +116,17 @@ jobs:
           else
             echo "no previous eiri release"
           fi
-          # create the tag, or force-move it if it already exists
+          # create the tag, or move it if it already exists
+          # (delete + recreate: the update endpoint wants a real JSON
+          # boolean for force, which -f can't send)
           if gh api "repos/xvoidsx/navi/git/refs/tags/eiri" >/dev/null 2>&1; then
-            echo "tag exists — force-moving to $sha"
-            gh api "repos/xvoidsx/navi/git/refs/tags/eiri" \
-              -X PATCH -f sha="$sha" -f force=true
+            echo "tag exists — moving to $sha"
+            gh api "repos/xvoidsx/navi/git/refs/tags/eiri" -X DELETE
           else
             echo "creating tag eiri on $sha"
-            gh api "repos/xvoidsx/navi/git/refs" \
-              -f ref="refs/tags/eiri" -f sha="$sha"
           fi
+          gh api "repos/xvoidsx/navi/git/refs" \
+            -f ref="refs/tags/eiri" -f sha="$sha"
           echo "tag eiri -> $sha"
 
       - name: Create the public release
