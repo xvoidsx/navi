@@ -1,64 +1,72 @@
 # navi
-<img width="1366" height="768" alt="the navi desktop with an animated Lain gifpaper" src="screenshots/gifpaper-glitch-lain.png" />
+<img width="1436" height="900" alt="the navi desktop — Lain line-art wallpaper, waybar, conky" src="screenshots/site-hero.png" />
 
 ###### welcome to the wired
 
-> **navi 1.5 "mika" is stable and available now — the NaviVim update.**
+> **navi 1.6 "mika" is stable and available now** — the cohesion update.
 >
-> Download it from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page: `navi-1.5-mika.iso` plus `SHA256SUMS.txt` so you can verify your download. Boots on legacy BIOS and UEFI, x86_64.
+> Download it from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page. Boots on legacy BIOS and UEFI, x86_64.
+>
+> Feeling adventurous? The **eiri** rolling channel now publishes public snapshots: [github.com/xvoidsx/navi/releases/tag/eiri](https://github.com/xvoidsx/navi/releases/tag/eiri).
 
-**navi** is a new GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx).
+**navi** is a GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx) — a complete, opinionated, **agent-native** desktop OS on a dependable Debian base.
 
-It uses [wiredWM](https://github.com/rav3ndust/wiredWM), our fork of the `sway` wayland compositor, as its flagship desktop.
-
-The compositor is heavily modified, and has an integrated `waybar`, `conky`, `rofi`, `dunst`, a host of custom scripts and curated software, and more.
+It uses [wiredWM](https://github.com/rav3ndust/wiredWM), our fork of the `sway` Wayland compositor, as its flagship desktop (X11/i3 fallback included). Wayland-first tiling, deep blacks, neon pink, phosphor green — the **nightshadeNeon** design language across the whole desktop.
 
 It aims to celebrate the spirit of the Wired and provide a futuristic and yet retro-feeling computing environment that feels alive.
 
 It's your window into the smallweb.
 
-It follows the [Serial Experiments Lain](#) aesthetic, and also uses our [nightshadeNeon](https://rav3ndust.xyz/wiki/nightshadeNeon.html) theme all throughout the distro.
+### agent-native, out of the box
+
+**navi** ships a full lineup of AI agents ready at a keypress — ollama, opencode, omp, goose, herdr — with a panel module that shows what they're doing and an agent center to manage them all.
+
+<img width="1437" height="900" alt="the navi agent center TUI with live agent status" src="screenshots/site-agent-center.png" />
+
+###### the agent center — status, models, harnesses, autonomy, evals, providers
+
+**Hey Lain** is navi's voice assistant: tap `Alt+V`, speak, and she runs desktop commands or chats through a small local language model. Your voice never leaves the machine.
+
+<img width="1366" height="768" alt="Hey Lain voice assistant responding on the navi desktop" src="screenshots/site-hey-lain.png" />
+
+###### Hey Lain — "press Alt+V to talk to me"
 
 ### cozy computing
 
-**navi** brings you the minimalism and speed you can only get in a tiling environment, and it looks and feels great to live in. Here are some screenshots of it in day to day use.
+**navi** brings you the minimalism and speed you can only get in a tiling environment, and it looks and feels great to live in.
 
-A cozy computing environment is one that you look forward to using when you sit down at the computer. Not only does it feel good and functional to use, but it also looks beautiful as well! If you're going to be using your computer for hours every day doing work and play, don't you want to use a system that invites you to *have fun* while you do so?
+<img width="1438" height="900" alt="tiled terminals and apps on the navi desktop" src="screenshots/site-tiled-work.png" />
 
-<img width="1366" height="768" alt="neighborli and the glyyph nostr client open side by side" src="screenshots/desktop-neighborli-glyyph.png" />
+###### the daily driver — tiling that stays out of your way
 
-###### your people, your protocols — neighborli and glyyph, side by side
+**Brave** is navi's default browser on the eiri channel — the most private Chromium out of the box, running navi's webapps too. Stock Chromium ships alongside it as the vanilla alternative, and `navi-browser` lets you switch the default anytime. The OS suggests, you decide.
 
-<img width="1366" height="768" alt="herdr running agent sessions with omp and hermes in tiled terminals" src="screenshots/herdr-agents.png" />
+**naviApps** is our nightshadeNeon app store — a curated catalog of 130+ apps: our own software, native apps, agents, and webapps. Not a purity test — good commercial services are welcome too, and nothing proprietary is ever forced on you.
 
-###### herdr activated, agents at work
+<img width="1436" height="900" alt="the naviApps store and navi-get TUI" src="screenshots/site-naviapps.png" />
 
-<img width="1366" height="768" alt="elinks and amfora open on the smallweb" src="screenshots/smallweb-elinks-amfora.png" />
+###### naviApps — the app store for **navi**
 
-###### the smallweb, native
+Your people, your protocols: **neighborli** (our fediverse instance), **glyyph** (Nostr), and **navi radio** ship as webapps, alongside a terminal-native smallweb (elinks, amfora for Gemini).
 
-<img width="1280" height="719" alt="the naviApps store showing the local webapp catalog" src="screenshots/naviapps-store.png" />
+<img width="1437" height="900" alt="social protocols on the navi desktop" src="screenshots/site-social.png" />
 
-###### naviApps, the app store for **navi**
+###### your people, your protocols
 
-<img width="1366" height="768" alt="navi radio playing a station in its nightshadeNeon interface" src="screenshots/navi-radio.png" />
+### perma-computing
 
-###### navi radio, tuned to the desktop
+**navi** keeps old hardware useful. If the installer works on our 2015 Acer Aspire Cloudbook test bench, it'll work anywhere.
 
-<img width="1280" height="719" alt="fastfetch showing navi 1.3 mika on a 2015 Acer Aspire Cloudbook" src="screenshots/fastfetch-cloudbook.png" />
+<img width="1436" height="900" alt="navi running on old hardware" src="screenshots/site-old-iron.png" />
 
-###### proven on old iron — **navi** 1.3 on a 2015 Acer Cloudbook
-
-<img width="1366" height="768" alt="cmus and cava on the navi desktop" src="screenshots/music-desktop.png" />
-
-###### the wired has a pulse — cmus and cava, pre-tuned
+###### proven on old iron
 
 ### notes
 
-**navi 1.5 "mika"** is the current stable release. It ships **NaviVim** as the default terminal IDE. If you're new, grab the ISO from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page and give it a spin in a VM or on a spare machine — it was validated on hardware as old as a 2015 Acer Cloudbook, so it'll run just about anywhere.
+**navi 1.6 "mika"** is the current stable release. If you're new, grab the ISO from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page and give it a spin in a VM or on a spare machine.
+
+**eiri** is the rolling channel — it tracks the latest development, and public snapshots publish at [github.com/xvoidsx/navi/releases/tag/eiri](https://github.com/xvoidsx/navi/releases/tag/eiri). That's where Brave-as-default is landing first.
 
 Documentation lives in the built-in manual: press `Super+Shift+H` anywhere in **navi** to open it, or browse the `wired/manual` folder in this repo.
 
 Found a bug or have an idea? Open an issue in this repo's [issue tracker](https://github.com/xvoidsx/navi/issues) — that's where we track everything.
-
-What's next: small maintenance releases on the 1.4 line, then **navi 2 "eiri"** — the coherence release.
