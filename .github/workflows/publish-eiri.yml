@@ -10,6 +10,11 @@
 # api.github.com, and release-asset uploads go to uploads.github.com
 # (401 there). GITHUB_TOKEN has no such restriction.
 #
+# Division of labor: the rolling `eiri` tag is managed via the API
+# (git refs work fine with the surrogate credential) BEFORE dispatching.
+# The workflow verifies the tag, downloads the ISO, and creates the
+# public release on it.
+#
 # Usage (API; the Actions tab only lists default-branch workflows):
 #   gh-api POST /repos/xvoidsx/navi/actions/workflows/publish-eiri.yml/dispatches \
 #     --data '{"ref":"eiri","inputs":{"run_id":"<iso-eiri run id>","notes":"..."}}'
@@ -95,37 +100,19 @@ jobs:
           echo "iso=$iso" >>"$GITHUB_ENV"
           ls -lh "$iso"
 
-      - name: Move the rolling eiri tag
+      - name: Verify the rolling eiri tag
+        # Tag management happens via API (the surrogate credential handles
+        # git refs fine); the workflow just verifies it's in place.
+        # The tag must point at the commit the ISO was built from.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          sha="${{ steps.meta.outputs.sha }}"
-          if [ -z "$sha" ] || [ "$sha" = "null" ]; then
-            # fallback: resolve from the run directly via REST
-            sha="$(gh api "repos/xvoidsx/navi/actions/runs/${{ steps.meta.outputs.run_id }}" -q .head_sha)"
-          fi
-          echo "target sha: [$sha]"
-          [ -n "$sha" ] && [ "$sha" != "null" ] || { echo "empty sha output"; exit 1; }
-          # drop the previous rolling release if any (tag goes with --cleanup-tag)
-          if gh release view eiri --repo xvoidsx/navi >/dev/null 2>&1; then
-            echo "deleting previous eiri release"
-            gh release delete eiri --repo xvoidsx/navi --yes --cleanup-tag
-          else
-            echo "no previous eiri release"
-          fi
-          # create the tag, or move it if it already exists
-          # (delete + recreate: the update endpoint wants a real JSON
-          # boolean for force, which -f can't send)
-          if gh api "repos/xvoidsx/navi/git/refs/tags/eiri" >/dev/null 2>&1; then
-            echo "tag exists — moving to $sha"
-            gh api "repos/xvoidsx/navi/git/refs/tags/eiri" -X DELETE
-          else
-            echo "creating tag eiri on $sha"
-          fi
-          gh api "repos/xvoidsx/navi/git/refs" \
-            -f ref="refs/tags/eiri" -f sha="$sha"
-          echo "tag eiri -> $sha"
+          want='${{ steps.meta.outputs.sha }}'
+          got="$(gh api repos/xvoidsx/navi/git/refs/tags/eiri -q .object.sha)"
+          echo "tag eiri -> [$got], want [$want]"
+          [ -n "$got" ] || { echo "eiri tag missing"; exit 1; }
+          [ "$got" = "$want" ] || { echo "tag points elsewhere"; exit 1; }
 
       - name: Create the public release
         env:
