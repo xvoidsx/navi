@@ -669,6 +669,18 @@
     "icon": "💬"
   },
   {
+    "id": "native-etcher",
+    "name": "balenaEtcher",
+    "summary": "Flash OS images to SD cards and USB drives, safely and easily. Ships out of the box on navi.",
+    "category": "Productivity",
+    "source": "native",
+    "package": "balena-etcher-electron",
+    "install": "doas apt install -y balena-etcher-electron",
+    "remove": "doas apt remove -y balena-etcher-electron",
+    "homepage": "https://etcher.balena.io",
+    "icon": "💾"
+  },
+  {
     "id": "native-tailscale",
     "name": "Tailscale",
     "summary": "Zero-config mesh VPN — your own private tailnet across every device. No port forwarding, no config files.",

@@ -134,6 +134,20 @@ Firefox ESR ships too. The OS suggests, the user decides.
 - This arrangement is **experimental**: Raven is bench-testing it on new
   installs first, and it reverts in one commit if they don't like it.
 
+## Out-of-the-box apps: balenaEtcher (Raven's call, 2026-09-30)
+
+**balenaEtcher** ships by default — flash OS images to SD cards/USB drives,
+safely and easily, no terminal required. This removes the need to reach for
+GNOME Disks for flashing. Long-term, Raven wants a native nightshadeNeon
+**navi-disks** for this; Etcher holds the fort until then.
+
+- `install.sh`'s `setup_etcher` adds balena's official Cloudsmith apt repo
+  (keyring + sources file, replicated manually — never piped-to-bash) and
+  installs `balena-etcher-electron`. The old Bintray `deb.etcher.io` repo
+  is long dead; Cloudsmith is the current official channel.
+- Listed in the manual (disks & images) and naviApps (`native-etcher`).
+- The .deb ships its own .desktop file, so it appears in rofi automatically.
+
 ## install.sh — installer and deployer
 
 `install.sh` does double duty: fresh installs *and* redeploys onto a live

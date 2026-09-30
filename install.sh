@@ -1631,6 +1631,37 @@ seed_default_browser() {
   fi
 }
 
+# ---------------------------------------------------------------- etcher
+
+# balenaEtcher (Raven's call, 2026-09-30): flash OS images to SD cards and
+# USB drives, safely and easily. Ships out of the box so nobody needs to
+# reach for GNOME Disks to flash an ISO. Long-term, Raven wants a native
+# nightshadeNeon navi-disks for this; Etcher holds the fort until then.
+#
+# Distribution: balena's official Cloudsmith apt repo (the old Bintray
+# deb.etcher.io is long dead). We replicate their setup.deb.sh manually —
+# keyring + sources file, no piped-to-bash.
+setup_etcher() {
+  step "balenaEtcher (USB/SD image flasher)"
+  if [ ! -f /etc/apt/sources.list.d/balena-etcher.list ]; then
+    $DOAS curl -fsSL https://dl.cloudsmith.io/public/balena/etcher/gpg.70528471AFF9A051.key \
+      | $DOAS gpg --dearmor -o /usr/share/keyrings/balena-etcher-archive-keyring.gpg
+    $DOAS chmod 644 /usr/share/keyrings/balena-etcher-archive-keyring.gpg
+    printf '%s\n' "deb [signed-by=/usr/share/keyrings/balena-etcher-archive-keyring.gpg] https://dl.cloudsmith.io/public/balena/etcher/deb/debian trixie main" \
+      | $DOAS tee /etc/apt/sources.list.d/balena-etcher.list >/dev/null
+    $DOAS apt-get update
+    ok "balenaEtcher apt repository added"
+  else
+    info "balenaEtcher apt repository already present"
+  fi
+  if ! dpkg -l balena-etcher-electron 2>/dev/null | grep -q "^ii"; then
+    $DOAS apt-get install -y balena-etcher-electron
+    ok "balena-etcher-electron installed"
+  else
+    info "balena-etcher-electron already installed"
+  fi
+}
+
 # ---------------------------------------------------------------- fonts
 
 # JetBrainsMono Nerd Font: Debian ships no nerd-fonts packages, so we
@@ -1777,6 +1808,7 @@ main() {
     setup_sddm
     setup_chromium
     setup_brave
+    setup_etcher
     setup_fonts
     setup_webapps
     setup_telegram
@@ -1815,6 +1847,7 @@ main() {
   setup_sddm
   setup_chromium
   setup_brave
+  setup_etcher
   setup_fonts
   setup_webapps
   setup_telegram
