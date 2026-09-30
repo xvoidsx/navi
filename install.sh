@@ -122,8 +122,8 @@ PKGS=(
 # `navi-webapp install`. Names must match .desktop filenames in
 # wired/naviApps/webapps/ exactly. Tweak freely — users can always
 # add/remove more from the naviApps store.
-# (telegram and element graduated to native apps — telegram installs via
-# setup_telegram below, element via `navi-extras --install element`.)
+# (telegram and element graduated to native apps — both install via
+# setup_telegram/setup_element below.)
 DEFAULT_WEBAPPS=(
   navi-radio neighborli glyyph pandora
   github youtube yomi twitch discord perplexity dropbox
@@ -1347,6 +1347,25 @@ setup_telegram() {
   fi
 }
 
+setup_element() {
+  step "element (native)"
+  if command -v element-desktop >/dev/null 2>&1; then
+    ok "element already installed — skipping"
+    return 0
+  fi
+  local installer="$REPO_DIR/scripts/installers/element-installer.sh"
+  [ -x "$installer" ] || installer="/usr/share/navi/installers/element-installer.sh"
+  if [ ! -x "$installer" ]; then
+    warn "element installer not found — skipping (later: navi-extras --install element)"
+    return 0
+  fi
+  if bash "$installer"; then
+    ok "element installed natively"
+  else
+    warn "element installer failed — retry later with: navi-extras --install element"
+  fi
+}
+
 # ---------------------------------------------------------------- gtk theme cohesion
 # settings.ini covers plain GTK apps, but GSettings-aware apps (nemo and
 # friends) read org.gnome.desktop.interface — whose schema default is
@@ -1819,6 +1838,7 @@ main() {
     setup_fonts
     setup_webapps
     setup_telegram
+    setup_element
     ok "deploy-only refresh complete (navi $NAVI_VERSION)"
     exit 0
   fi
@@ -1858,6 +1878,7 @@ main() {
   setup_fonts
   setup_webapps
   setup_telegram
+  setup_element
   tighten_sudo
   done_banner
 }
