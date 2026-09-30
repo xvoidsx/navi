@@ -102,13 +102,25 @@ jobs:
         run: |
           set -euo pipefail
           sha="${{ steps.meta.outputs.sha }}"
-          # drop the previous rolling release (tag goes with --cleanup-tag)
-          gh release delete eiri --repo xvoidsx/navi --yes --cleanup-tag 2>/dev/null || true
-          # point the tag at the built commit (create, or force-move)
-          gh api "repos/xvoidsx/navi/git/refs" \
-            -f ref="refs/tags/eiri" -f sha="$sha" 2>/dev/null \
-          || gh api "repos/xvoidsx/navi/git/refs/tags/eiri" \
-            -X PATCH -f sha="$sha" -f force=true
+          echo "target sha: [$sha]"
+          [ -n "$sha" ] || { echo "empty sha output"; exit 1; }
+          # drop the previous rolling release if any (tag goes with --cleanup-tag)
+          if gh release view eiri --repo xvoidsx/navi >/dev/null 2>&1; then
+            echo "deleting previous eiri release"
+            gh release delete eiri --repo xvoidsx/navi --yes --cleanup-tag
+          else
+            echo "no previous eiri release"
+          fi
+          # create the tag, or force-move it if it already exists
+          if gh api "repos/xvoidsx/navi/git/refs/tags/eiri" >/dev/null 2>&1; then
+            echo "tag exists — force-moving to $sha"
+            gh api "repos/xvoidsx/navi/git/refs/tags/eiri" \
+              -X PATCH -f sha="$sha" -f force=true
+          else
+            echo "creating tag eiri on $sha"
+            gh api "repos/xvoidsx/navi/git/refs" \
+              -f ref="refs/tags/eiri" -f sha="$sha"
+          fi
           echo "tag eiri -> $sha"
 
       - name: Create the public release
