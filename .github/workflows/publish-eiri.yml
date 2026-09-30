@@ -75,8 +75,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          run_id='${{ steps.meta.outputs.run_id }}'
+          echo "downloading artifacts for run: [$run_id]"
+          gh api "repos/xvoidsx/navi/actions/runs/$run_id/artifacts" \
+            -q '.artifacts[] | "\(.id) \(.name) (\(.size_in_bytes) bytes, expired=\(.expired))"'
           mkdir -p iso-out
-          gh run download '${{ steps.meta.outputs.run_id }}' --repo xvoidsx/navi --dir iso-out
+          gh run download "$run_id" --repo xvoidsx/navi --dir iso-out --verbose
           iso="$(ls iso-out/*.iso | head -n 1)"
           [ -n "$iso" ] || { echo "no ISO in the run's artifacts"; exit 1; }
           echo "iso=$iso" >>"$GITHUB_ENV"
