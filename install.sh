@@ -128,6 +128,9 @@ DEFAULT_WEBAPPS=(
   navi-radio neighborli glyyph pandora
   github youtube yomi twitch discord perplexity dropbox
   xbox-cloud geforce-now
+  # Workspace Stack — installed out of the box on every fresh install
+  # (Raven, 2026-09-30). Users can remove any of them from the naviApps store.
+  gmail googledrive fizzy notion airtable
 )
 
 # ---------------------------------------------------------------- ui
