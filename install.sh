@@ -297,7 +297,7 @@ build_mpvpaper() {
 
 # ---------------------------------------------------------------- agents
 
-# Agent-native from the first boot: ollama runtime, opencode, omp, goose.
+# Agent-native from the first boot: ollama runtime, opencode, omp, goose, hermes.
 # Binaries land in /usr/bin (or /usr/local/bin via npm) so every user on
 # the machine gets them.
 #
@@ -326,7 +326,7 @@ host_up() { # host_up <url> -> 0 if the host answers a quick probe
 }
 
 setup_agents() {
-  step "agent runtime (ollama, opencode, omp, goose)"
+  step "agent runtime (ollama, opencode, omp, goose, hermes)"
 
   if command -v ollama >/dev/null 2>&1; then
     ok "ollama already installed"
@@ -448,6 +448,52 @@ setup_agents() {
       warn "herdr install failed — skipping (re-run install.sh --yes later)"
     fi
     rm -f "$herdr_tmp"
+  fi
+
+  # hermes (Nous Research's open-source agent — navi's default agent, "Lain"):
+  # self-improving AI agent with persistent memory. MIT licensed.
+  # Install script is fetched first (never pipe-to-bash), then run with
+  # the standard timeout/setsid treatment. The Lain identity layer
+  # (persona, theme) deploys from wired/lain/ to ~/.config/hermes/lain.
+  if command -v hermes >/dev/null 2>&1; then
+    ok "hermes already installed"
+  elif ! host_up https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh; then
+    warn "hermes installer unreachable — skipping hermes (re-run install.sh --yes later)"
+  else
+    info "installing hermes (Nous Research)..."
+    local hermestmp
+    hermestmp="$(mktemp)"
+    if fetch https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh -o "$hermestmp" \
+        && setsid timeout -k 30 300 bash "$hermestmp" </dev/null \
+        && command -v hermes >/dev/null 2>&1; then
+      ok "hermes -> $(command -v hermes)"
+    else
+      warn "hermes install failed — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$hermestmp"
+  fi
+
+  # Lain identity layer: the persona, theme, and knowledge scaffolding
+  # that makes Hermes "Lain" in navi. Hermes is the engine (Nous Research,
+  # MIT — honestly attributed, never claimed as ours); Lain is the
+  # navi-configured experience on top. Deployed per-user, overridable.
+  if [ -d "$REPO_DIR/wired/lain" ]; then
+    info "deploying lain identity layer..."
+    mkdir -p "$HOME/.config/hermes/lain"
+    cp -r "$REPO_DIR/wired/lain/." "$HOME/.config/hermes/lain/"
+    # also seed /etc/skel so future users get it
+    if [ -w /etc/skel ]; then
+      mkdir -p /etc/skel/.config/hermes/lain
+      cp -r "$REPO_DIR/wired/lain/." /etc/skel/.config/hermes/lain/
+    fi
+    # the navi-lain launcher goes to /usr/bin for every user
+    if [ -f "$REPO_DIR/wired/lain/navi-lain.sh" ]; then
+      $DOAS install -m 0755 "$REPO_DIR/wired/lain/navi-lain.sh" /usr/bin/navi-lain
+      ok "navi-lain -> /usr/bin/navi-lain"
+    fi
+    ok "lain identity layer deployed (~/.config/hermes/lain)"
+  else
+    warn "wired/lain missing from repo — skipping lain identity layer"
   fi
 
   # goose <-> herdr awareness: user-scope goose plugin that reports goose's

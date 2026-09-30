@@ -1129,12 +1129,12 @@
   },
   {
     "id": "agent-hermes",
-    "name": "Hermes",
-    "summary": "Nous Research's open-source agent with persistent memory — it learns your workflows instead of forgetting them. Landing as a navi default soon.",
+    "name": "Hermes — Lain",
+    "summary": "Nous Research's open-source agent with persistent memory — it learns your workflows instead of forgetting them. Ships as navi's default agent, configured as Lain with the nightshadeNeon theme.",
     "category": "agents",
     "source": "agent",
     "package": "hermes",
-    "install": "coming soon — landing as a navi default",
+    "install": "ships by default — run 'navi-lain' or press Super+Q",
     "icon": "🪽"
   },
   {

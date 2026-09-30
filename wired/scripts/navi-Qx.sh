@@ -22,11 +22,13 @@ APP_ID="navi-Q"
 
 case "${1:-}" in
     agent)
-        # default agent, chosen in the agent center (~/.config/navi/default-agent)
+        # default agent, chosen in the agent center (~/.config/navi/default-agent).
+        # hermes ("Lain") is navi's default; opencode is the fallback.
+        # the user's explicit choice always wins.
         _qa="$(cat "$HOME/.config/navi/default-agent" 2>/dev/null)"
         case "$_qa" in
             pi|omp|opencode|codex|agy|crush|goose|hermes|openclaw|muse|aider|kilo|copilot|kimi|claude|gemini) COMMAND=("$_qa") ;;
-            *) COMMAND=("$OC") ;;
+            *) if command -v hermes >/dev/null 2>&1; then COMMAND=("hermes"); else COMMAND=("$OC"); fi ;;
         esac
         unset _qa
         ;;

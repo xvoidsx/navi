@@ -358,7 +358,7 @@ var knownHarnesses = []struct{ bin, hint string }{
 	{"opencode", "ships with navi"},
 	{"omp", "ships with navi"},
 	{"goose", "ships with navi"},
-	{"hermes", "landing as a navi default"},
+	{"hermes", "ships with navi — default agent (Lain)"},
 	{"openclaw", "naviApps → Agents shelf"},
 	{"muse", "naviApps → Agents shelf"},
 	{"pi", "naviApps → Agents shelf"},
