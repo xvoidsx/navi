@@ -69,9 +69,8 @@ jobs:
             echo "no successful iso-eiri run to publish"; exit 1
           fi
           echo "run_id=$run_id" >>"$GITHUB_OUTPUT"
-          sha="$(gh run view "$run_id" --repo xvoidsx/navi \
-            --json headSha -q .headSha)"
-          [ -n "$sha" ] || { echo "no headSha for run $run_id"; exit 1; }
+          sha="$(gh api "repos/xvoidsx/navi/actions/runs/$run_id" -q .head_sha)"
+          [ -n "$sha" ] && [ "$sha" != "null" ] || { echo "no head_sha for run $run_id"; exit 1; }
           echo "sha=$sha" >>"$GITHUB_OUTPUT"
           echo "publishing ISO from run $run_id (built from $sha)"
           artifact="$(gh api "repos/xvoidsx/navi/actions/runs/$run_id/artifacts" \
@@ -102,13 +101,12 @@ jobs:
         run: |
           set -euo pipefail
           sha="${{ steps.meta.outputs.sha }}"
-          if [ -z "$sha" ]; then
-            # fallback: resolve from the run directly
-            sha="$(gh run view '${{ steps.meta.outputs.run_id }}' --repo xvoidsx/navi \
-              --json headSha -q .headSha)"
+          if [ -z "$sha" ] || [ "$sha" = "null" ]; then
+            # fallback: resolve from the run directly via REST
+            sha="$(gh api "repos/xvoidsx/navi/actions/runs/${{ steps.meta.outputs.run_id }}" -q .head_sha)"
           fi
           echo "target sha: [$sha]"
-          [ -n "$sha" ] || { echo "empty sha output"; exit 1; }
+          [ -n "$sha" ] && [ "$sha" != "null" ] || { echo "empty sha output"; exit 1; }
           # drop the previous rolling release if any (tag goes with --cleanup-tag)
           if gh release view eiri --repo xvoidsx/navi >/dev/null 2>&1; then
             echo "deleting previous eiri release"
