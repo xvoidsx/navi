@@ -861,6 +861,20 @@
     "icon": "📝"
   },
   {
+    "id": "web-airtable",
+    "name": "Airtable",
+    "summary": "Spreadsheet-database hybrid for organizing anything.",
+    "category": "Productivity",
+    "source": "webapp",
+    "package": "airtable",
+    "url": "https://airtable.com",
+    "install": "navi-webapp install airtable",
+    "downloadUrl": "webapps/airtable.desktop",
+    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Airtable\nExec=navi-browser-run --force-dark-mode --app=https://airtable.com\nComment=Spreadsheet-database hybrid for organizing anything.\nTerminal=false\nType=Application\nIcon=navi-airtable\nStartupNotify=true\nCategories=Office;",
+    "homepage": "https://airtable.com",
+    "icon": "🗂️"
+  },
+  {
     "id": "web-crunchyroll",
     "name": "Crunchyroll",
     "summary": "Anime streaming.",
