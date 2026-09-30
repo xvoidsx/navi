@@ -17,6 +17,15 @@
 name: publish eiri ISO (public rolling release)
 
 on:
+  # Push trigger: GitHub only registers workflow_dispatch for workflows on
+  # the default branch, so manual dispatch 404s while this file lives on
+  # eiri only. Push this file with [publish-eiri] in the commit message to
+  # cut a public release. (When eiri eventually merges, dispatch starts
+  # working as-is.)
+  push:
+    branches: [eiri]
+    paths:
+      - '.github/workflows/publish-eiri.yml'
   workflow_dispatch:
     inputs:
       run_id:
@@ -34,6 +43,9 @@ permissions:
 
 jobs:
   publish:
+    # push path: only run when explicitly asked via the commit message.
+    # dispatch path: inputs.run_id is always set, so the condition passes.
+    if: contains(github.event.head_commit.message, '[publish-eiri]') || inputs.run_id != ''
     runs-on: ubuntu-24.04
     steps:
       - name: Resolve the built commit
@@ -42,11 +54,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          sha="$(gh run view '${{ inputs.run_id }}' --repo xvoidsx/navi \
+          run_id="${{ inputs.run_id }}"
+          if [ -z "$run_id" ]; then
+            # push path: take the latest successful iso-eiri build
+            run_id="$(gh run list --repo xvoidsx/navi \
+              --workflow "navi ISO (2.0 \"eiri\" experimental)" \
+              --status success --limit 1 --json databaseId -q '.[0].databaseId')"
+          fi
+          [ -n "$run_id" ] || { echo "no iso-eiri run to publish"; exit 1; }
+          echo "run_id=$run_id" >>"$GITHUB_OUTPUT"
+          sha="$(gh run view "$run_id" --repo xvoidsx/navi \
             --json headSha -q .headSha)"
-          [ -n "$sha" ] || { echo "no headSha for run ${{ inputs.run_id }}"; exit 1; }
+          [ -n "$sha" ] || { echo "no headSha for run $run_id"; exit 1; }
           echo "sha=$sha" >>"$GITHUB_OUTPUT"
-          echo "ISO was built from $sha"
+          echo "publishing ISO from run $run_id (built from $sha)"
 
       - name: Download the ISO artifact
         env:
@@ -54,7 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p iso-out
-          gh run download '${{ inputs.run_id }}' --repo xvoidsx/navi --dir iso-out
+          gh run download '${{ steps.meta.outputs.run_id }}' --repo xvoidsx/navi --dir iso-out
           iso="$(ls iso-out/*.iso | head -n 1)"
           [ -n "$iso" ] || { echo "no ISO in the run's artifacts"; exit 1; }
           echo "iso=$iso" >>"$GITHUB_ENV"
