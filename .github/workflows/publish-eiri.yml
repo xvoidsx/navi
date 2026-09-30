@@ -57,12 +57,17 @@ jobs:
           set -euo pipefail
           run_id="${{ inputs.run_id }}"
           if [ -z "$run_id" ]; then
-            # push path: take the latest successful iso-eiri build
+            # push path: latest successful iso-eiri build (361240192).
+            # --status takes run statuses (completed), not conclusions;
+            # filter conclusion==success in jq and reject jq's "null".
             run_id="$(gh run list --repo xvoidsx/navi \
-              --workflow "navi ISO (2.0 \"eiri\" experimental)" \
-              --status success --limit 1 --json databaseId -q '.[0].databaseId')"
+              --workflow 361240192 --status completed --limit 20 \
+              --json databaseId,conclusion \
+              -q '[.[] | select(.conclusion=="success")][0].databaseId')"
           fi
-          [ -n "$run_id" ] || { echo "no iso-eiri run to publish"; exit 1; }
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "no successful iso-eiri run to publish"; exit 1
+          fi
           echo "run_id=$run_id" >>"$GITHUB_OUTPUT"
           sha="$(gh run view "$run_id" --repo xvoidsx/navi \
             --json headSha -q .headSha)"
