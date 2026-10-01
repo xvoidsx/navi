@@ -527,7 +527,7 @@ setup_agents() {
       # activate: merge display.skin into config.yaml without clobbering
       _cfg="$HOME/.hermes/config.yaml"
       if [ -f "$_cfg" ]; then
-        if ! grep -q "skin:" "$_cfg"; then
+        if ! grep -qE "^[[:space:]]*skin:" "$_cfg"; then
           printf '
 display:
   skin: nightshadeNeon
