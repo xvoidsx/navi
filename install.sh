@@ -705,6 +705,85 @@ setup_navivim() {
     ok "NaviVim theme default: nightshadeNeon"
   fi
 }
+setup_navicode() {
+  step "naviCode (VScodium + nightshadeNeon + Lain)"
+
+  # 1. VScodium apt repo (official). trixie uses the .sources format.
+  local keyring="/usr/share/keyrings/vscodium-archive-keyring.gpg"
+  if [ ! -f "$keyring" ]; then
+    if ! host_up https://download.vscodium.com; then
+      warn "vscodium repo unreachable — skipping naviCode (re-run install.sh --yes later)"
+      return 0
+    fi
+    info "adding VScodium apt repo..."
+    fetch https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg -o /tmp/vscodium.gpg \
+      && $DOAS gpg --dearmor -o "$keyring" /tmp/vscodium.gpg 2>/dev/null \
+      && rm -f /tmp/vscodium.gpg \
+      && printf 'Types: deb\nURIs: https://download.vscodium.com/debs\nSuites: vscodium\nComponents: main\nArchitectures: amd64 arm64\nSigned-by: %s\n' "$keyring" | $DOAS tee /etc/apt/sources.list.d/vscodium.sources >/dev/null \
+      && $DOAS apt-get update -qq 2>/dev/null
+    ok "VScodium repo added"
+  fi
+
+  # 2. Install codium (the package is called "codium", not "vscodium").
+  if ! command -v codium >/dev/null 2>&1; then
+    info "installing VScodium..."
+    if ! $DOAS apt-get install -y -qq codium 2>/dev/null; then
+      warn "codium install failed — skipping naviCode extensions/theme (re-run install.sh --yes later)"
+      return 0
+    fi
+    ok "codium installed"
+  else
+    ok "codium already installed"
+  fi
+
+  # 3. nightshadeNeon theme — from the naviCode repo if available,
+  #    else fetch the .vsix from GitHub.
+  local vsix="" tmpdir=""
+  for cand in "$REPO_DIR/../naviCode/nightshadeNeon-VSC/nightshade-neon-1.0.0.vsix" "/opt/navi-iso/naviCode.vsix"; do
+    if [ -f "$cand" ]; then vsix="$cand"; break; fi
+  done
+  if [ -z "$vsix" ] && host_up https://github.com; then
+    tmpdir="$(mktemp -d)"
+    if fetch "https://github.com/xvoidsx/naviCode/raw/main/nightshadeNeon-VSC/nightshade-neon-1.0.0.vsix" -o "$tmpdir/theme.vsix" 2>/dev/null; then
+      vsix="$tmpdir/theme.vsix"
+    fi
+  fi
+  if [ -n "$vsix" ] && [ -f "$vsix" ]; then
+    if ! codium --list-extensions 2>/dev/null | grep -qi "nightshade"; then
+      codium --install-extension "$vsix" 2>/dev/null && ok "nightshadeNeon theme installed"
+    else
+      ok "nightshadeNeon theme already installed"
+    fi
+  else
+    warn "nightshadeNeon .vsix not found — theme not installed (re-run install.sh --yes later)"
+  fi
+  [ -n "$tmpdir" ] && rm -rf "$tmpdir"
+
+  # 4. Rina Hermes ACP — the in-editor Lain. From Open VSX (VScodium's
+  #    native registry, no sideloading).
+  if ! codium --list-extensions 2>/dev/null | grep -qi "rina-hermes-acp"; then
+    codium --install-extension "JoveRina.rina-hermes-acp" 2>/dev/null && ok "Rina Hermes ACP installed (Lain in the editor)"
+  else
+    ok "Rina Hermes ACP already installed"
+  fi
+
+  # 5. Default settings — nightshadeNeon theme, no auto-detect fighting it.
+  #    The OS suggests: only seed when the user hasn't customized.
+  local settings_dir="$HOME/.config/VSCodium/User"
+  mkdir -p "$settings_dir"
+  if [ ! -f "$settings_dir/settings.json" ]; then
+    printf '{\n  "workbench.colorTheme": "nightshadeNeon",\n  "window.autoDetectColorScheme": false\n}\n' > "$settings_dir/settings.json"
+    ok "naviCode defaults seeded (nightshadeNeon)"
+  fi
+  # /etc/skel so future users get it too
+  if [ -w /etc/skel ]; then
+    $DOAS mkdir -p /etc/skel/.config/VSCodium/User
+    if [ ! -f /etc/skel/.config/VSCodium/User/settings.json ]; then
+      printf '{\n  "workbench.colorTheme": "nightshadeNeon",\n  "window.autoDetectColorScheme": false\n}\n' | $DOAS tee /etc/skel/.config/VSCodium/User/settings.json >/dev/null
+    fi
+  fi
+}
+
 
 # ---------------------------------------------------------------- system: navi mods (eiri)
 # the Go/Bubble Tea panel mods — prebuilt binaries committed in the repo,
@@ -1948,6 +2027,7 @@ main() {
     setup_zram
     setup_agents
     setup_navivim
+    setup_navicode
     setup_mods
     setup_heylain
     setup_environment
@@ -1991,6 +2071,7 @@ main() {
   setup_zram
   setup_agents
   setup_navivim
+  setup_navicode
   setup_mods
   setup_heylain
   setup_environment
