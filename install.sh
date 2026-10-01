@@ -113,6 +113,9 @@ PKGS=(
   # navi-power mod (eiri): power-profiles-daemon provides
   # powerprofilesctl; upower gives honest time-to-empty/full estimates.
   power-profiles-daemon upower
+  # gnome-keyring: secret store for Element, Signal, Chromium, etc.
+  # libpam-gnome-keyring auto-unlocks the login keyring via SDDM.
+  gnome-keyring libpam-gnome-keyring
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -1671,6 +1674,16 @@ setup_sddm() {
     /usr/share/wayland-sessions/navi.desktop
   $DOAS sed -i -e "s/^Name=.*/Name=navi $sver \"$sname\" (X11)/" \
     /usr/share/xsessions/navi.desktop
+  # auto-unlock the login keyring on SDDM login so Element, Signal,
+  # Chromium etc. get encryption without a separate keyring password.
+  # libpam-gnome-keyring must be installed (see PKGS above).
+  if [ -f /etc/pam.d/sddm ]; then
+    grep -q "pam_gnome_keyring.so" /etc/pam.d/sddm 2>/dev/null || {
+      $DOAS sh -c 'printf "%s\n" "auth optional pam_gnome_keyring.so" >> /etc/pam.d/sddm'
+      $DOAS sh -c 'printf "%s\n" "session optional pam_gnome_keyring.so auto_start" >> /etc/pam.d/sddm'
+      ok "sddm unlocks the login keyring on sign-in"
+    }
+  fi
   $DOAS systemctl enable sddm
   ok "sddm serves the navi login; pick Wayland or X11 at the prompt"
 }
