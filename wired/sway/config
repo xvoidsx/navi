@@ -37,7 +37,7 @@ set $mod Mod4
 exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP=sway XDG_SESSION_DESKTOP=sway
 
 # set secret store. we use gnome-keyring. a gui to see its content can be called via `seahorse`
-exec --no-startup-id "gnome-keyring-daemon --components=secrets"
+exec --no-startup-id gnome-keyring-daemon --start --components=pkcs11,secrets,ssh
 
 # handle some imports
 exec systemctl --user import-environment DISPLAY WAYLAND_DISPLAY SWAYSOCK PATH

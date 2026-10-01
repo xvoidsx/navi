@@ -48,7 +48,7 @@ exec_always --no-startup-id systemctl --user set-environment PATH="/usr/games:$H
 
 # Secret store
 # A GUI for inspecting the keyring is available through `seahorse`.
-exec --no-startup-id "gnome-keyring-daemon --components=secrets"
+exec --no-startup-id gnome-keyring-daemon --start --components=pkcs11,secrets,ssh
 
 
 ################################################################
