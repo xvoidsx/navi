@@ -685,7 +685,11 @@ setup_mods() {
       warn "systemctl not found — enable the wiredrop daemon by hand: systemctl --user enable --now wiredrop"
       return 0
     fi
-    systemctl --user daemon-reload >/dev/null 2>&1
+    # daemon-reload must not be fatal: in the ISO provisioner (running as
+    # root, no user D-Bus session) `systemctl --user` fails, and with
+    # `set -e` that would kill the entire install. the enable --now below
+    # is already guarded and warns gracefully.
+    systemctl --user daemon-reload >/dev/null 2>&1 || true
     if systemctl --user enable --now wiredrop.service >/dev/null 2>&1; then
       ok "wiredrop daemon enabled and started (systemctl --user status wiredrop)"
     else
