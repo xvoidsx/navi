@@ -78,6 +78,16 @@ cp -a "$NAVIVIM_STAGE/navivim" "$BUILD/config/includes.chroot/opt/navi-iso/naviv
   || { echo "stage.sh: neovim tarball staging failed" >&2; exit 1; }
 echo "staged NaviVim $NAVIVIM_PIN + neovim $NAVIVIM_NVIM_VERSION (x86_64)"
 
+# naviCode: stage the nightshadeNeon .vsix so fresh ISOs don't need
+# network to install the theme. The installer falls back to GitHub
+# fetch if staging is missing, but staged is preferred.
+NAVICODE_VSIX_URL="https://github.com/xvoidsx/naviCode/raw/main/nightshadeNeon-VSC/nightshade-neon-1.0.0.vsix"
+if ! curl -fsSL -o "$BUILD/config/includes.chroot/opt/navi-iso/naviCode.vsix" "$NAVICODE_VSIX_URL" 2>/dev/null; then
+  echo "stage.sh: WARNING: naviCode .vsix fetch failed — ISO will fall back to GitHub" >&2
+else
+  echo "staged naviCode nightshadeNeon .vsix"
+fi
+
 # live-build only runs hooks when they are executable —
 # make that true no matter how the repo was fetched.
 chmod +x "$BUILD/config/hooks/normal/"*.hook.chroot

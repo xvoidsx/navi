@@ -761,20 +761,50 @@ setup_navicode() {
 
   # 4. Rina Hermes ACP — the in-editor Lain. From Open VSX (VScodium's
   #    native registry, no sideloading).
+  #    NOTE: a bad extension ID installs nothing and raises no error —
+  #    so we assert afterward. A miss must be loud, not silent.
   if ! codium --list-extensions 2>/dev/null | grep -qi "rina-hermes-acp"; then
-    codium --install-extension "JoveRina.rina-hermes-acp" 2>/dev/null && ok "Rina Hermes ACP installed (Lain in the editor)"
+    codium --install-extension "JoveRina.rina-hermes-acp" 2>/dev/null || true
+    if codium --list-extensions 2>/dev/null | grep -qi "rina-hermes-acp"; then
+      ok "Rina Hermes ACP installed (Lain in the editor)"
+    else
+      warn "Rina Hermes ACP install may have failed — check 'codium --list-extensions' (ID: JoveRina.rina-hermes-acp)"
+    fi
   else
     ok "Rina Hermes ACP already installed"
   fi
 
   # 5. Default settings — nightshadeNeon theme, no auto-detect fighting it.
-  #    The OS suggests: only seed when the user hasn't customized.
+  #    The OS suggests: merge the theme key into existing settings.json
+  #    without clobbering user customizations. Only touch the two keys
+  #    we own; everything else stays as the user left it.
   local settings_dir="$HOME/.config/VSCodium/User"
   mkdir -p "$settings_dir"
-  if [ ! -f "$settings_dir/settings.json" ]; then
-    printf '{\n  "workbench.colorTheme": "nightshadeNeon",\n  "window.autoDetectColorScheme": false\n}\n' > "$settings_dir/settings.json"
-    ok "naviCode defaults seeded (nightshadeNeon)"
-  fi
+  python3 - "$settings_dir/settings.json" << 'PYEOF_MERGE' 2>/dev/null || true
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        data = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    data = {}
+changed = False
+if data.get("workbench.colorTheme") != "nightshadeNeon":
+    # Only set if the user hasn't chosen a different theme
+    if "workbench.colorTheme" not in data:
+        data["workbench.colorTheme"] = "nightshadeNeon"
+        changed = True
+if data.get("window.autoDetectColorScheme") is not False:
+    if "window.autoDetectColorScheme" not in data:
+        data["window.autoDetectColorScheme"] = False
+        changed = True
+if changed or not data:
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    print("naviCode defaults merged")
+PYEOF_MERGE
+  ok "naviCode settings ensured (nightshadeNeon)"
   # /etc/skel so future users get it too
   if [ -w /etc/skel ]; then
     $DOAS mkdir -p /etc/skel/.config/VSCodium/User
