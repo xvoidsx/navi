@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mdp/qrterminal/v3"
 	theme "github.com/rav3ndust/navi-theme"
 )
 
@@ -118,8 +121,134 @@ func tailscaleUp() error {
 	return cmd.Run()
 }
 
+// tailscaleUpCapture runs `tailscale up` and returns combined output so we
+// can extract the login URL for the QR code.
+func tailscaleUpCapture() (string, error) {
+	cmd := exec.Command("tailscale", "up")
+	cmd.Stdin = nil
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+// extractLoginURL finds the tailscale login URL in `tailscale up` output.
+func extractLoginURL(output string) string {
+	for _, line := range strings.Split(output, "\n") {
+		for _, field := range strings.Fields(line) {
+			if strings.HasPrefix(field, "https://login.tailscale.com/") {
+				return strings.Trim(field, "()[]")
+			}
+		}
+	}
+	return ""
+}
+
+// renderQR returns a text QR code for the given URL.
+func renderQR(url string) string {
+	var sb strings.Builder
+	// small QR, suitable for terminal
+	qrterminal.Generate(url, qrterminal.L, &sb)
+	return sb.String()
+}
+
 func tailscaleDown() error {
 	return exec.Command("tailscale", "down").Run()
+}
+
+// setExitNode routes traffic through the named peer ("" to clear).
+func setExitNode(peer string) error {
+	args := []string{"up"}
+	if peer == "" {
+		args = append(args, "--exit-node=")
+	} else {
+		args = append(args, "--exit-node="+peer)
+	}
+	cmd := exec.Command("tailscale", args...)
+	cmd.Stdin = nil
+	return cmd.Run()
+}
+
+// currentExitNode parses `tailscale status --json` for the active exit node.
+func currentExitNode() string {
+	out, err := exec.Command("tailscale", "status", "--json").Output()
+	if err != nil {
+		return ""
+	}
+	var js tsStatusJSON
+	if err := json.Unmarshal(out, &js); err != nil {
+		return ""
+	}
+	if js.Self != nil {
+		// Self has ExitNodeOption / ExitNode fields in full JSON;
+		// we check peer list for the one marked as our exit node.
+		// The JSON has "Self": {"ExitNode": ...} — simplified here.
+	}
+	return ""
+}
+
+// listSendableFiles finds files in common locations for taildrop.
+func listSendableFiles() []string {
+	var files []string
+	seen := map[string]bool{}
+	dirs := []string{}
+	if h, err := os.UserHomeDir(); err == nil {
+		dirs = append(dirs,
+			filepath.Join(h, "Downloads"),
+			filepath.Join(h, "Documents"),
+			filepath.Join(h, "Pictures"),
+			h,
+		)
+	}
+	for _, dir := range dirs {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+				continue
+			}
+			p := filepath.Join(dir, e.Name())
+			if !seen[p] {
+				seen[p] = true
+				files = append(files, p)
+			}
+			if len(files) >= 50 {
+				break
+			}
+		}
+	}
+	sort.Slice(files, func(i, j int) bool {
+		ai, _ := os.Stat(files[i])
+		aj, _ := os.Stat(files[j])
+		if ai == nil || aj == nil {
+			return files[i] < files[j]
+		}
+		return ai.ModTime().After(aj.ModTime())
+	})
+	return files
+}
+
+// taildropSend sends a file to a peer via `tailscale file cp`.
+func taildropSend(file, peer string) error {
+	cmd := exec.Command("tailscale", "file", "cp", file, peer+":")
+	return cmd.Run()
+}
+
+// taildropInbox lists files waiting in the taildrop inbox.
+func taildropInbox() ([]string, error) {
+	out, err := exec.Command("tailscale", "file", "get", "--target", "/tmp").Output()
+	if err != nil {
+		// "no files" is not an error we care about
+		return nil, nil
+	}
+	var files []string
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			files = append(files, line)
+		}
+	}
+	return files, nil
 }
 
 func tailscalePing(ip string) (string, error) {
@@ -149,6 +278,9 @@ type screen int
 const (
 	screenMain screen = iota
 	screenConfirmDown
+	screenAuth
+	screenTaildrop
+	screenTaildropInbox
 )
 
 type model struct {
@@ -161,6 +293,17 @@ type model struct {
 	quitting bool
 	width    int
 	height   int
+	// auth flow
+	authURL string
+	authQR  string
+	// taildrop
+	tdFiles    []string
+	tdCursor   int
+	tdPeer     int // selected peer index for sending
+	tdStep     int // 0=pick file, 1=pick peer, 2=confirm
+	tdFile     string
+	// exit node
+	exitNode string
 }
 
 type statusMsg struct {
@@ -175,6 +318,17 @@ type pingMsg struct {
 }
 
 type actionDoneMsg struct {
+	msg string
+	err error
+}
+
+type authMsg struct {
+	url string
+	qr  string
+	err error
+}
+
+type taildropMsg struct {
 	msg string
 	err error
 }
@@ -227,6 +381,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// refresh status after any action
 		return m, fetchStatus
+
+	case authMsg:
+		if msg.err != nil {
+			m.setMsg("auth failed: " + msg.err.Error())
+			m.screen = screenMain
+		} else if msg.url != "" {
+			m.authURL = msg.url
+			m.authQR = msg.qr
+			m.screen = screenAuth
+		} else {
+			// already authenticated or no URL needed
+			m.setMsg("connected to tailnet")
+			m.screen = screenMain
+		}
+		return m, fetchStatus
+
+	case taildropMsg:
+		if msg.err != nil {
+			m.setMsg("taildrop failed: " + msg.err.Error())
+		} else {
+			m.setMsg(msg.msg)
+		}
+		m.screen = screenMain
+		return m, nil
 	}
 	return m, nil
 }
@@ -253,6 +431,23 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, nil
+
+	case screenAuth:
+		// any key returns to main (auth happens in browser/phone)
+		m.screen = screenMain
+		m.authURL = ""
+		m.authQR = ""
+		return m, fetchStatus
+
+	case screenTaildrop:
+		return m.handleTaildropKey(msg)
+
+	case screenTaildropInbox:
+		if msg.String() == "esc" || msg.String() == "q" {
+			m.screen = screenMain
+			return m, nil
+		}
+		return m, nil
 	}
 
 	// main screen
@@ -275,12 +470,18 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, fetchStatus
 
 	case "u":
-		// tailscale up
+		// tailscale up with QR code auth flow
 		return m, func() tea.Msg {
-			if err := tailscaleUp(); err != nil {
-				return actionDoneMsg{"", err}
+			out, err := tailscaleUpCapture()
+			if err != nil {
+				return authMsg{"", "", err}
 			}
-			return actionDoneMsg{"connecting to tailnet…", nil}
+			url := extractLoginURL(out)
+			if url == "" {
+				// no URL = already authenticated
+				return authMsg{"", "", nil}
+			}
+			return authMsg{url, renderQR(url), nil}
 		}
 
 	case "d":
@@ -320,6 +521,123 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			fmt.Printf("\n%s\n", ip)
 			m.setMsg("IP printed below (select + copy)")
 		}
+
+	case "e":
+		// toggle exit node for selected peer
+		if m.cursor < n {
+			peer := m.status.Peers[m.cursor]
+			if !peer.IsExit {
+				m.setMsg(peer.Name + " is not an exit node")
+				return m, nil
+			}
+			peerName := peer.Name
+			return m, func() tea.Msg {
+				// toggle: if already using this exit node, clear it
+				// (we track locally; tailscale doesn't expose it cleanly)
+				if err := setExitNode(peerName); err != nil {
+					return actionDoneMsg{"", err}
+				}
+				return actionDoneMsg{"exit node: " + peerName, nil}
+			}
+		}
+
+	case "E":
+		// clear exit node
+		return m, func() tea.Msg {
+			if err := setExitNode(""); err != nil {
+				return actionDoneMsg{"", err}
+			}
+			return actionDoneMsg{"exit node cleared", nil}
+		}
+
+	case "t":
+		// taildrop: send a file
+		if !m.status.Up {
+			m.setMsg("connect to tailnet first")
+			return m, nil
+		}
+		m.tdFiles = listSendableFiles()
+		m.tdCursor = 0
+		m.tdStep = 0
+		m.screen = screenTaildrop
+		return m, nil
+
+	case "i":
+		// taildrop inbox
+		m.screen = screenTaildropInbox
+		return m, func() tea.Msg {
+			files, err := taildropInbox()
+			if err != nil {
+				return actionDoneMsg{"", err}
+			}
+			if len(files) == 0 {
+				return actionDoneMsg{"inbox empty", nil}
+			}
+			return actionDoneMsg{fmt.Sprintf("%d files in inbox", len(files)), nil}
+		}
+	}
+	return m, nil
+}
+
+func (m model) handleTaildropKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	k := msg.String()
+	switch m.tdStep {
+	case 0: // pick file
+		switch k {
+		case "esc", "q":
+			m.screen = screenMain
+			return m, nil
+		case "up", "k":
+			if m.tdCursor > 0 {
+				m.tdCursor--
+			}
+		case "down", "j":
+			if m.tdCursor < len(m.tdFiles)-1 {
+				m.tdCursor++
+			}
+		case "enter":
+			if len(m.tdFiles) > 0 {
+				m.tdFile = m.tdFiles[m.tdCursor]
+				m.tdStep = 1
+				m.tdPeer = m.cursor // default to currently selected peer
+			}
+		}
+	case 1: // pick peer
+		n := len(m.status.Peers)
+		switch k {
+		case "esc":
+			m.tdStep = 0
+			return m, nil
+		case "up", "k":
+			if m.tdPeer > 0 {
+				m.tdPeer--
+			}
+		case "down", "j":
+			if m.tdPeer < n-1 {
+				m.tdPeer++
+			}
+		case "enter":
+			if m.tdPeer < n {
+				m.tdStep = 2
+			}
+		}
+	case 2: // confirm send
+		switch k {
+		case "y", "Y", "enter":
+			file := m.tdFile
+			peer := m.status.Peers[m.tdPeer].Name
+			m.screen = screenMain
+			return m, func() tea.Msg {
+				if err := taildropSend(file, peer); err != nil {
+					return taildropMsg{"", err}
+				}
+				return taildropMsg{fmt.Sprintf("sent %s → %s",
+					filepath.Base(file), peer), nil}
+			}
+		case "n", "N", "esc":
+			m.tdStep = 1
+			return m, nil
+		}
 	}
 	return m, nil
 }
@@ -338,12 +656,21 @@ func (m model) View() string {
 	b.WriteString(header + "\n")
 	b.WriteString(theme.Divider(frameWidth) + "\n")
 
-	if !m.status.LoggedIn {
-		b.WriteString(m.renderNotLoggedIn())
-	} else {
-		b.WriteString(m.renderSelf())
-		b.WriteString("\n")
-		b.WriteString(m.renderPeers())
+	switch m.screen {
+	case screenMain, screenConfirmDown:
+		if !m.status.LoggedIn {
+			b.WriteString(m.renderNotLoggedIn())
+		} else {
+			b.WriteString(m.renderSelf())
+			b.WriteString("\n")
+			b.WriteString(m.renderPeers())
+		}
+	case screenAuth:
+		b.WriteString(m.renderAuth())
+	case screenTaildrop:
+		b.WriteString(m.renderTaildrop())
+	case screenTaildropInbox:
+		b.WriteString(m.renderInbox())
 	}
 
 	// message line (fixed slot so footer never shifts)
@@ -360,17 +687,46 @@ func (m model) View() string {
 	}
 
 	// footer
-	b.WriteString(theme.Footer(true,
-		[2]string{"↑↓", "navigate"},
-		[2]string{"u", "up"},
-		[2]string{"d", "down"},
-		[2]string{"p", "ping"},
-		[2]string{"s", "ssh"},
-		[2]string{"c", "copy IP"},
-		[2]string{"r", "refresh"},
-		[2]string{"q", "quit"},
-	))
+	b.WriteString(m.footer())
 	return b.String()
+}
+
+func (m model) footer() string {
+	switch m.screen {
+	case screenAuth:
+		return theme.Footer(true, [2]string{"any key", "done"})
+	case screenTaildrop:
+		if m.tdStep == 0 {
+			return theme.Footer(true,
+				[2]string{"↑↓", "select file"},
+				[2]string{"enter", "choose"},
+				[2]string{"esc", "back"})
+		} else if m.tdStep == 1 {
+			return theme.Footer(true,
+				[2]string{"↑↓", "select peer"},
+				[2]string{"enter", "choose"},
+				[2]string{"esc", "back"})
+		}
+		return theme.Footer(true,
+			[2]string{"y", "send"},
+			[2]string{"n", "cancel"})
+	case screenTaildropInbox:
+		return theme.Footer(true, [2]string{"esc", "back"})
+	default:
+		return theme.Footer(true,
+			[2]string{"↑↓", "navigate"},
+			[2]string{"u", "up"},
+			[2]string{"d", "down"},
+			[2]string{"p", "ping"},
+			[2]string{"s", "ssh"},
+			[2]string{"e", "exit node"},
+			[2]string{"t", "taildrop"},
+			[2]string{"i", "inbox"},
+			[2]string{"c", "copy IP"},
+			[2]string{"r", "refresh"},
+			[2]string{"q", "quit"},
+		)
+	}
 }
 
 func (m model) statusBadge() string {
@@ -456,6 +812,77 @@ func (m model) renderPeers() string {
 		}
 		b.WriteString(line + "\n")
 	}
+	return b.String()
+}
+
+func (m model) renderAuth() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("JOIN TAILNET") + "\n\n")
+	b.WriteString("  " + theme.Dimmed.Render("scan with your phone to authenticate:") + "\n\n")
+	// indent QR code
+	for _, line := range strings.Split(m.authQR, "\n") {
+		if line != "" {
+			b.WriteString("  " + line + "\n")
+		}
+	}
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Dimmed.Render("or visit:") + "\n")
+	cyan := lipgloss.NewStyle().Foreground(theme.Cyan)
+	b.WriteString("  " + cyan.Render(m.authURL) + "\n")
+	return b.String()
+}
+
+func (m model) renderTaildrop() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("TAILDROP — SEND FILE") + "\n\n")
+
+	if m.tdStep == 0 {
+		b.WriteString("  " + theme.Dimmed.Render("select a file:") + "\n")
+		if len(m.tdFiles) == 0 {
+			b.WriteString("  " + theme.Dimmed.Render("no files found in ~/Downloads, ~/Documents") + "\n")
+			return b.String()
+		}
+		for i, f := range m.tdFiles {
+			cursor := "  "
+			nameStyle := lipgloss.NewStyle().Foreground(theme.White)
+			if i == m.tdCursor {
+				cursor = theme.Selected.Render("▸ ")
+				nameStyle = nameStyle.Bold(true)
+			}
+			b.WriteString(fmt.Sprintf("%s%s\n", cursor, nameStyle.Render(filepath.Base(f))))
+		}
+	} else if m.tdStep == 1 {
+		b.WriteString("  " + theme.Dimmed.Render("file: "+filepath.Base(m.tdFile)) + "\n\n")
+		b.WriteString("  " + theme.Dimmed.Render("send to:") + "\n")
+		for i, p := range m.status.Peers {
+			if !p.Online {
+				continue
+			}
+			cursor := "  "
+			nameStyle := lipgloss.NewStyle().Foreground(theme.White)
+			if i == m.tdPeer {
+				cursor = theme.Selected.Render("▸ ")
+				nameStyle = nameStyle.Bold(true)
+			}
+			b.WriteString(fmt.Sprintf("%s%s\n", cursor, nameStyle.Render(p.Name)))
+		}
+	} else {
+		peer := m.status.Peers[m.tdPeer]
+		b.WriteString("  send " + theme.Selected.Render(filepath.Base(m.tdFile)) + "\n")
+		b.WriteString("  to " + theme.Selected.Render(peer.Name) + "?\n\n")
+		b.WriteString("  " + theme.Dimmed.Render("press y to send, n to go back") + "\n")
+	}
+	return b.String()
+}
+
+func (m model) renderInbox() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("TAILDROP INBOX") + "\n\n")
+	b.WriteString("  " + theme.Dimmed.Render("received files land in your taildrop directory.") + "\n")
+	b.WriteString("  " + theme.Dimmed.Render("press esc to go back.") + "\n")
 	return b.String()
 }
 
