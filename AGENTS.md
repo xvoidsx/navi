@@ -369,11 +369,15 @@ file limit so they can ship in the repo.)
 - This repo's `AGENTS.md` is mirrored to the website as `agents.html`. After
   changing this file, re-run `build-agents-page.sh` in the site repo and push
   — the repo copy stays the source of truth.
-- NaviVim (xvoidsx/navivim, navi's default editor from 1.5) has its own site
+- NaviVim (xvoidsx/navivim, navi's default terminal editor from 1.5) has its own site
   section: `navivim.html` (hand-written product page), `navivim-handbook.html`
   (mirror of its HANDBOOK.md), `navivim-agents.html` (mirror of its AGENTS.md)
   — all built by `build-navivim-pages.sh` in the site repo. The NaviVim repo
   copies stay the source of truth.
+- naviCode (xvoidsx/naviCode, navi's graphical editor from eiri) is VScodium
+  with the nightshadeNeon theme and Rina Hermes ACP pre-installed —
+  installed by `setup_navicode` in install.sh (official apt repo, package
+  `codium`). The in-editor agent is Lain via `hermes acp`.
 - Doc-mirror build scripts need the Python `markdown` package. Make sure it's
   installed somewhere that survives your environment rebuilds — a plain system
   pip install may not be.
