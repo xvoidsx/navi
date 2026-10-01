@@ -492,9 +492,22 @@ setup_agents() {
     # 1. Hermes-native persona — every hermes invocation picks this up.
     #    SOUL.md lives at ~/.hermes/; USER.md and MEMORY.md live at
     #    ~/.hermes/memories/ (per Hermes docs).
+    #    On navi, Hermes IS Lain — so if the existing SOUL.md is the stock
+    #    Hermes default (not Lain, not user-customized), we replace it.
+    #    Genuine user customizations are backed up, never lost.
     mkdir -p "$HOME/.hermes" "$HOME/.hermes/memories"
-    if [ -f "$REPO_DIR/wired/lain/SOUL.md" ] && [ ! -f "$HOME/.hermes/SOUL.md" ]; then
-      cp "$REPO_DIR/wired/lain/SOUL.md" "$HOME/.hermes/SOUL.md"
+    if [ -f "$REPO_DIR/wired/lain/SOUL.md" ]; then
+      if [ ! -f "$HOME/.hermes/SOUL.md" ]; then
+        cp "$REPO_DIR/wired/lain/SOUL.md" "$HOME/.hermes/SOUL.md"
+        ok "Lain SOUL.md deployed"
+      elif ! grep -qi "lain" "$HOME/.hermes/SOUL.md"; then
+        # Not Lain — either the Hermes default or a user customization.
+        # Back it up, then deploy Lain. The OS suggests, the user decides:
+        # they can restore the backup if they preferred the old one.
+        cp "$HOME/.hermes/SOUL.md" "$HOME/.hermes/SOUL.md.pre-lain-backup"
+        cp "$REPO_DIR/wired/lain/SOUL.md" "$HOME/.hermes/SOUL.md"
+        ok "Lain SOUL.md deployed (previous saved to SOUL.md.pre-lain-backup)"
+      fi
     fi
     for _f in USER.md MEMORY.md; do
       if [ -f "$REPO_DIR/wired/lain/$_f" ] && [ ! -f "$HOME/.hermes/memories/$_f" ]; then

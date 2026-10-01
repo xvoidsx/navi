@@ -21,11 +21,17 @@ if [ -d "$REPO_LAIN" ]; then
         mkdir -p "$LAIN_DIR"
         cp -r "$REPO_LAIN/." "$LAIN_DIR/"
     fi
-    # Hermes-native persona — never overwrite the user's own.
+    # Hermes-native persona. On navi, Hermes IS Lain — if the existing
+    # SOUL.md isn't Lain (stock Hermes default), back it up and deploy ours.
     # SOUL.md at ~/.hermes/; USER.md and MEMORY.md at ~/.hermes/memories/
     mkdir -p "$HOME/.hermes" "$HOME/.hermes/memories"
-    if [ -f "$REPO_LAIN/SOUL.md" ] && [ ! -f "$HOME/.hermes/SOUL.md" ]; then
-        cp "$REPO_LAIN/SOUL.md" "$HOME/.hermes/SOUL.md"
+    if [ -f "$REPO_LAIN/SOUL.md" ]; then
+        if [ ! -f "$HOME/.hermes/SOUL.md" ]; then
+            cp "$REPO_LAIN/SOUL.md" "$HOME/.hermes/SOUL.md"
+        elif ! grep -qi "lain" "$HOME/.hermes/SOUL.md"; then
+            cp "$HOME/.hermes/SOUL.md" "$HOME/.hermes/SOUL.md.pre-lain-backup"
+            cp "$REPO_LAIN/SOUL.md" "$HOME/.hermes/SOUL.md"
+        fi
     fi
     for _f in USER.md MEMORY.md; do
         if [ -f "$REPO_LAIN/$_f" ] && [ ! -f "$HOME/.hermes/memories/$_f" ]; then
