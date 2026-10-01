@@ -116,6 +116,8 @@ PKGS=(
   # gnome-keyring: secret store for Element, Signal, Chromium, etc.
   # libpam-gnome-keyring auto-unlocks the login keyring via SDDM.
   gnome-keyring libpam-gnome-keyring
+  # wlsunset: night light for Wayland (used by navi-displays)
+  wlsunset
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -2097,6 +2099,7 @@ main() {
     setup_webapps
     setup_telegram
     setup_element
+    setup_tailscale
     ok "deploy-only refresh complete (navi $NAVI_VERSION)"
     exit 0
   fi
@@ -2138,6 +2141,7 @@ main() {
   setup_webapps
   setup_telegram
   setup_element
+  setup_tailscale
   tighten_sudo
   done_banner
 }
