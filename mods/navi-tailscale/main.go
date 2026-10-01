@@ -156,12 +156,7 @@ func tailscaleDown() error {
 
 // setExitNode routes traffic through the named peer ("" to clear).
 func setExitNode(peer string) error {
-	args := []string{"up"}
-	if peer == "" {
-		args = append(args, "--exit-node=")
-	} else {
-		args = append(args, "--exit-node="+peer)
-	}
+	args := []string{"set", "--exit-node=" + peer}
 	cmd := exec.Command("tailscale", args...)
 	cmd.Stdin = nil
 	return cmd.Run()
@@ -234,21 +229,30 @@ func taildropSend(file, peer string) error {
 	return cmd.Run()
 }
 
-// taildropInbox lists files waiting in the taildrop inbox.
-func taildropInbox() ([]string, error) {
-	out, err := exec.Command("tailscale", "file", "get", "--target", "/tmp").Output()
+// taildropReceive pulls waiting files into ~/Downloads.
+func taildropReceive() (int, error) {
+	home, err := os.UserHomeDir()
 	if err != nil {
-		// "no files" is not an error we care about
-		return nil, nil
+		return 0, err
 	}
-	var files []string
+	dl := filepath.Join(home, "Downloads")
+	out, err := exec.Command("tailscale", "file", "get", dl).CombinedOutput()
+	if err != nil {
+		// "no files" exits non-zero — treat as empty, not failure
+		if strings.Contains(string(out), "no files") ||
+			strings.Contains(strings.ToLower(string(out)), "empty") {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	}
+	// count received files from output lines
+	n := 0
 	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			files = append(files, line)
+		if strings.TrimSpace(line) != "" {
+			n++
 		}
 	}
-	return files, nil
+	return n, nil
 }
 
 func tailscalePing(ip string) (string, error) {
@@ -563,17 +567,17 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "i":
-		// taildrop inbox
+		// taildrop inbox: pull waiting files into ~/Downloads
 		m.screen = screenTaildropInbox
 		return m, func() tea.Msg {
-			files, err := taildropInbox()
+			n, err := taildropReceive()
 			if err != nil {
 				return actionDoneMsg{"", err}
 			}
-			if len(files) == 0 {
-				return actionDoneMsg{"inbox empty", nil}
+			if n == 0 {
+				return actionDoneMsg{"inbox empty — nothing to pull", nil}
 			}
-			return actionDoneMsg{fmt.Sprintf("%d files in inbox", len(files)), nil}
+			return actionDoneMsg{fmt.Sprintf("pulled %d file(s) into ~/Downloads", n), nil}
 		}
 	}
 	return m, nil
@@ -881,8 +885,7 @@ func (m model) renderInbox() string {
 	var b strings.Builder
 	b.WriteString("\n")
 	b.WriteString("  " + theme.Header.Render("TAILDROP INBOX") + "\n\n")
-	b.WriteString("  " + theme.Dimmed.Render("received files land in your taildrop directory.") + "\n")
-	b.WriteString("  " + theme.Dimmed.Render("press esc to go back.") + "\n")
+	b.WriteString("  " + theme.Dimmed.Render("pulling waiting files into ~/Downloads…") + "\n")
 	return b.String()
 }
 
