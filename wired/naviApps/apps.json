@@ -1266,6 +1266,17 @@
     "icon": "✨"
   },
   {
+    "id": "agent-odysseus",
+    "name": "Odysseus",
+    "summary": "PewDiePie's self-hosted AI workspace — local-first, zero telemetry, MIT licensed. Chat, agents, deep research, and memory in a web UI. The GUI path to agents for anyone who'd rather not live in the terminal.",
+    "category": "agents",
+    "source": "webapp",
+    "package": "odysseus",
+    "install": "git clone https://github.com/pewdiepie-archdaemon/odysseus.git && cd odysseus && docker compose up -d --build",
+    "homepage": "https://github.com/pewdiepie-archdaemon/odysseus",
+    "icon": "🌊"
+  },
+  {
     "id": "web-cloudflare",
     "name": "Cloudflare",
     "summary": "DNS, CDN, and edge infra — the Cloudflare dashboard as a navi webapp.",
@@ -1350,6 +1361,17 @@
     "remove": "doas apt remove -y yandex-browser-stable",
     "homepage": "https://browser.yandex.com",
     "icon": "🌐"
+  },
+  {
+    "id": "native-signal",
+    "name": "Signal",
+    "summary": "Private messaging — end-to-end encrypted texts, voice, and video calls. The native desktop app.",
+    "category": "Internet",
+    "source": "native",
+    "package": "signal-desktop",
+    "install": "navi-extras --install signal",
+    "homepage": "https://signal.org",
+    "icon": "💬"
   },
   {
     "id": "native-ani-cli",
