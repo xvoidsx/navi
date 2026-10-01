@@ -479,29 +479,38 @@ setup_agents() {
   # navi-configured experience on top.
   #
   # TWO deployment targets:
-  #   ~/.hermes/SOUL.md|USER.md|MEMORY.md — Hermes NATIVELY injects these
-  #     into every session (CLI, gateway, herdr, subagents). This is what
-  #     makes *every* hermes invocation Lain, not just navi-lain.
+  #   ~/.hermes/SOUL.md + ~/.hermes/memories/{USER,MEMORY}.md — Hermes
+  #     NATIVELY injects these into every session (CLI, gateway, herdr,
+  #     subagents). This is what makes *every* hermes invocation Lain,
+  #     not just navi-lain.
   #   ~/.config/hermes/lain/ — navi's theme/banner assets for the
   #     navi-lain wrapper (ASCII art, THEME.md).
   # The OS suggests: we seed the persona on fresh installs but never
-  # overwrite a SOUL.md the user has customized.
+  # overwrite files the user has customized.
   if [ -d "$REPO_DIR/wired/lain" ]; then
     info "deploying lain identity layer..."
-    # 1. Hermes-native persona — every hermes invocation picks this up
-    mkdir -p "$HOME/.hermes"
-    for _f in SOUL.md USER.md MEMORY.md; do
-      if [ -f "$REPO_DIR/wired/lain/$_f" ] && [ ! -f "$HOME/.hermes/$_f" ]; then
-        cp "$REPO_DIR/wired/lain/$_f" "$HOME/.hermes/$_f"
+    # 1. Hermes-native persona — every hermes invocation picks this up.
+    #    SOUL.md lives at ~/.hermes/; USER.md and MEMORY.md live at
+    #    ~/.hermes/memories/ (per Hermes docs).
+    mkdir -p "$HOME/.hermes" "$HOME/.hermes/memories"
+    if [ -f "$REPO_DIR/wired/lain/SOUL.md" ] && [ ! -f "$HOME/.hermes/SOUL.md" ]; then
+      cp "$REPO_DIR/wired/lain/SOUL.md" "$HOME/.hermes/SOUL.md"
+    fi
+    for _f in USER.md MEMORY.md; do
+      if [ -f "$REPO_DIR/wired/lain/$_f" ] && [ ! -f "$HOME/.hermes/memories/$_f" ]; then
+        cp "$REPO_DIR/wired/lain/$_f" "$HOME/.hermes/memories/$_f"
       fi
     done
     unset _f
     # also seed /etc/skel so future users get it
     if [ -w /etc/skel ]; then
-      mkdir -p /etc/skel/.hermes
-      for _f in SOUL.md USER.md MEMORY.md; do
-        if [ -f "$REPO_DIR/wired/lain/$_f" ] && [ ! -f "/etc/skel/.hermes/$_f" ]; then
-          cp "$REPO_DIR/wired/lain/$_f" "/etc/skel/.hermes/$_f"
+      mkdir -p /etc/skel/.hermes /etc/skel/.hermes/memories
+      if [ -f "$REPO_DIR/wired/lain/SOUL.md" ] && [ ! -f "/etc/skel/.hermes/SOUL.md" ]; then
+        cp "$REPO_DIR/wired/lain/SOUL.md" "/etc/skel/.hermes/SOUL.md"
+      fi
+      for _f in USER.md MEMORY.md; do
+        if [ -f "$REPO_DIR/wired/lain/$_f" ] && [ ! -f "/etc/skel/.hermes/memories/$_f" ]; then
+          cp "$REPO_DIR/wired/lain/$_f" "/etc/skel/.hermes/memories/$_f"
         fi
       done
       unset _f

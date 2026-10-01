@@ -21,11 +21,15 @@ if [ -d "$REPO_LAIN" ]; then
         mkdir -p "$LAIN_DIR"
         cp -r "$REPO_LAIN/." "$LAIN_DIR/"
     fi
-    # Hermes-native persona — never overwrite the user's own
-    mkdir -p "$HOME/.hermes"
-    for _f in SOUL.md USER.md MEMORY.md; do
-        if [ -f "$REPO_LAIN/$_f" ] && [ ! -f "$HOME/.hermes/$_f" ]; then
-            cp "$REPO_LAIN/$_f" "$HOME/.hermes/$_f"
+    # Hermes-native persona — never overwrite the user's own.
+    # SOUL.md at ~/.hermes/; USER.md and MEMORY.md at ~/.hermes/memories/
+    mkdir -p "$HOME/.hermes" "$HOME/.hermes/memories"
+    if [ -f "$REPO_LAIN/SOUL.md" ] && [ ! -f "$HOME/.hermes/SOUL.md" ]; then
+        cp "$REPO_LAIN/SOUL.md" "$HOME/.hermes/SOUL.md"
+    fi
+    for _f in USER.md MEMORY.md; do
+        if [ -f "$REPO_LAIN/$_f" ] && [ ! -f "$HOME/.hermes/memories/$_f" ]; then
+            cp "$REPO_LAIN/$_f" "$HOME/.hermes/memories/$_f"
         fi
     done
     unset _f
