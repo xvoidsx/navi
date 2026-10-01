@@ -476,12 +476,39 @@ setup_agents() {
   # Lain identity layer: the persona, theme, and knowledge scaffolding
   # that makes Hermes "Lain" in navi. Hermes is the engine (Nous Research,
   # MIT — honestly attributed, never claimed as ours); Lain is the
-  # navi-configured experience on top. Deployed per-user, overridable.
+  # navi-configured experience on top.
+  #
+  # TWO deployment targets:
+  #   ~/.hermes/SOUL.md|USER.md|MEMORY.md — Hermes NATIVELY injects these
+  #     into every session (CLI, gateway, herdr, subagents). This is what
+  #     makes *every* hermes invocation Lain, not just navi-lain.
+  #   ~/.config/hermes/lain/ — navi's theme/banner assets for the
+  #     navi-lain wrapper (ASCII art, THEME.md).
+  # The OS suggests: we seed the persona on fresh installs but never
+  # overwrite a SOUL.md the user has customized.
   if [ -d "$REPO_DIR/wired/lain" ]; then
     info "deploying lain identity layer..."
+    # 1. Hermes-native persona — every hermes invocation picks this up
+    mkdir -p "$HOME/.hermes"
+    for _f in SOUL.md USER.md MEMORY.md; do
+      if [ -f "$REPO_DIR/wired/lain/$_f" ] && [ ! -f "$HOME/.hermes/$_f" ]; then
+        cp "$REPO_DIR/wired/lain/$_f" "$HOME/.hermes/$_f"
+      fi
+    done
+    unset _f
+    # also seed /etc/skel so future users get it
+    if [ -w /etc/skel ]; then
+      mkdir -p /etc/skel/.hermes
+      for _f in SOUL.md USER.md MEMORY.md; do
+        if [ -f "$REPO_DIR/wired/lain/$_f" ] && [ ! -f "/etc/skel/.hermes/$_f" ]; then
+          cp "$REPO_DIR/wired/lain/$_f" "/etc/skel/.hermes/$_f"
+        fi
+      done
+      unset _f
+    fi
+    # 2. navi theme/banner assets for the wrapper
     mkdir -p "$HOME/.config/hermes/lain"
     cp -r "$REPO_DIR/wired/lain/." "$HOME/.config/hermes/lain/"
-    # also seed /etc/skel so future users get it
     if [ -w /etc/skel ]; then
       mkdir -p /etc/skel/.config/hermes/lain
       cp -r "$REPO_DIR/wired/lain/." /etc/skel/.config/hermes/lain/
@@ -491,7 +518,7 @@ setup_agents() {
       $DOAS install -m 0755 "$REPO_DIR/wired/lain/navi-lain.sh" /usr/bin/navi-lain
       ok "navi-lain -> /usr/bin/navi-lain"
     fi
-    ok "lain identity layer deployed (~/.config/hermes/lain)"
+    ok "lain identity layer deployed (~/.hermes/ + ~/.config/hermes/lain)"
   else
     warn "wired/lain missing from repo — skipping lain identity layer"
   fi
