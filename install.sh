@@ -464,7 +464,7 @@ setup_agents() {
     local hermestmp
     hermestmp="$(mktemp)"
     if fetch https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh -o "$hermestmp" \
-        && setsid timeout -k 30 300 bash "$hermestmp" </dev/null \
+        && setsid timeout -k 30 300 bash "$hermestmp" --non-interactive </dev/null \
         && command -v hermes >/dev/null 2>&1; then
       ok "hermes -> $(command -v hermes)"
     else
