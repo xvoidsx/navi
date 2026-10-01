@@ -668,6 +668,7 @@ setup_mods() {
   install_mod "navi-notifs"     "navi-notifs"
   install_mod "navi-nowplaying" "navi-nowplaying"
   install_mod "wiredrop"        "wiredrop"
+  install_mod "navi-tailscale"  "navi-tailscale"
 
   # wiredrop: the receiver only receives while the daemon listens, so it
   # runs as a per-user systemd service. Installed to the user's own
