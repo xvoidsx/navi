@@ -64,7 +64,7 @@
     "clock#2": {
         "format": "{:%H:%M}",
         "tooltip": false,
-        "on-click": "alacritty -e tty-clock"
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-reminders\" navi-reminders"
     },
     "clock#3": {
         //"format": "{:%Y/%m/%d}",
