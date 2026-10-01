@@ -28,7 +28,7 @@ if [ -d "$REPO_LAIN" ]; then
     if [ -f "$REPO_LAIN/SOUL.md" ]; then
         if [ ! -f "$HOME/.hermes/SOUL.md" ]; then
             cp "$REPO_LAIN/SOUL.md" "$HOME/.hermes/SOUL.md"
-        elif ! grep -qi "lain" "$HOME/.hermes/SOUL.md"; then
+        elif ! grep -q "Lain, the navi assistant" "$HOME/.hermes/SOUL.md"; then
             cp "$HOME/.hermes/SOUL.md" "$HOME/.hermes/SOUL.md.pre-lain-backup"
             cp "$REPO_LAIN/SOUL.md" "$HOME/.hermes/SOUL.md"
         fi

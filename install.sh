@@ -500,7 +500,7 @@ setup_agents() {
       if [ ! -f "$HOME/.hermes/SOUL.md" ]; then
         cp "$REPO_DIR/wired/lain/SOUL.md" "$HOME/.hermes/SOUL.md"
         ok "Lain SOUL.md deployed"
-      elif ! grep -qi "lain" "$HOME/.hermes/SOUL.md"; then
+      elif ! grep -q "Lain, the navi assistant" "$HOME/.hermes/SOUL.md"; then
         # Not Lain — either the Hermes default or a user customization.
         # Back it up, then deploy Lain. The OS suggests, the user decides:
         # they can restore the backup if they preferred the old one.
