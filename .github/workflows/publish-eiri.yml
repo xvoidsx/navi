@@ -124,8 +124,20 @@ jobs:
             notes="navi 2.0 \"eiri\" — rolling snapshot, built $(date -u +%Y-%m-%d).
           Experimental: bench it before trusting it."
           fi
-          gh release create eiri "$iso" --repo xvoidsx/navi \
-            --title "navi 2.0 \"eiri\" (rolling)" \
-            --notes "$notes"
+          if gh release view eiri --repo xvoidsx/navi >/dev/null 2>&1; then
+            # Rolling release exists — replace the ISO asset.
+            # Delete old ISOs first (keep the release itself).
+            for _a in $(gh release view eiri --repo xvoidsx/navi --json assets -q '.assets[].name | select(endswith(".iso"))'); do
+              gh release delete-asset eiri "$_a" --repo xvoidsx/navi --yes
+            done
+            unset _a
+            gh release upload eiri "$iso" --repo xvoidsx/navi --clobber
+            # Update the release notes.
+            gh release edit eiri --repo xvoidsx/navi --notes "$notes"
+          else
+            gh release create eiri "$iso" --repo xvoidsx/navi \
+              --title "navi 2.0 \"eiri\" (rolling)" \
+              --notes "$notes"
+          fi
           gh release view eiri --repo xvoidsx/navi --json url,assets -q \
             '"published: \(.url)\nassets:" + (.assets[] | "  \(.name) (\(.size) bytes)")'
