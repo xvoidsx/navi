@@ -1597,6 +1597,14 @@ setup_element() {
   fi
   if bash "$installer"; then
     ok "element installed natively"
+    # Electron can't auto-detect the secret store on sway/wayland — force
+    # gnome-libsecret so safeStorage uses the keyring instead of falling
+    # back to plaintext (which users correctly reject).
+    for d in /usr/share/applications ~/.local/share/applications; do
+      if [ -f "$d/element-desktop.desktop" ]; then
+        $DOAS sed -i 's|^Exec=element-desktop|Exec=element-desktop --password-store=gnome-libsecret|' "$d/element-desktop.desktop" 2>/dev/null ||           sed -i 's|^Exec=element-desktop|Exec=element-desktop --password-store=gnome-libsecret|' "$d/element-desktop.desktop"
+      fi
+    done
   else
     warn "element installer failed — retry later with: navi-extras --install element"
   fi
