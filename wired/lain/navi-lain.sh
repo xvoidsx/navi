@@ -29,6 +29,11 @@ if [ -d "$REPO_LAIN" ]; then
         fi
     done
     unset _f
+    # nightshadeNeon skin — always refresh (it's ours, not the user's)
+    if [ -f "$REPO_LAIN/skins/nightshadeNeon.yaml" ]; then
+        mkdir -p "$HOME/.hermes/skins"
+        cp "$REPO_LAIN/skins/nightshadeNeon.yaml" "$HOME/.hermes/skins/"
+    fi
 fi
 
 # the mark — neon pink on dark, like everything else in the wired
@@ -41,4 +46,6 @@ if [ -f "$LAIN_DIR/ascii-lain.txt" ] && [ -t 1 ]; then
 fi
 
 # hand off to the engine
+# The persona comes from ~/.hermes/SOUL.md (native Hermes) — every hermes
+# invocation is Lain. This wrapper adds the LAIN banner on top.
 exec hermes "$@"

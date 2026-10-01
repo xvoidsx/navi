@@ -518,6 +518,29 @@ setup_agents() {
       $DOAS install -m 0755 "$REPO_DIR/wired/lain/navi-lain.sh" /usr/bin/navi-lain
       ok "navi-lain -> /usr/bin/navi-lain"
     fi
+    # nightshadeNeon skin for Hermes — the visual layer. Deployed to
+    # ~/.hermes/skins/ where Hermes natively loads it. Activated via
+    # display.skin in config.yaml (merged, not overwritten).
+    if [ -f "$REPO_DIR/wired/lain/skins/nightshadeNeon.yaml" ]; then
+      mkdir -p "$HOME/.hermes/skins"
+      cp "$REPO_DIR/wired/lain/skins/nightshadeNeon.yaml" "$HOME/.hermes/skins/"
+      # activate: merge display.skin into config.yaml without clobbering
+      _cfg="$HOME/.hermes/config.yaml"
+      if [ -f "$_cfg" ]; then
+        if ! grep -q "skin:" "$_cfg"; then
+          printf '
+display:
+  skin: nightshadeNeon
+' >> "$_cfg"
+        fi
+      else
+        printf 'display:
+  skin: nightshadeNeon
+' > "$_cfg"
+      fi
+      unset _cfg
+      ok "nightshadeNeon skin deployed and activated"
+    fi
     ok "lain identity layer deployed (~/.hermes/ + ~/.config/hermes/lain)"
   else
     warn "wired/lain missing from repo — skipping lain identity layer"

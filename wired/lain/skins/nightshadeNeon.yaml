@@ -1,0 +1,62 @@
+name: nightshadeNeon
+description: Black, purple, and red Wired-inspired theme — Lain on navi
+
+colors:
+  banner_border: "#7B2CBF"
+  banner_title: "#F72585"
+  banner_accent: "#FF1744"
+  banner_dim: "#3B1A5A"
+  banner_text: "#F2EAFB"
+
+  ui_accent: "#B026FF"
+  ui_label: "#F72585"
+  ui_ok: "#70E000"
+  ui_error: "#FF1744"
+  ui_warn: "#FF8A65"
+
+  prompt: "#F2EAFB"
+  input_rule: "#7B2CBF"
+  response_border: "#F72585"
+  session_label: "#B026FF"
+  session_border: "#5A3A70"
+
+  status_bar_bg: "#08070D"
+  voice_status_bg: "#08070D"
+  selection_bg: "#3B1A5A"
+  completion_menu_bg: "#100A18"
+  completion_menu_current_bg: "#54147A"
+  completion_menu_meta_bg: "#100A18"
+  completion_menu_meta_current_bg: "#3B1A5A"
+
+branding:
+  agent_name: "LAIN"
+  welcome: "Welcome to the Wired. Type your message or /help for commands."
+  goodbye: "Connection terminated."
+  response_label: " LAIN "
+  prompt_symbol: "❯"
+  help_header: "The Wired: Available Commands"
+
+spinner:
+  waiting_faces:
+    - "(.)"
+    - "(+)"
+    - "(*)"
+  thinking_faces:
+    - "(~)"
+    - "(=)"
+    - "(<>)"
+  thinking_verbs:
+    - "synchronizing"
+    - "decoding"
+    - "tracing"
+    - "rendering"
+
+tool_prefix: "┊"
+
+banner_logo: |
+  ██╗      █████╗ ██╗ ███╗   ██╗
+  ██║     ██╔══██╗██║ ████╗  ██║
+  ██║     ███████║██║ ██╔██╗ ██║
+  ██║     ██╔══██║██║ ██║╚██╗██║
+  ███████╗██║  ██║██║ ██║ ╚████║
+  ╚══════╝╚═╝  ╚═╝╚═╝ ╚═╝  ╚═══╝
