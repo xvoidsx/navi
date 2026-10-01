@@ -1480,15 +1480,15 @@
     "icon": "🖋️"
   },
   {
-    "id": "flatpak-steam",
+    "id": "native-steam",
     "name": "Steam",
-    "summary": "The big one. The Flatpak sandbox handles the 32-bit libs so Steam runs clean on navi.",
+    "summary": "The big one. Native Debian package (not Flatpak) — pulls Steam straight from Valve with full 32-bit library support.",
     "category": "Games",
     "subcategory": "Storefronts & Launchers",
-    "source": "flatpak",
-    "package": "com.valvesoftware.Steam",
-    "install": "flatpak install -y flathub com.valvesoftware.Steam",
-    "remove": "flatpak uninstall -y com.valvesoftware.Steam",
+    "source": "native",
+    "package": "steam-installer",
+    "install": "doas dpkg --add-architecture i386 && doas apt update && doas apt install -y steam-installer",
+    "remove": "doas apt remove -y steam-installer steam-launcher",
     "homepage": "https://store.steampowered.com",
     "icon": "🎮"
   },
