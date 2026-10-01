@@ -145,6 +145,10 @@ GNOME Disks for flashing. Long-term, Raven wants a native nightshadeNeon
   (keyring + sources file, replicated manually — never piped-to-bash) and
   installs `balena-etcher-electron`. The old Bintray `deb.etcher.io` repo
   is long dead; Cloudsmith is the current official channel.
+- **DISABLED 2026-10-01:** balena-etcher-electron hard-depends on gconf2,
+  which Debian removed from trixie entirely — apt refuses the install.
+  Both `setup_etcher` call sites in install.sh are commented out. Re-enable
+  if balena fixes their packaging, or retire when navi-imprint lands.
 - Listed in the manual (disks & images) and naviApps (`native-etcher`).
 - The .deb ships its own .desktop file, so it appears in rofi automatically.
 

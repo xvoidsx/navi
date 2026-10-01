@@ -1885,7 +1885,10 @@ main() {
     setup_sddm
     setup_chromium
     setup_brave
-    setup_etcher
+    # setup_etcher — DISABLED 2026-10-01: balena-etcher-electron hard-depends
+    # on gconf2, which was removed from Debian trixie entirely. apt refuses
+    # to install it. Re-enable if balena fixes their packaging, or retire
+    # when navi-imprint (native flasher) lands.
     setup_fonts
     setup_webapps
     setup_telegram
@@ -1925,7 +1928,7 @@ main() {
   setup_sddm
   setup_chromium
   setup_brave
-  setup_etcher
+  # setup_etcher — DISABLED 2026-10-01: gconf2 gone from trixie (see above)
   setup_fonts
   setup_webapps
   setup_telegram
