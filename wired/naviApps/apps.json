@@ -1487,8 +1487,8 @@
     "subcategory": "Storefronts & Launchers",
     "source": "native",
     "package": "steam-installer",
-    "install": "doas dpkg --add-architecture i386 && doas apt update && doas apt install -y steam-installer",
-    "remove": "doas apt remove -y steam-installer steam-launcher",
+    "install": "doas dpkg --add-architecture i386 && doas apt update && doas apt install -y steam-installer steam-devices",
+    "remove": "doas apt remove -y steam-installer steam-launcher steam-devices",
     "homepage": "https://store.steampowered.com",
     "icon": "🎮"
   },
