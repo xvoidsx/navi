@@ -9,6 +9,10 @@
 >
 > Feeling adventurous? The **eiri** rolling channel now publishes public snapshots: [github.com/xvoidsx/navi/releases/tag/eiri](https://github.com/xvoidsx/navi/releases/tag/eiri).
 
+**⚠️Hi! This is navi's `tachibana` branch, and it is highly experimental.⚠️**
+
+**This branch is for experimenting with a future re-base of navi to the nix way of doing things. Please don't use it for serious production work yet - stick with `mika` or `eiri`.**
+
 **navi** is a GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx) — a complete, opinionated, **agent-native** desktop OS on a dependable Debian base.
 
 It uses [wiredWM](https://github.com/rav3ndust/wiredWM), our fork of the `sway` Wayland compositor, as its flagship desktop (X11/i3 fallback included). Wayland-first tiling, deep blacks, neon pink, phosphor green — the **nightshadeNeon** design language across the whole desktop.
