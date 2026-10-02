@@ -1651,6 +1651,25 @@ setup_element() {
   fi
 }
 
+setup_tailscale() {
+  step "tailscale (mesh VPN)"
+  if command -v tailscale >/dev/null 2>&1; then
+    ok "tailscale already installed — skipping"
+    return 0
+  fi
+  local installer="$REPO_DIR/scripts/installers/tailscale-installer.sh"
+  [ -x "$installer" ] || installer="/usr/share/navi/installers/tailscale-installer.sh"
+  if [ ! -x "$installer" ]; then
+    warn "tailscale installer not found — skipping (later: navi-extras --install tailscale)"
+    return 0
+  fi
+  if bash "$installer"; then
+    ok "tailscale installed — run 'tailscale up' to join your tailnet"
+  else
+    warn "tailscale installer failed — retry later with: navi-extras --install tailscale"
+  fi
+}
+
 # ---------------------------------------------------------------- gtk theme cohesion
 # settings.ini covers plain GTK apps, but GSettings-aware apps (nemo and
 # friends) read org.gnome.desktop.interface — whose schema default is
