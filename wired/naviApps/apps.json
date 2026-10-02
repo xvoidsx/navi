@@ -1155,8 +1155,8 @@
     "category": "agents",
     "source": "agent",
     "package": "codex",
-    "install": "doas npm install -g @openai/codex",
-    "remove": "doas npm uninstall -g @openai/codex",
+    "install": "curl -fsSL https://chatgpt.com/codex/install.sh | bash",
+    "remove": "rm -rf ~/.codex",
     "homepage": "https://github.com/openai/codex",
     "icon": "⚡"
   },
@@ -1178,8 +1178,8 @@
     "category": "agents",
     "source": "agent",
     "package": "aider",
-    "install": "doas python3 -m pip install --break-system-packages aider-chat",
-    "remove": "doas python3 -m pip uninstall -y aider-chat",
+    "install": "curl -fsSL https://aider.chat/install.sh | sh",
+    "remove": "uv tool uninstall aider-chat",
     "homepage": "https://aider.chat",
     "icon": "🤝"
   },
@@ -1190,7 +1190,7 @@
     "category": "agents",
     "source": "agent",
     "package": "pi",
-    "install": "doas npm install -g @mariozechner/pi-coding-agent",
+    "install": "curl -fsSL https://pi.dev/install.sh | sh",
     "remove": "doas npm uninstall -g @mariozechner/pi-coding-agent",
     "homepage": "https://github.com/badlogic/pi-mono",
     "icon": "🧩"
@@ -1214,7 +1214,7 @@
     "category": "agents",
     "source": "agent",
     "package": "openclaw",
-    "install": "doas npm install -g openclaw@latest",
+    "install": "curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-prompt --no-onboard",
     "remove": "doas npm uninstall -g openclaw",
     "icon": "💬"
   },
@@ -1225,10 +1225,46 @@
     "category": "agents",
     "source": "agent",
     "package": "kilo",
-    "install": "doas npm install -g @kilocode/cli",
+    "install": "curl -fsSL https://kilo.ai/cli/install | bash",
     "remove": "doas npm uninstall -g @kilocode/cli",
     "homepage": "https://kilo.ai",
     "icon": "🚀"
+  },
+  {
+    "id": "agent-amp",
+    "name": "Amp",
+    "summary": "Sourcegraph's multi-model coding agent — routes among frontier models automatically, no model picker. Threads, orbs, subagents.",
+    "category": "agents",
+    "source": "agent",
+    "package": "amp",
+    "install": "curl -fsSL https://ampcode.com/install.sh | bash",
+    "remove": "rm -rf ~/.local/bin/amp ~/.config/amp",
+    "homepage": "https://ampcode.com",
+    "icon": "🔮"
+  },
+  {
+    "id": "agent-antigravity",
+    "name": "Antigravity",
+    "summary": "Google's agent-first CLI assistant (agy) — the successor to Gemini CLI.",
+    "category": "agents",
+    "source": "agent",
+    "package": "antigravity",
+    "install": "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+    "remove": "rm -rf ~/.local/bin/agy",
+    "homepage": "https://antigravity.google",
+    "icon": "🛰️"
+  },
+  {
+    "id": "agent-droid",
+    "name": "Droid",
+    "summary": "Factory's terminal coding agent — curl-installed, auth via login or API key.",
+    "category": "agents",
+    "source": "agent",
+    "package": "droid",
+    "install": "curl -fsSL https://app.factory.ai/cli | sh",
+    "remove": "rm -rf ~/.local/bin/droid",
+    "homepage": "https://factory.ai",
+    "icon": "🤖"
   },
   {
     "id": "agent-copilot-cli",
