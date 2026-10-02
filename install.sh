@@ -384,6 +384,26 @@ setup_agents() {
     rm -f "$octmp"
   fi
 
+  # wisp (xvoidsx/wisp — navi's own coding agent, opencode fork with
+  # nightshadeNeon theme, Ollama-first, herdr integration). Installs from
+  # the GitHub releases via the install.sh script.
+  if [ -x /usr/bin/wisp ]; then
+    ok "wisp already in /usr/bin"
+  elif ! host_up https://raw.githubusercontent.com/xvoidsx/wisp/dev/install.sh; then
+    warn "wisp installer unreachable — skipping wisp (re-run install.sh --yes later)"
+  else
+    info "installing wisp..."
+    local wisptmp
+    wisptmp="$(mktemp)"
+    if fetch https://raw.githubusercontent.com/xvoidsx/wisp/dev/install.sh -o "$wisptmp" \
+        && $DOAS setsid timeout -k 30 300 bash "$wisptmp" </dev/null; then
+      ok "wisp -> /usr/bin/wisp"
+    else
+      warn "wisp install failed — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$wisptmp"
+  fi
+
   # the omp installer honors PI_INSTALL_DIR — straight into /usr/bin.
   if [ -x /usr/bin/omp ]; then
     ok "omp already in /usr/bin"
