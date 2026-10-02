@@ -402,6 +402,25 @@ setup_agents() {
     rm -f "$omptmp"
   fi
 
+  # pi (the pi agent): official curl installer from pi.dev. Faster updates
+  # than npm, and the designed non-interactive path under setsid.
+  if command -v pi >/dev/null 2>&1; then
+    ok "pi already installed"
+  elif ! host_up https://pi.dev/install.sh; then
+    warn "pi.dev unreachable — skipping pi (re-run install.sh --yes later)"
+  else
+    info "installing pi..."
+    local pitmp
+    pitmp="$(mktemp)"
+    if fetch https://pi.dev/install.sh -o "$pitmp" \
+        && $DOAS setsid timeout -k 30 300 sh "$pitmp" </dev/null; then
+      ok "pi installed"
+    else
+      warn "pi install failed — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$pitmp"
+  fi
+
   # goose (aaif-goose/goose — ex-Block, now the Linux Foundation's Agentic
   # AI Foundation): open-source AI agent, CLI + desktop app. Its install
   # script is designed for non-interactive use (automation/docker): both
