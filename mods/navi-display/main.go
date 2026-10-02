@@ -703,9 +703,9 @@ func (m model) outputsView() string {
 		[2]string{"↑↓", "navigate"},
 		[2]string{"enter", "detail"},
 	)
-	line2 := theme.Footer(len(m.outputs) > 1, [2]string{"h/l/k/j", "arrange"}) + "   " +
+	line2 := theme.Footer(len(m.outputs) > 1, [2]string{"h/l/k/j", "left/right/above/below"}) + "   " +
 		theme.Footer(len(m.outputs) > 1, [2]string{"m", "mirror"}) + "   " +
-		theme.Footer(len(m.outputs) > 0, [2]string{"a", "auto"})
+		theme.Footer(len(m.outputs) > 0, [2]string{"a", "auto-arrange"})
 	line3 := theme.Footer(true,
 		[2]string{"R", "refresh"},
 		[2]string{"q", "quit"},
