@@ -22,7 +22,7 @@ Guiding ideas:
 - **Additive, not purist.** We add our stack alongside upstream tools; we
   don't purge theirs. doas is the navi-native way up, sudo stays as the
   compatibility layer. GTK3 stays as long as possible; choice is preserved.
-- **Agent-native.** ollama, opencode, omp, goose, and herdr ship out of the
+- **Agent-native.** ollama, wisp, opencode, omp, goose, and herdr ship out of the
   box. The OS is a window to the smallweb (amfora for Gemini, glyyph for
   Nostr, neighborli fediverse instance, navi radio).
 - **Customized configs are sacred.** The updater *preserves* user-customized
