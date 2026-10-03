@@ -10,7 +10,10 @@
 
 set -uo pipefail
 
-kitty --title "navi-notifs" -e navi-notifs &
+alacritty --title "navi-notifs" -e navi-notifs &
+# NOTE: reverted from kitty 2026-10-03 — the DIMS cell-exact sizing is
+# alacritty-specific and kitty's pixel approximation was off. mods stay
+# on alacritty until kitty sizing is properly measured.
 sleep 0.5
 
 if [ -n "${SWAYSOCK:-}" ] && command -v swaymsg >/dev/null 2>&1; then
