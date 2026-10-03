@@ -584,7 +584,7 @@ func (m model) smartAction() (tea.Model, tea.Cmd) {
 }
 
 func (m model) beginPair(d device) (tea.Model, tea.Cmd) {
-	sess, err := startPair(d.mac)
+	sess, err := startPairWithName(d.mac, d.name)
 	if err != nil {
 		m.status = "× could not start pairing: " + err.Error()
 		m.statusErr = true
