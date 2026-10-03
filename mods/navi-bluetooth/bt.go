@@ -94,9 +94,43 @@ func parseDeviceLines(out string) []device {
 			continue
 		}
 		seen[mac] = true
-		devs = append(devs, device{mac: mac, name: strings.TrimSpace(m[2]), battery: -1})
+		name := strings.TrimSpace(m[2])
+		// If the name is just the MAC (unresolved), try `info` for the real name.
+		if name == "" || strings.ToUpper(name) == mac {
+			if n, ok := deviceName(mac); ok {
+				name = n
+			} else {
+				name = mac // last resort: show the MAC
+			}
+		}
+		devs = append(devs, device{mac: mac, name: name, battery: -1})
 	}
 	return devs
+}
+
+// deviceName gets the friendly name via `bluetoothctl info`.
+func deviceName(mac string) (string, bool) {
+	out, err := btRun("info " + mac)
+	if err != nil {
+		return "", false
+	}
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Name:") {
+			n := strings.TrimSpace(strings.TrimPrefix(line, "Name:"))
+			if n != "" {
+				return n, true
+			}
+		}
+		// Some BlueZ versions use "Alias:" for the friendly name.
+		if strings.HasPrefix(line, "Alias:") {
+			n := strings.TrimSpace(strings.TrimPrefix(line, "Alias:"))
+			if n != "" {
+				return n, true
+			}
+		}
+	}
+	return "", false
 }
 
 // listSnapshot refreshes everything: adapter state, all devices, paired

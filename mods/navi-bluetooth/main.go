@@ -929,7 +929,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Install bluez first.")
 		os.Exit(1)
 	}
-	// Scan while the mod is open; bluetoothd keeps discovering daemon-side.
+	// Ensure the adapter is powered — don't depend on blueman-applet
+	// or any other tool having done it. Then start scanning.
+	_ = setPower(true)
+	time.Sleep(300 * time.Millisecond)
 	_ = setScan(true)
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
