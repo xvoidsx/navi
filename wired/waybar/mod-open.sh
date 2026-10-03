@@ -48,6 +48,7 @@ navi-browser) DIMS="74x31" ;;
 navi-calendar) DIMS="68x29" ;;
 navi-display) DIMS="67x26" ;;
 navi-get) DIMS="75x39" ;;
+navi-extras) DIMS="70x30" ;;  # estimate, tune as needed
 navi-lain-config) DIMS="70x23" ;;
 navi-networking) DIMS="69x38" ;;
 navi-notifs) DIMS="69x29" ;;

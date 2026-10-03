@@ -2,7 +2,7 @@
 Type=Application
 Name=navi-browser
 Comment=choose navi's default Chromium browser — webapps follow your choice
-Exec=alacritty -e navi-browser
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-browser" navi-browser
 Icon=web-browser
 Terminal=false
 Categories=System;Settings;

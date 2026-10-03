@@ -2,7 +2,7 @@
 Type=Application
 Name=navi-get
 Comment=navi software center: search the catalog and install apps, extras, and agents
-Exec=alacritty -e navi-get
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-get" navi-get
 Icon=system-software-install
 Terminal=false
 Categories=System;Settings;
