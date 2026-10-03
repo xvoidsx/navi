@@ -109,24 +109,30 @@ func parseDeviceLines(out string) []device {
 }
 
 // deviceName gets the friendly name via `bluetoothctl info`.
+// Retries a few times — LE devices can be slow to resolve names.
 func deviceName(mac string) (string, bool) {
-	out, err := btRun("info " + mac)
-	if err != nil {
-		return "", false
-	}
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "Name:") {
-			n := strings.TrimSpace(strings.TrimPrefix(line, "Name:"))
-			if n != "" {
-				return n, true
-			}
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(500 * time.Millisecond)
 		}
-		// Some BlueZ versions use "Alias:" for the friendly name.
-		if strings.HasPrefix(line, "Alias:") {
-			n := strings.TrimSpace(strings.TrimPrefix(line, "Alias:"))
-			if n != "" {
-				return n, true
+		out, err := btRun("info " + mac)
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(out, "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "Name:") {
+				n := strings.TrimSpace(strings.TrimPrefix(line, "Name:"))
+				// Skip if it's just the MAC with dashes (unresolved).
+				if n != "" && strings.ToUpper(strings.ReplaceAll(n, "-", ":")) != mac {
+					return n, true
+				}
+			}
+			if strings.HasPrefix(line, "Alias:") {
+				n := strings.TrimSpace(strings.TrimPrefix(line, "Alias:"))
+				if n != "" && strings.ToUpper(strings.ReplaceAll(n, "-", ":")) != mac {
+					return n, true
+				}
 			}
 		}
 	}
