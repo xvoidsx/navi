@@ -1291,6 +1291,7 @@ deploy_configs() {
   deploy_config "picom/picom.conf"            "$HOME/.config/picom/picom.conf"
   deploy_config "terminals/alacritty.toml"    "$HOME/.config/alacritty/alacritty.toml"
   deploy_config "terminals/foot.ini"          "$HOME/.config/foot/foot.ini"
+  deploy_config "terminals/kitty.conf"        "$HOME/.config/kitty/kitty.conf"
   deploy_config "cliamp/config.toml"         "$HOME/.config/cliamp/config.toml"
   deploy_config "herdr/config.toml"          "$HOME/.config/herdr/config.toml"
   # cmus + cava: the nightshadeNeon music setup. the cmus rc selects the
