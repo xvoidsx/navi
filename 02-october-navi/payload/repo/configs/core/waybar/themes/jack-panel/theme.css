@@ -1,0 +1,399 @@
+/* ============================================================================
+ * JACK PANEL
+ * ----------------------------------------------------------------------------
+ * The bar as the front of a rack: a panel plate, a patch cable running its full
+ * width, and every module a real jack socket — concentric rings with a dark
+ * bore, the plug seated in the middle.
+ *
+ * The cable is the loudest element, as it is on a real desk. It carries the
+ * animated colour, the jack rings stay static, and the sockets pick up state by
+ * the ring colour rather than by any box or glow — which keeps the whole thing
+ * legible even with sixteen modules lit at once.
+ *
+ * Cost: the cable colour drifts slowly (one change per ~11s) and a signal pulse
+ * runs it every 14s in eight hops. ~15ms a repaint means motion is priced per
+ * visible change, so a panel that mostly holds still and occasionally sends
+ * something is both cheaper and more convincing than a constant animation.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ *
+ * The white square the weather module used to show was NOT a missing font.
+ * weather.sh emitted each glyph followed by U+FE0F VARIATION SELECTOR-16, which
+ * forces emoji *presentation*. Pango honoured that and demanded a real colour
+ * emoji font, and the only one installed (Noto Color Emoji) is a fixed 109px
+ * strike that cannot be used at bar size — so GTK drew the .notdef box. The fix
+ * belongs in weather.sh, which now strips the selector in json_escape.
+ *
+ * Noto Color Emoji is deliberately NOT named in this stack for the same reason:
+ * it is a 109px bitmap strike and would downscale to mush at 10px.
+ * ========================================================================== */
+
+@define-color np #ff10f0;
+@define-color ng #39ff14;
+@define-color nc #00ffff;
+@define-color nr #ff3131;
+@define-color nw #ffffff;
+@define-color plate #0b0710;
+
+@define-color np-1 rgba(255, 16, 240, 0.34);
+@define-color np-2 rgba(255, 16, 240, 0.68);
+@define-color ng-1 rgba(57, 255, 20, 0.38);
+@define-color ng-2 rgba(57, 255, 20, 0.70);
+@define-color nc-1 rgba(0, 255, 255, 0.34);
+@define-color nc-2 rgba(0, 255, 255, 0.68);
+@define-color nw-2 rgba(255, 255, 255, 0.68);
+@define-color nw-3 rgba(255, 255, 255, 0.44);
+@define-color nw-4 rgba(255, 255, 255, 0.24);
+@define-color bore #050308;
+
+* {
+    font-family: "Noto Sans", "Noto Sans Symbols2", sans-serif;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* ----------------------------------------------------------------------------
+ * The panel plate and the cable.
+ *
+ * The cable is a border-bottom so its colour can animate — a background layer's
+ * gradient stops are positional and will not interpolate. A second, brighter
+ * border sits on top of it as the specular highlight real cable has.
+ * -------------------------------------------------------------------------- */
+window#waybar {
+    color: @nw;
+    background-color: @plate;
+
+    /* the signal pulse travelling the cable */
+    background-image:
+        linear-gradient(to right,
+            rgba(0, 255, 255, 0) 0%,
+            rgba(255, 16, 240, 0.55) 40%,
+            rgba(255, 255, 255, 0.95) 50%,
+            rgba(255, 16, 240, 0.55) 60%,
+            rgba(0, 255, 255, 0) 100%),
+        /* brushed sheen across the plate */
+        linear-gradient(to bottom,
+            rgba(255, 255, 255, 0.045) 0%,
+            rgba(255, 255, 255, 0.012) 45%,
+            rgba(0, 0, 0, 0.10) 100%);
+
+    background-size: 200px 4px, 100% 100%;
+    background-position: -200px 32px, 0 0;
+    background-repeat: no-repeat;
+
+    border-bottom: 3px solid rgba(255, 16, 240, 0.62);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    box-shadow:
+        0 0 12px rgba(255, 16, 240, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+
+    animation:
+        signal-pulse 14s steps(90, end) infinite,
+        cable-drift 11s steps(4, end) infinite;
+}
+
+@keyframes signal-pulse {
+    0%   { background-position: -200px 32px, 0 0; }
+    12%  { background-position: 1560px 32px, 0 0; }
+    100% { background-position: 1560px 32px, 0 0; }
+}
+
+@keyframes cable-drift {
+    0%   { border-bottom-color: rgba(255, 16, 240, 0.62); }
+    33%  { border-bottom-color: rgba(0, 255, 255, 0.62); }
+    66%  { border-bottom-color: rgba(57, 255, 20, 0.62); }
+    100% { border-bottom-color: rgba(255, 16, 240, 0.62); }
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Jack sockets. Each module is a ring pair around a dark bore: the ring is the
+ * border, the bore is the inset shadow, and the glyph sits in the middle.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#power-profiles-daemon,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 4px 6px 7px 6px;
+    padding: 2px 9px;
+    color: @nw;
+    background-color: rgba(11, 7, 16, 0.92);
+    border: 2px solid @np-1;
+    border-radius: 11px;
+    box-shadow:
+        inset 0 0 0 2px rgba(5, 3, 8, 0.95),
+        inset 0 0 7px rgba(0, 0, 0, 0.9),
+        0 0 9px rgba(255, 16, 240, 0.16);
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.40);
+    animation: ring-drift 9s steps(5, end) infinite;
+    transition: border-color 300ms ease-out, box-shadow 400ms ease-out;
+}
+
+/* Low amplitude again: a wide colour swing turns every step into a strobe. */
+@keyframes ring-drift {
+    0%   { border-color: @np-1; }
+    33%  { border-color: @nc-1; }
+    66%  { border-color: @ng-1; }
+    100% { border-color: @np-1; }
+}
+
+/* Signature ring colours. */
+#custom-wired-launcher,
+#custom-power,
+#clock,
+#power-profiles-daemon { border-color: rgba(255, 16, 240, 0.50); color: #ff6ef4; }
+
+#network,
+#backlight,
+#memory,
+#cpu { border-color: rgba(57, 255, 20, 0.46); color: #7cff5c; }
+
+#custom-volume,
+#idle_inhibitor { border-color: rgba(0, 255, 255, 0.50); color: #5cfff5; }
+
+#battery { border-color: rgba(255, 255, 255, 0.34); color: @nw-2; }
+
+#custom-wired-launcher,
+#custom-power { font-size: 12px; }
+
+/* Workspaces: a bank of mini jacks. */
+#workspaces button {
+    min-width: 20px;
+    margin: 0 2px;
+    padding: 1px 6px;
+    color: @nw-3;
+    background-color: rgba(5, 3, 8, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px rgba(5, 3, 8, 0.9);
+    text-shadow: none;
+}
+
+#workspaces button.empty {
+    color: @nw-4;
+    background-color: rgba(5, 3, 8, 0.6);
+    border-color: rgba(255, 255, 255, 0.09);
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @nw;
+    background-color: rgba(255, 16, 240, 0.22);
+    border-color: @np-2;
+    box-shadow:
+        inset 0 0 0 1px rgba(5, 3, 8, 0.85),
+        0 0 12px rgba(255, 16, 240, 0.60);
+    text-shadow: 0 0 7px rgba(255, 16, 240, 0.90);
+}
+
+#window {
+    color: rgba(255, 255, 255, 0.50);
+    border-color: rgba(255, 255, 255, 0.14);
+    animation: none;
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    opacity: 0;
+}
+
+#custom-weather {
+    color: rgba(184, 184, 184, 0.82);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    font-size: 8px;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.40);
+    animation: none;
+}
+
+/* ----------------------------------------------------------------------------
+ * State, expressed as ring colour.
+ * -------------------------------------------------------------------------- */
+#network.disconnected,
+#battery.critical {
+    color: @nr;
+    border-color: rgba(255, 49, 49, 0.80);
+    box-shadow:
+        inset 0 0 0 2px rgba(5, 3, 8, 0.95),
+        0 0 13px rgba(255, 49, 49, 0.60);
+    animation: alert-ring 1.2s steps(4, end) infinite alternate;
+}
+
+@keyframes alert-ring {
+    from { box-shadow: inset 0 0 0 2px rgba(5, 3, 8, 0.95), 0 0 6px rgba(255, 49, 49, 0.35); }
+    to   { box-shadow: inset 0 0 0 2px rgba(5, 3, 8, 0.95), 0 0 20px rgba(255, 49, 49, 0.85); }
+}
+
+#battery.warning { color: #ff6ef4; border-color: @np-2; animation: none; }
+
+/* Bluetooth: rune plus a link glyph, never a dot — the bell owns that shape. */
+#bluetooth.off {
+    color: @nw-3;
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: inset 0 0 0 2px rgba(5, 3, 8, 0.95);
+    text-shadow: none;
+    animation: none;
+}
+
+#bluetooth.connected {
+    color: #5cfff5;
+    border-color: @nc-2;
+    box-shadow:
+        inset 0 0 0 2px rgba(5, 3, 8, 0.92),
+        0 0 14px rgba(0, 255, 255, 0.50);
+    animation: none;
+}
+
+#bluetooth.connecting {
+    color: #ff6ef4;
+    border-color: @np-2;
+    animation: alert-ring 1s steps(4, end) infinite alternate;
+}
+
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep {
+    color: @nw-3;
+    border-color: rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 0 0 2px rgba(5, 3, 8, 0.95);
+    text-shadow: none;
+    animation: none;
+}
+
+#custom-update.updates-available {
+    color: #ff6ef4;
+    border-color: @np-2;
+    animation: alert-ring 2s steps(4, end) infinite alternate;
+}
+
+#custom-bell.has-notifs,
+#custom-agent.agent-ready {
+    color: #5cfff5;
+    border-color: @nc-2;
+    box-shadow:
+        inset 0 0 0 2px rgba(5, 3, 8, 0.92),
+        0 0 13px rgba(0, 255, 255, 0.42);
+    animation: none;
+}
+
+#custom-agent.agent-working {
+    color: #7cff5c;
+    border-color: @ng-2;
+    animation: alert-ring 1.8s steps(4, end) infinite alternate;
+}
+
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: #ff6ef4;
+    border-color: @np-2;
+    animation: alert-ring 1s steps(4, end) infinite alternate;
+}
+
+#custom-volume.muted {
+    color: @nw-3;
+    border-color: rgba(255, 255, 255, 0.20);
+    text-shadow: none;
+    animation: none;
+}
+
+#idle_inhibitor.activated {
+    color: #7cff5c;
+    border-color: @ng-2;
+    box-shadow: inset 0 0 0 2px rgba(5, 3, 8, 0.95), 0 0 12px rgba(57, 255, 20, 0.45);
+    animation: none;
+}
+
+#custom-nowplaying.idle {
+    color: @nw-3;
+    border-color: rgba(255, 255, 255, 0.13);
+    text-shadow: none;
+    animation: none;
+}
+
+#custom-nowplaying.playing {
+    color: #ff6ef4;
+    border-color: @np-2;
+    animation: alert-ring 2.2s steps(4, end) infinite alternate;
+}
+
+#custom-nowplaying.paused {
+    color: #5cfff5;
+    border-color: @nc-2;
+    animation: none;
+}
+
+#tray { padding-left: 6px; padding-right: 6px; }
+#tray > .passive { opacity: 0.50; }
+
+#tray > .needs-attention {
+    background-color: rgba(255, 49, 49, 0.20);
+    border-radius: 8px;
+}
+
+/* Hover: the plug seats fully. */
+#workspaces:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#bluetooth:hover {
+    border-color: @ng-2;
+    box-shadow:
+        inset 0 0 0 2px rgba(5, 3, 8, 0.70),
+        0 0 18px rgba(57, 255, 20, 0.45);
+    transition: border-color 300ms ease-out, box-shadow 700ms ease-out;
+}
+
+#custom-power:hover {
+    color: @nr;
+    border-color: rgba(255, 49, 49, 0.80);
+    box-shadow: inset 0 0 0 2px rgba(5, 3, 8, 0.70), 0 0 18px rgba(255, 49, 49, 0.60);
+}
+
+tooltip {
+    color: @nw;
+    background-color: rgba(5, 3, 8, 0.97);
+    border: 1px solid @ng-2;
+    border-radius: 6px;
+    box-shadow: 0 0 16px rgba(57, 255, 20, 0.35);
+}
+
+tooltip label { color: @nw; }

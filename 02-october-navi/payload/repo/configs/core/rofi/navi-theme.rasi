@@ -1,0 +1,198 @@
+// navi-theme — waybar theme picker.
+//
+// This is config.rasi (the wired nightshade launcher), forked deliberately so it
+// can be wider, shorter, and carry bar screenshots. It is a *fork* rather than
+// an include because rofi has no working @include: passing -theme replaces
+// config.rasi wholesale, so every widget config.rasi styles must also be styled
+// here or it falls back to rofi's light default. mainbox is the one that bites —
+// it wraps the input bar and the list, so omitting it paints a white panel
+// behind the themes. If you restyle the launcher, restyle this too.
+//
+// Differences from config.rasi, all picker-specific:
+//   width 720px -> 980px      room for a 440px bar screenshot per row
+//   lines 12 -> 5             only five themes; do not scroll
+//   element-icon 22px -> 440x18  the thumbnail
+//   configuration block added: show-icons so rofi honours the icon field
+
+configuration {
+    font: "Noto Sans 13";
+    show-icons: true;
+    display-drun: "Apps";
+}
+
+* {
+    background: #000000cf;
+    background-solid: #000000eb;
+    glass-surface: #120510d4;
+    glass-deep: #050005e8;
+    glass-edge: #39ff1499;
+    glass-highlight: #ffffff22;
+    neon-pink: #ff10f0;
+    foreground: #ff10f0;
+    accent: #ff10f0;
+    neon-green: #39ff14;
+    neon-cyan: #00ffff;
+    neon-red: #ff3131;
+    neon-white: #ffffff;
+    text-color: #ff10f0;
+    border-color: #ff10f0;
+    selected-background: #2a0a28dc;
+    selected-foreground: #39ff14;
+    muted: #8a8a8a;
+}
+
+window {
+    background-color: @background;
+    border: 1;
+    border-color: @glass-edge;
+    border-radius: 16px;
+    padding: 14;
+    width: 980px;
+}
+
+mainbox {
+    background-color: @glass-surface;
+    border: 1;
+    border-color: @glass-highlight;
+    border-radius: 11px;
+    padding: 9;
+    spacing: 8;
+}
+
+inputbar {
+    background-color: @glass-deep;
+    text-color: @foreground;
+    border: 1;
+    border-color: @neon-pink;
+    border-radius: 9px;
+    padding: 8;
+    spacing: 8;
+}
+
+prompt {
+    background-color: @glass-deep;
+    text-color: @neon-green;
+}
+
+entry {
+    background-color: @glass-deep;
+    text-color: @neon-white;
+    placeholder-color: @muted;
+}
+
+listview {
+    background-color: transparent;
+    border: 0;
+    padding: 4px;
+    spacing: 6px;
+    scrollbar: false;
+    lines: 5;
+}
+
+scrollbar {
+    background-color: @glass-deep;
+    handle-color: @neon-green;
+    handle-width: 4px;
+}
+
+element {
+    background-color: transparent;
+    text-color: @neon-white;
+    border: 1;
+    border-color: rgba(0, 255, 255, 0.26);
+    border-radius: 10px;
+    padding: 8px 10px;
+    spacing: 12;
+}
+
+element selected {
+    background-color: @selected-background;
+    text-color: @neon-white;
+    border: 1;
+    border-color: @neon-green;
+}
+
+element selected.normal {
+    background-color: @selected-background;
+    text-color: @selected-foreground;
+    border: 1;
+    border-color: @neon-green;
+}
+
+element selected.active {
+    background-color: @selected-background;
+    text-color: @neon-cyan;
+    border: 1;
+    border-color: @neon-cyan;
+}
+
+element selected.urgent {
+    background-color: @selected-background;
+    text-color: @neon-red;
+    border: 1;
+    border-color: @neon-red;
+}
+
+element normal {
+    background-color: transparent;
+    text-color: @neon-white;
+}
+
+element alternate.normal {
+    background-color: #12051066;
+    text-color: @neon-white;
+}
+
+element alternate.active {
+    background-color: #12051066;
+    text-color: @neon-cyan;
+}
+
+element alternate.urgent {
+    background-color: #12051066;
+    text-color: @neon-red;
+}
+
+element active {
+    background-color: transparent;
+    text-color: @neon-cyan;
+}
+
+element urgent {
+    background-color: transparent;
+    text-color: @neon-red;
+}
+
+element-text {
+    background-color: inherit;
+    text-color: inherit;
+    highlight: @neon-cyan;
+    vertical-align: center;
+}
+
+element-icon {
+    background-color: inherit;
+    size: 440px 18px;
+    border-radius: 3px;
+    padding: 0;
+    margin: 0;
+}
+
+message {
+    background-color: @glass-deep;
+    border: 1;
+    border-color: @neon-red;
+    padding: 8px;
+}
+
+textbox {
+    background-color: @glass-deep;
+    text-color: @neon-white;
+}
+
+button selected {
+    background-color: @selected-background;
+    text-color: @selected-foreground;
+    border: 1;
+    border-color: @neon-green;
+}
