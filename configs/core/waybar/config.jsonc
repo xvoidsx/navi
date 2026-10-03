@@ -27,7 +27,6 @@
 	"custom/update",
 	"custom/volume",
         "network",
-        "bluetooth",
         "battery",
         "backlight",
         "idle_inhibitor",
@@ -100,47 +99,6 @@
             "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-networking\" navi-networking",
             "interval": 30
         },
-    // Bluetooth — the bar's Bluetooth indicator, replacing the blueman applet.
-    //
-    // blueman-tray was a legacy X11 XEmbed tray host. On this pure-Wayland
-    // session it has no X display to reparent icons onto, so it never mapped a
-    // window: `xlsclients` on :1 reports zero clients and BlueZ's
-    // RegisteredStatusNotifierItems list is empty. It held ~77 MB while showing
-    // nothing. Waybar's own `bluetooth` module reads org.bluez over D-Bus, so it
-    // needs no PipeWire BlueZ plugin (that plugin is only required for BT *audio*
-    // profiles, a separate install).
-    //
-    // The glyph is the bluetooth mark itself so it is unmistakably bluetooth,
-    // followed by an explicit state dot: ● filled = a device is connected,
-    // ○ hollow = radio up but nothing connected, … = mid-connection. Colour in
-    // style.css (#bluetooth.off / .connected / .connecting) reinforces it, but
-    // the dot carries the state on its own so it survives any restyle.
-    //
-    // NOTE: waybar 0.12.0 on this box hard-crashes the entire bar
-    // ("argument not found") on the device-enumeration placeholders —
-    // {device_count}, {device_enumerate}, {device_alias}, {device_address} and
-    // {status_alias} all abort startup when no device is paired. {icon} and
-    // {status} are safe, so the state is expressed with literal per-state format
-    // strings instead. Revisit once a device is paired or waybar is past 0.12.0.
-    "bluetooth": {
-        "format": "{icon} 󰁨",
-        "format-icons": {
-            "off": "󰊓",
-            "on": "󰊓",
-            "connected": "󰊓",
-            "disconnected": "󰊓"
-        },
-        "format-off": "{icon} 󰀍",
-        "format-on": "{icon} 󰁨",
-        "format-connecting": "{icon} 󰅁",
-        "format-connected": "{icon} 󰃧",
-        "format-disconnected": "{icon} 󰁨",
-        "tooltip-format": "{status}",
-        "on-click": "navi-bluetooth",
-        "on-scroll-up": "bluetoothctl power on",
-        "on-scroll-down": "bluetoothctl power off",
-        "tooltip": true
-    },
     // now playing: fixed-width slot showing what's on the MPRIS bus.
     // click opens the full navi-nowplaying mod.
     "custom/nowplaying": {
