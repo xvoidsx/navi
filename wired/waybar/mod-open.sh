@@ -41,8 +41,8 @@ shift
 # and self-hugging frames (wiredrop: width-4) fill whatever they're given.
 # Dimensions are frame width+4 x frame height+1 (tight around the fixed frames).
 case "$(basename "$1")" in
-navi-agents-config) DIMS="87x26" ;;
-navi-audio) DIMS="67x19" ;;
+navi-agents-config) DIMS="87x27" ;;
+navi-audio) DIMS="73x20" ;;
 navi-bluetooth) DIMS="68x24" ;;
 navi-browser) DIMS="74x31" ;;
 navi-calendar) DIMS="68x29" ;;
@@ -50,10 +50,10 @@ navi-display) DIMS="67x26" ;;
 navi-get) DIMS="75x39" ;;
 navi-lain-config) DIMS="70x23" ;;
 navi-networking) DIMS="69x38" ;;
-navi-notifs) DIMS="67x29" ;;
+navi-notifs) DIMS="69x29" ;;
 navi-power) DIMS="67x26" ;;
-navi-reminders) DIMS="69x24" ;;
-navi-weather) DIMS="68x25" ;;
+navi-reminders) DIMS="68x24" ;;
+navi-weather) DIMS="68x24" ;;
 wiredrop) DIMS="66x23" ;;
 *) DIMS="" ;;
 esac
