@@ -418,6 +418,7 @@ type pairEventKind int
 
 const (
 	pairPromptPasskey   pairEventKind = iota // text = "583920" — confirm yes/no
+	pairPromptDisplay                        // text = "583920" — type it on the device, no confirmation
 	pairPromptPIN                            // enter PIN digits
 	pairPromptAuthorize                      // text = service desc — yes/no
 	pairDone
@@ -430,9 +431,10 @@ type pairEvent struct {
 }
 
 var (
-	passkeyRe   = regexp.MustCompile(`Confirm passkey\s+(\d+)`)
-	pinRe       = regexp.MustCompile(`(?i)(Request PIN code|Enter PIN)`)
-	authorizeRe = regexp.MustCompile(`Authorize service\s+(.*?)\s*\(yes/no\)`)
+	passkeyRe        = regexp.MustCompile(`Confirm passkey\s+(\d+)`)
+	displayPasskeyRe = regexp.MustCompile(`(?:Display passkey|Passkey):\s*(\d+)`)
+	pinRe            = regexp.MustCompile(`(?i)(Request PIN code|Enter PIN)`)
+	authorizeRe      = regexp.MustCompile(`Authorize service\s+(.*?)\s*\(yes/no\)`)
 )
 
 // classifyPairLine maps one bluetoothctl stdout line to a pair event.
@@ -440,6 +442,9 @@ var (
 func classifyPairLine(line string) (ev pairEvent, ok bool) {
 	if m := passkeyRe.FindStringSubmatch(line); m != nil {
 		return pairEvent{kind: pairPromptPasskey, text: m[1]}, true
+	}
+	if m := displayPasskeyRe.FindStringSubmatch(line); m != nil {
+		return pairEvent{kind: pairPromptDisplay, text: m[1]}, true
 	}
 	if pinRe.FindString(line) != "" {
 		return pairEvent{kind: pairPromptPIN}, true
@@ -509,6 +514,11 @@ func (s *pairSession) loop(scan *bufio.Scanner) {
 			continue
 		}
 		switch ev.kind {
+		case pairPromptDisplay:
+			// Display-only: show the passkey, no answer needed.
+			// User types it on the device (e.g. Apple keyboard).
+			s.Events <- ev
+			// Don't mark as answered — keep listening for the result.
 		case pairPromptPasskey, pairPromptPIN, pairPromptAuthorize:
 			// Answer each prompt kind at most once; a repeated prompt
 			// after an answer means the peer rejected it.

@@ -340,6 +340,10 @@ func (m model) handlePairEvent(ev pairEvent) (tea.Model, tea.Cmd) {
 		m.pairPrompt = ev
 		m.screen = screenPairing
 		return m, keepListening()
+	case pairPromptDisplay:
+		m.pairPrompt = ev
+		m.screen = screenPairing // shows "type this on the device"
+		return m, keepListening()
 	case pairPromptPIN:
 		m.pairPrompt = ev
 		m.pinBuf = ""
@@ -841,7 +845,11 @@ func (m model) viewPairing() string {
 	var b strings.Builder
 	b.WriteString("\n")
 	b.WriteString(theme.Header.Render("  pairing with "+truncateRunes(m.pairDev.name, 40)) + "\n\n")
-	if m.pairPrompt.kind == pairPromptPasskey {
+	if m.pairPrompt.kind == pairPromptDisplay {
+		b.WriteString(theme.Dimmed.Render("  type this passkey on the keyboard, then press Enter:") + "\n\n")
+		b.WriteString("  " + theme.Selected.Render(m.pairPrompt.text) + "\n\n")
+		b.WriteString(theme.Dimmed.Render("  waiting for you to type it… (esc cancels)") + "\n")
+	} else if m.pairPrompt.kind == pairPromptPasskey {
 		b.WriteString(theme.Dimmed.Render("  confirm the passkey matches on both devices:") + "\n\n")
 		b.WriteString("  " + theme.Selected.Render(m.pairPrompt.text) + "\n\n")
 		b.WriteString("  " + theme.Selected.Render("y") + theme.Dimmed.Render(" matches   ") +
