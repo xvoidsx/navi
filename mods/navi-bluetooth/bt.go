@@ -481,8 +481,9 @@ func startPair(mac string) (*pairSession, error) {
 	return startPairWithName(mac, "")
 }
 
-// startPairWithName sets up pairing. The default bluetoothctl agent
-// handles DisplayPasskey correctly for keyboards.
+// startPairWithName sets up pairing. For Apple keyboards, registers
+// a DisplayOnly agent to force Passkey Entry (type on keyboard)
+// instead of Numeric Comparison (yes/no).
 func startPairWithName(mac, name string) (*pairSession, error) {
 	cmd := exec.Command("bluetoothctl")
 	stdin, err := cmd.StdinPipe()
@@ -507,6 +508,14 @@ func startPairWithName(mac, name string) (*pairSession, error) {
 		closed:  make(chan struct{}),
 	}
 	go s.loop(bufio.NewScanner(stdout))
+	// Apple keyboards: DisplayOnly forces Passkey Entry method.
+	// Without this, BlueZ does Numeric Comparison (yes/no) which
+	// makes no sense for a keyboard with no display.
+	if isAppleDevice(name) {
+		fmt.Fprintln(stdin, "agent DisplayOnly")
+		fmt.Fprintln(stdin, "default-agent")
+		time.Sleep(500 * time.Millisecond)
+	}
 	fmt.Fprintf(stdin, "pair %s\n", mac)
 	return s, nil
 }
