@@ -5,8 +5,9 @@
 # usage: mod-open.sh <window-title> <command> [args...]
 #
 # fitted windows: every mod gets a terminal sized to its own frame
-# (COLSxLINES cells, via alacritty -o window.dimensions), so the rounded
-# frame isn't drowned in dead terminal space. the table below is the
+# (COLSxLINES cells, converted to pixels for kitty via measured ratios),
+# so the rounded frame isn't drowned in dead terminal space. the table
+# below is the
 # family geometry — tweak a number here, never at the callers. commands
 # not listed (herdr, the update click script, anything future) fall back
 # to the old 640x760 pixel resize.
@@ -59,12 +60,16 @@ wiredrop) DIMS="66x23" ;;
 esac
 
 FLOAT_CMDS="floating enable, move position center"
-ALACRITTY_OPTS=()
+KITTY_OPTS=()
 if [ -n "$DIMS" ]; then
   COLS="${DIMS%x*}"
   LINES="${DIMS#*x}"
-  # cell-exact sizing: DPI-independent, no pixel math, no sway resize.
-  ALACRITTY_OPTS=(-o "window.dimensions.columns=$COLS" -o "window.dimensions.lines=$LINES")
+  # kitty has no cell-exact CLI flag like alacritty's window.dimensions.
+  # measured on T440p (2026-10-03): 1366px/135cols=10.1, 768px/34lines=22.6.
+  # rounded to 10x23 plus 10px window padding.
+  PX_W=$(( COLS * 10 + 10 ))
+  PX_H=$(( LINES * 23 + 10 ))
+  KITTY_OPTS=(--override "initial_window_width=${PX_W}" --override "initial_window_height=${PX_H}")
 else
   # unknown command: the old pixel resize, as before.
   FLOAT_CMDS="floating enable, resize set 640 760, move position center"
@@ -101,7 +106,7 @@ if [ -f "$AGENTS_ENV" ]; then
   set -a; . "$AGENTS_ENV" 2>/dev/null; set +a
 fi
 
-alacritty --title "$TITLE" "${ALACRITTY_OPTS[@]}" -e "$@" &
+kitty --title "$TITLE" "${KITTY_OPTS[@]}" -e "$@" &
 term_pid=$!
 
 if [ "$COMPOSITOR" = "sway" ]; then
