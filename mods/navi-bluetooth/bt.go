@@ -431,8 +431,8 @@ type pairEvent struct {
 }
 
 var (
-	passkeyRe        = regexp.MustCompile(`Confirm passkey\s+(\d+)`)
-	displayPasskeyRe = regexp.MustCompile(`(?:Display passkey|Passkey):\s*(\d+)`)
+	passkeyRe        = regexp.MustCompile(`(?i)confirm passkey\D*(\d{6})`)
+	displayPasskeyRe = regexp.MustCompile(`(?i)(?:display passkey|passkey)\D*(\d{6})`)
 	pinRe            = regexp.MustCompile(`(?i)(Request PIN code|Enter PIN)`)
 	authorizeRe      = regexp.MustCompile(`Authorize service\s+(.*?)\s*\(yes/no\)`)
 )
@@ -481,9 +481,8 @@ func startPair(mac string) (*pairSession, error) {
 	return startPairWithName(mac, "")
 }
 
-// startPairWithName sets the agent capability based on device type before pairing.
-// Apple keyboards need the default agent (handles DisplayPasskey); explicitly
-// registering ensures BlueZ uses the right IO capability negotiation.
+// startPairWithName sets up pairing. The default bluetoothctl agent
+// handles DisplayPasskey correctly for keyboards.
 func startPairWithName(mac, name string) (*pairSession, error) {
 	cmd := exec.Command("bluetoothctl")
 	stdin, err := cmd.StdinPipe()
@@ -508,15 +507,6 @@ func startPairWithName(mac, name string) (*pairSession, error) {
 		closed:  make(chan struct{}),
 	}
 	go s.loop(bufio.NewScanner(stdout))
-	// Register agent with KeyboardDisplay capability for Apple keyboards.
-	// This tells BlueZ we can display a passkey for the user to type
-	// on the keyboard, rather than asking for yes/no confirmation.
-	if isAppleDevice(name) {
-		fmt.Fprintln(stdin, "agent KeyboardDisplay")
-		fmt.Fprintln(stdin, "default-agent")
-		// Small delay to let the agent register.
-		time.Sleep(300 * time.Millisecond)
-	}
 	fmt.Fprintf(stdin, "pair %s\n", mac)
 	return s, nil
 }
