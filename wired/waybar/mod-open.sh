@@ -42,7 +42,7 @@ shift
 # Dimensions are frame width+4 x frame height+1 (tight around the fixed frames).
 case "$(basename "$1")" in
 navi-nowplaying) DIMS="66x21" ;;
-navi-networking) DIMS="68x37" ;;
+navi-networking) DIMS="68x37"; FONT_SIZE="10.0" ;;  # dense layout needs smaller text
 navi-calendar) DIMS="66x30" ;;
 navi-audio) DIMS="66x20" ;;
 navi-bluetooth) DIMS="66x25" ;;
@@ -70,6 +70,10 @@ if [ -n "$DIMS" ]; then
   PX_W=$(( COLS * 10 + 10 ))
   PX_H=$(( LINES * 23 + 10 ))
   KITTY_OPTS=(--override "initial_window_width=${PX_W}" --override "initial_window_height=${PX_H}")
+  # per-mod font size (navi-networking's dense layout needs smaller text)
+  if [ -n "${FONT_SIZE:-}" ]; then
+    KITTY_OPTS+=(--override "font_size=${FONT_SIZE}")
+  fi
 else
   # unknown command: the old pixel resize, as before.
   FLOAT_CMDS="floating enable, resize set 640 760, move position center"
