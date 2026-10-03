@@ -5,8 +5,9 @@
 # usage: mod-open.sh <window-title> <command> [args...]
 #
 # fitted windows: every mod gets a terminal sized to its own frame
-# (COLSxLINES cells, approximated in pixels for kitty), so the rounded
-# frame isn't drowned in dead terminal space. the table below is the
+# (COLSxLINES cells, converted to pixels for kitty via measured ratios),
+# so the rounded frame isn't drowned in dead terminal space. the table
+# below is the
 # family geometry — tweak a number here, never at the callers. commands
 # not listed (herdr, the update click script, anything future) fall back
 # to the old 640x760 pixel resize.
@@ -64,11 +65,10 @@ if [ -n "$DIMS" ]; then
   COLS="${DIMS%x*}"
   LINES="${DIMS#*x}"
   # kitty has no cell-exact CLI flag like alacritty's window.dimensions.
-  # approximate: JetBrains Mono 12pt ~7px wide, ~15px tall per cell,
-  # plus window padding (5px each side from kitty.conf).
-  # not pixel-perfect, but close enough for floating mods.
-  PX_W=$(( COLS * 7 + 10 ))
-  PX_H=$(( LINES * 15 + 10 ))
+  # measured on T440p (2026-10-03): 1366px/135cols=10.1, 768px/34lines=22.6.
+  # rounded to 10x23 plus 10px window padding.
+  PX_W=$(( COLS * 10 + 10 ))
+  PX_H=$(( LINES * 23 + 10 ))
   KITTY_OPTS=(--override "initial_window_width=${PX_W}" --override "initial_window_height=${PX_H}")
 else
   # unknown command: the old pixel resize, as before.
