@@ -5,9 +5,12 @@
 {
     "layer": "top",
     "position": "top",
-    "height": 34,
-    "margin-top": 0,
+    "height": 38,
+    "margin-top": 8,
     "margin-bottom": 0,
+    "margin-left": 10,
+    "margin-right": 10,
+    "spacing": 2,
 
     "modules-left": [
         "custom/wired-launcher",
@@ -20,14 +23,18 @@
         "clock#3"
     ],
     "modules-right": [
-        //"custom/media",
-	"pulseaudio",
+	"custom/weather",
+	"custom/update",
+	"custom/volume",
         "network",
+        "bluetooth",
         "battery",
         "backlight",
         "idle_inhibitor",
-        "power-profiles-daemon",	
-	"tray", 	
+        "power-profiles-daemon",
+	"custom/agent",
+	"custom/bell",
+	"tray",
 	"custom/power"
     ],
 
@@ -58,31 +65,31 @@
     "clock#2": {
         "format": "{:%H:%M}",
         "tooltip": false,
-        "on-click": "alacritty -e tty-clock"
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-reminders\" navi-reminders"
     },
     "clock#3": {
         //"format": "{:%Y/%m/%d}",
         "format": "{:%d %B}",
-	"tooltip": false, 
-        "on-click": "gsimplecal"
+	"tooltip": false,
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-calendar\" navi-calendar"
     },
 
-    "pulseaudio": {
-        "format": "🔊 {volume:2}%",  // Added volume character
-        "format-bluetooth": "🔊 Volume {volume}% ",
-        "format-muted": "🔇 mute",  // Added mute character
-        "format-icons": {
-            "headphones": "🎧",
-            "default": [
-                "🔊",
-                "🔈"
-            ]
-        },
-        "scroll-step": 5,
+    "custom/volume": {
+        // navi-audio volume module: live volume ("🔊 74%"). the device
+        // label ("Line Out", "HDMI", …) lives in the tooltip so the module
+        // stays compact. audio-status.sh is long-running and re-emits on
+        // `pactl subscribe` events — no polling.
+        "format": "{}",
+        "return-type": "json",
+        "exec": "/usr/share/navi/wired/waybar/audio-status.sh",
         "on-click": "pamixer -t",
-        "on-click-right": "pavucontrol"
+        "on-scroll-up": "pamixer -i 5",
+        "on-scroll-down": "pamixer -d 5",
+        "on-click-right": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-audio\" navi-audio",
+        "on-click-middle": "/usr/share/navi/wired/waybar/audio-switch.sh",
+        "tooltip": true
     },
-    // - - - XXX testing section XXX - - - 
+    // - - - XXX testing section XXX - - -
     // this is a 'testing' network module. if it doesn't work out right, we'll remove it
     "network": {
             "format-wifi": "📶 {signalStrength}%",
@@ -90,21 +97,63 @@
             "format-disconnected": "⚠ Disconnected",
             "tooltip-format": "Wireless status -  {ifname}: {ipaddr}/{cidr}",
 	    "tooltip-format-wifi": "{essid}",
-            "on-click": "st -e nmtui",
-            "interval": 30 
+            "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-networking\" navi-networking",
+            "interval": 30
         },
-    // this is a 'testing' audioplayer module. shows currently playing audio and is interactive.
-    "custom/media": {
-	    "format": "{}",
-	    "return-type": "json",
-	    "max-length": 20,
-	    "fixed-width": true,
-	    "escape": true,
-	    "exec": "/usr/local/bin/mediaplayer.sh",
-	    "on-click": "playerctl play-pause",
-	    "interval": 1 
+    // Bluetooth — the bar's Bluetooth indicator, replacing the blueman applet.
+    //
+    // blueman-tray was a legacy X11 XEmbed tray host. On this pure-Wayland
+    // session it has no X display to reparent icons onto, so it never mapped a
+    // window: `xlsclients` on :1 reports zero clients and BlueZ's
+    // RegisteredStatusNotifierItems list is empty. It held ~77 MB while showing
+    // nothing. Waybar's own `bluetooth` module reads org.bluez over D-Bus, so it
+    // needs no PipeWire BlueZ plugin (that plugin is only required for BT *audio*
+    // profiles, a separate install).
+    //
+    // The glyph is the bluetooth mark itself so it is unmistakably bluetooth,
+    // followed by an explicit state dot: ● filled = a device is connected,
+    // ○ hollow = radio up but nothing connected, … = mid-connection. Colour in
+    // style.css (#bluetooth.off / .connected / .connecting) reinforces it, but
+    // the dot carries the state on its own so it survives any restyle.
+    //
+    // NOTE: waybar 0.12.0 on this box hard-crashes the entire bar
+    // ("argument not found") on the device-enumeration placeholders —
+    // {device_count}, {device_enumerate}, {device_alias}, {device_address} and
+    // {status_alias} all abort startup when no device is paired. {icon} and
+    // {status} are safe, so the state is expressed with literal per-state format
+    // strings instead. Revisit once a device is paired or waybar is past 0.12.0.
+    "bluetooth": {
+        "format": "{icon} 󰁨",
+        "format-icons": {
+            "off": "󰊓",
+            "on": "󰊓",
+            "connected": "󰊓",
+            "disconnected": "󰊓"
+        },
+        "format-off": "{icon} 󰀍",
+        "format-on": "{icon} 󰁨",
+        "format-connecting": "{icon} 󰅁",
+        "format-connected": "{icon} 󰃧",
+        "format-disconnected": "{icon} 󰁨",
+        "tooltip-format": "{status}",
+        "on-click": "blueman-manager",
+        "on-scroll-up": "bluetoothctl power on",
+        "on-scroll-down": "bluetoothctl power off",
+        "tooltip": true
     },
-    // - - - XXX end testing section XXX - - - 
+    // now playing: fixed-width slot showing what's on the MPRIS bus.
+    // click opens the full navi-nowplaying mod.
+    "custom/nowplaying": {
+        "format": "{}",
+        "return-type": "json",
+        "max-length": 22,
+        "fixed-width": true,
+        "escape": true,
+        "exec": "/usr/share/navi/wired/waybar/waybar-nowplaying.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi now playing\" navi-nowplaying",
+        "interval": 2,
+        "tooltip": true
+    },
     "memory": {
         "interval": 5,
         "format": "Mem {}%"
@@ -134,14 +183,15 @@
         "path": "/"
     },
     "tray": {
-        "icon-size": 20 
+        "icon-size": 20,
+        "spacing": 6
     },
     "custom/wired-launcher": {
         //"format": "▽",
         "format": "∅",
 	"on-click": "rofi -show combi -combi -modi window,drun,run modi combi",
         "tooltip": true,
-		"tooltip-format": "open Wired launcher"	
+		"tooltip-format": "open Wired launcher"
     },
     "idle_inhibitor": {
         "format": "{icon}",
@@ -166,6 +216,44 @@
             "balanced": "",
             "power-saver": ""
         }
+    },
+    "custom/update": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 300,
+        "exec": "/usr/share/navi/wired/waybar/update-check.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-update\" /usr/share/navi/wired/waybar/navi-update-click.sh",
+        "tooltip": true
+    },
+    "custom/weather": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 600,
+        "exec": "/usr/share/navi/wired/waybar/weather.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi weather\" navi-weather",
+        "tooltip": true
+    },
+    "custom/bell": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 10,
+        "exec": "/usr/share/navi/wired/waybar/notif-bell.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-notifs\" navi-notifs",
+        "tooltip": true
+    },
+    "custom/agent": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 5,
+        "exec": "/usr/share/navi/wired/waybar/agent-mod.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-agents-config\" navi-agents-config",
+        "on-click-right": "/usr/share/navi/wired/waybar/agent-menu.sh",
+        "on-click-middle": "/usr/share/navi/wired/waybar/mod-open.sh \"herdr\" herdr",
+        "tooltip": true
     },
     "custom/power": {
         "format" : "⏻ ",

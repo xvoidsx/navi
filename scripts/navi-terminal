@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# navi-terminal — the right terminal for this session.
+#
+# kitty everywhere (GPU-accelerated, Wayland + X11, ~50MB vs alacritty's 80MB).
+# Falls back to foot on Wayland (lightest at 25MB) or alacritty if kitty
+# isn't installed. Passes all args through.
+#
+# Usage: navi-terminal [-e command ...]
+
+set -uo pipefail
+
+if command -v kitty >/dev/null 2>&1; then
+    exec kitty "$@"
+elif [ -n "${WAYLAND_DISPLAY:-}" ] && command -v foot >/dev/null 2>&1; then
+    exec foot "$@"
+elif command -v alacritty >/dev/null 2>&1; then
+    exec alacritty "$@"
+else
+    echo "navi-terminal: no suitable terminal found (need kitty, foot, or alacritty)" >&2
+    exit 1
+fi

@@ -15,7 +15,23 @@ CACHE_DIR="$HOME/.cache/navi-weather"
 CONFIG="$HOME/.config/navi-weather/config.json"
 CACHE_TTL=3600 # 1 hour
 
-json_escape() { python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().strip()))' <<<"$1"; }
+# U+FE0F (VARIATION SELECTOR-16) forces emoji *presentation* on whatever follows
+# it. Pango honours that by demanding a real colour-emoji font, and the only one
+# installed here (Noto Color Emoji) is a fixed 109px strike that cannot be used at
+# bar size — so GTK painted the .notdef box instead of the glyph, and the weather
+# module showed a white square next to the temperature.
+#
+# The condition glyphs are fine on their own: every font on the box (Noto Sans,
+# Noto Sans Symbols2, DejaVu, the Nerd Fonts) carries U+1F32B and friends as
+# clean monochrome glyphs that read correctly at 10px. Dropping the selector
+# leaves each codepoint at its default text presentation, which is what we want
+# in a 10px bar anyway.
+#
+# Stripped in json_escape so the fix covers text, tooltip and every other
+# consumer of this module at once, present and future.
+json_escape() {
+  python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().replace("️","").strip()))' <<<"$1"
+}
 
 emit() { # <text> <tooltip> <class>
   printf '{"text": %s, "tooltip": %s, "class": %s}\n' \

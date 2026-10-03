@@ -97,6 +97,10 @@ PKGS=(
   # Hey Lain voice assistant (eiri): venv tooling + audio capture libs.
   # The venv itself (faster-whisper, piper) is built by setup_heylain.
   python3-venv python3-pip pipewire-audio-client-libraries alsa-utils
+  # libspa-0.2-bluetooth: BlueZ audio backend for PipeWire/WirePlumber.
+  # WirePlumber builds its module graph at boot, so this must be installed
+  # before first boot — installing it mid-session needs a wireplumber restart.
+  libspa-0.2-bluetooth
   # NaviVim (default terminal IDE): telescope needs ripgrep + fd
   # (Debian calls it fd-find), treesitter parsers and fzf-native compile
   # at first launch (build-essential), shellcheck for config linting.
@@ -1198,6 +1202,74 @@ deploy_config() {
   ok "${dest#$HOME/} deployed"
 }
 
+deploy_waybar_themes() {
+  # deploy_waybar_themes — the waybar theme store.
+  # system: /usr/share/navi/waybar/themes/<name>/{theme.css,meta}
+  # user:   ~/.local/share/navi/waybar/themes/<name>/{theme.css,meta} (wins)
+  # navi-theme resolves user-first, so a user theme of the same name shadows
+  # the distro one. in update mode, user themes are only overwritten if
+  # untouched (same manifest logic as deploy_config).
+  local src_dir="$WIRED_SHARE/waybar/themes"
+  [ -d "$src_dir" ] || { warn "missing waybar themes in wired/ — skipping"; return 0; }
+  local sys_dir="$SHARE_DIR/waybar/themes"
+  $DOAS mkdir -p "$sys_dir"
+  $DOAS cp -a "$src_dir/." "$sys_dir/"
+  $DOAS chmod -R a+rX "$sys_dir"
+  ok "waybar themes -> $sys_dir"
+
+  local user_dir="$HOME/.local/share/navi/waybar/themes"
+  mkdir -p "$user_dir"
+  local theme
+  for theme in "$src_dir"/*/; do
+    theme="$(basename "$theme")"
+    local dest="$user_dir/$theme"
+    if [ "$NAVI_UPDATE_MODE" -eq 1 ] && [ -d "$dest" ]; then
+      # update mode: only overwrite untouched user themes
+      local baseline live_sha
+      baseline="$(manifest_lookup "$dest/theme.css")"
+      if [ -n "$baseline" ]; then
+        live_sha="$(sha256sum "$dest/theme.css" 2>/dev/null | cut -d' ' -f1 || true)"
+        if [ "$live_sha" != "$baseline" ]; then
+          info "kept your modified waybar theme: $theme"
+          continue
+        fi
+      fi
+    fi
+    backup_if_changed "$src_dir/$theme/theme.css" "$dest/theme.css"
+    mkdir -p "$dest"
+    cp -a "$src_dir/$theme/." "$dest/"
+    manifest_record "$src_dir/$theme/theme.css" "waybar/themes/$theme/theme.css" "$dest/theme.css" "644"
+  done
+  ok "waybar themes -> ~/.local/share/navi/waybar/themes"
+}
+
+deploy_waybar_service() {
+  # deploy_waybar_service — the waybar systemd user unit.
+  # replaces the packaged /usr/lib/systemd/user/waybar.service outright:
+  # the packaged unit carries Requisite=graphical-session.target, which is
+  # never activated in a plain sddm-launched Wayland session, so it fails
+  # silently. a drop-in cannot remove dependencies, only add them — hence
+  # a full replacement unit hooked into default.target.
+  local src="$WIRED_SHARE/systemd/waybar.service"
+  [ -f "$src" ] || { warn "missing waybar.service — skipping autostart setup"; return 0; }
+  local unit_dir="$HOME/.config/systemd/user"
+  mkdir -p "$unit_dir"
+  backup_if_changed "$src" "$unit_dir/waybar.service"
+  install -m 0644 "$src" "$unit_dir/waybar.service"
+  manifest_record "$src" "systemd/waybar.service" "$unit_dir/waybar.service" "644"
+  ok "waybar.service -> ~/.config/systemd/user/"
+  if ! command -v systemctl >/dev/null 2>&1; then
+    warn "systemctl not found — enable waybar by hand: systemctl --user enable --now waybar"
+    return 0
+  fi
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
+  if systemctl --user enable --now waybar.service >/dev/null 2>&1; then
+    ok "waybar enabled and started (systemctl --user status waybar)"
+  else
+    warn "waybar.service could not be enabled — run: systemctl --user enable --now waybar"
+  fi
+}
+
 deploy_configs() {
   step "deploying user configs (backups -> $BACKUP_DIR)"
 
@@ -1205,12 +1277,21 @@ deploy_configs() {
   deploy_config "i3/config"                   "$HOME/.config/i3/config"
   deploy_config "waybar/config.jsonc"         "$HOME/.config/waybar/config.jsonc"
   deploy_config "waybar/style.css"            "$HOME/.config/waybar/style.css"
+  # waybar theme store (eiri): five themes, one dir each so a theme can grow
+  # its own config.json later. system copy lands under /usr/share/navi (what
+  # navi-theme reads as SYS_THEMES); user copy goes to ~/.local/share/navi
+  # (USER_THEMES, wins). style.css IS the patchbay theme, byte-identical —
+  # that's the whole default-persistence mechanism (no state file to drift).
+  deploy_waybar_themes
+  deploy_config "rofi/navi-theme.rasi"       "$HOME/.config/rofi/navi-theme.rasi"
+  deploy_waybar_service
   deploy_config "polybar/config.ini"          "$HOME/.config/polybar/config.ini"
   deploy_config "polybar/battery-combined-shell.sh" "$HOME/.config/polybar/battery-combined-shell.sh" 755
   deploy_config "rofi/config.rasi"            "$HOME/.config/rofi/config.rasi"
   deploy_config "picom/picom.conf"            "$HOME/.config/picom/picom.conf"
   deploy_config "terminals/alacritty.toml"    "$HOME/.config/alacritty/alacritty.toml"
   deploy_config "terminals/foot.ini"          "$HOME/.config/foot/foot.ini"
+  deploy_config "terminals/kitty.conf"        "$HOME/.config/kitty/kitty.conf"
   deploy_config "cliamp/config.toml"         "$HOME/.config/cliamp/config.toml"
   deploy_config "herdr/config.toml"          "$HOME/.config/herdr/config.toml"
   # cmus + cava: the nightshadeNeon music setup. the cmus rc selects the
@@ -1323,7 +1404,7 @@ install_commands() {
 
   # distro-level tools live in scripts/ (repo root), outside the /wired
   # desktop layer — same /usr/bin destination, same rofi visibility.
-  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore" "navi-wired-adopt.sh:navi-wired-adopt" "navi-extras.sh:navi-extras"; do
+  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore" "navi-wired-adopt.sh:navi-wired-adopt" "navi-extras.sh:navi-extras" "navi-theme:navi-theme" "navi-terminal:navi-terminal"; do
     local src="$REPO_DIR/scripts/${pair%%:*}" name="${pair##*:}"
     if [ -e "$src" ]; then
       $DOAS install -m 0755 "$src" "/usr/bin/$name"

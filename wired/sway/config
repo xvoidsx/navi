@@ -37,7 +37,14 @@ set $mod Mod4
 exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP=sway XDG_SESSION_DESKTOP=sway
 
 # set secret store. we use gnome-keyring. a gui to see its content can be called via `seahorse`
-exec --no-startup-id gnome-keyring-daemon --start --components=pkcs11,secrets,ssh
+#
+# the value must stay inside quotes: sway's config lexer treats `,` as a token
+# separator, so an unquoted `--components=pkcs11,secrets,ssh` gets split into
+# three tokens and sway aborts the line with "Unknown/invalid command
+# 'secrets'". the daemon never launched, so SSH_AUTH_SOCK and
+# GNOME_KEYRING_CONTROL were never exported into the session and terminals
+# inherited no keyring or agent.
+exec_always --no-startup-id sh -c "gnome-keyring-daemon --start --components=pkcs11,secrets,ssh"
 
 # handle some imports
 exec systemctl --user import-environment DISPLAY WAYLAND_DISPLAY SWAYSOCK PATH
@@ -94,7 +101,19 @@ exec swayidle \
     timeout 900 'systemctl suspend' \
     before-sleep 'nslock'
 
-exec --no-startup-id sh -c "sleep 1 && blueman-applet &"
+# Blueman tray/applet: retired.
+#
+# blueman-tray is a legacy X11 XEmbed tray host. On this pure-Wayland session it
+# has no X display to reparent icons onto, so it never mapped a window and never
+# showed anything — `xlsclients` on :1 reports zero clients and `busctl` shows
+# org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems is an empty list.
+# It was silently holding ~103 MB (blueman-applet 55 MB + blueman-tray 45 MB +
+# obexd 2 MB) at 0% CPU.
+#
+# Waybar's own `tray` module is the real StatusNotifierItem host and is kept in
+# config.jsonc. Bluetooth status now comes from waybar's `bluetooth` module,
+# which talks to org.bluez over D-Bus and does not depend on the applet.
+# exec --no-startup-id sh -c "sleep 1 && blueman-applet &"
 exec --no-startup-id dunst
 exec --no-startup-id lxpolkit
 # Volume OSD: listens to PipeWire/Pulse events, pops a bottom-center meter.
@@ -114,7 +133,7 @@ bindsym --no-repeat Alt+v exec /usr/share/navi/hey-lain/bin/toggle.sh
 floating_modifier $mod
 
 # start a terminal.
-bindsym $mod+Return exec alacritty
+bindsym $mod+Return exec kitty
 
 # kill focused window
 bindsym $mod+Shift+q kill
@@ -138,6 +157,8 @@ bindsym Mod1+c exec --no-startup-id "alacritty -e calcurse"
 bindsym $mod+Shift+f exec --no-startup-id "nemo"
 bindsym Caps_Lock exec --no-startup-id "notify-send 'wired helper' 'Caps Lock pressed.'"
 bindsym $mod+p exec --no-startup-id "navishot"
+# waybar theme picker: real screenshots, switch applied live via SIGUSR2.
+bindsym Mod1+t exec --no-startup-id "navi-theme"
 bindsym Mod1+h exec --no-startup-id "alacritty -e htop"
 bindsym Mod1+s exec --no-startup-id "alacritty -e vim /tmp/$(date -I).txt"
 bindsym Mod1+e exec --no-startup-id "remoji"

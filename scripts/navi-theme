@@ -1,0 +1,290 @@
+#!/usr/bin/env bash
+# navi-theme — choose the Navi waybar theme.
+#
+# The distro that feels alive, and lets you pick how it looks.
+#
+#   navi-theme                  interactive picker with real screenshots
+#   navi-theme list             list themes, * marks the active one
+#   navi-theme use <name>       apply a theme (live, no restart)
+#   navi-theme current          print the active theme
+#   navi-theme shot [name]      rebuild preview screenshots
+#   navi-theme edit <name>      open a theme's css in $EDITOR
+#   navi-theme --help
+#
+# Themes live one-per-directory so a theme can grow to carry its own config.json
+# later without breaking anything:
+#
+#   ~/.local/share/navi/waybar/themes/<name>/theme.css   user  (wins)
+#   /usr/share/navi/waybar/themes/<name>/theme.css      system (distro)
+#   .../<name>/meta                                    optional key=value info
+#
+# The active theme is simply the one whose theme.css matches the live style.css,
+# so there is no separate state file to drift out of sync.
+
+set -uo pipefail
+
+WAYBAR_DIR="${WAYBAR_DIR:-$HOME/.config/waybar}"
+USER_THEMES="${NAVI_THEMES_USER:-$HOME/.local/share/navi/waybar/themes}"
+SYS_THEMES="${NAVI_THEMES_SYS:-/usr/share/navi/waybar/themes}"
+CACHE="${NAVI_THEME_CACHE:-$HOME/.cache/navi-theme}"
+STYLE="$WAYBAR_DIR/style.css"
+SHOTS="$CACHE/shots"
+
+die() { printf 'navi-theme: %s\n' "$*" >&2; exit 1; }
+say() { printf '%s\n' "$*"; }
+
+[ -d "$WAYBAR_DIR" ] || die "no waybar config at $WAYBAR_DIR"
+
+# ---------------------------------------------------------------- discovery --
+
+# All themes visible to this user: system first, user second so a user theme of
+# the same name shadows the system one.
+all_themes() {
+    {
+        [ -d "$SYS_THEMES" ] && find "$SYS_THEMES" -mindepth 2 -maxdepth 2 -name theme.css -printf '%h\n' 2>/dev/null
+        [ -d "$USER_THEMES" ] && find "$USER_THEMES" -mindepth 2 -maxdepth 2 -name theme.css -printf '%h\n' 2>/dev/null
+    } | while read -r d; do basename "$d"; done | awk '!seen[$0]++' | sort
+}
+
+theme_dir() {
+    # user overrides system
+    [ -f "$USER_THEMES/$1/theme.css" ] && { printf '%s\n' "$USER_THEMES/$1"; return; }
+    [ -f "$SYS_THEMES/$1/theme.css" ] && { printf '%s\n' "$SYS_THEMES/$1"; return; }
+    return 1
+}
+
+meta_get() { # <dir> <key>
+    [ -f "$1/meta" ] || return 0
+    sed -n "s/^[[:space:]]*$2=//p" "$1/meta" | head -1
+}
+
+current_theme() {
+    local n
+    for n in $(all_themes); do
+        local d; d=$(theme_dir "$n") || continue
+        cmp -s "$d/theme.css" "$STYLE" 2>/dev/null && { printf '%s\n' "$n"; return; }
+    done
+    printf 'custom\n'
+}
+
+# -------------------------------------------------------------------- apply --
+
+# GTK3 rejects comma selector lists inside @keyframes and renders `transparent`
+# as a dark fringe, so a broken theme can take the whole bar down. Validate before
+# installing, not after. Prints one line per error and returns non-zero if the
+# stylesheet will not load.
+validate_css() {
+    python3 - "$1" <<'PY' 2>/dev/null
+import sys
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
+
+errs = []
+p = Gtk.CssProvider()
+
+def on_err(provider, section, error):
+    try:
+        line = int(error.start_location[1]) + 1
+        errs.append("  line %d: %s" % (line, error.message))
+    except Exception:
+        errs.append("  %s" % error.message)
+
+p.connect("parsing-error", on_err)
+try:
+    p.load_from_path(sys.argv[1])
+except Exception as e:
+    errs.append("  %s" % e)
+
+for e in errs:
+    print(e)
+sys.exit(1 if errs else 0)
+PY
+}
+
+apply_theme() { # <name>
+    local name="$1" d out
+    d=$(theme_dir "$name") || {
+        say "available themes:"
+        all_themes | sed 's/^/  /'
+        die "no theme named '$name'"
+    }
+
+    # Capture stderr too: a hard parse failure raises rather than reporting.
+    if ! out=$(validate_css "$d/theme.css" 2>&1); then
+        printf '%s\n' "$out" >&2
+        die "theme '$name' is invalid — bar left on '$(current_theme)'"
+    fi
+
+    cp -f "$d/theme.css" "$STYLE"
+    pkill -SIGUSR2 -x waybar 2>/dev/null || true
+
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -a "navi-theme" -u low -t 2200 \
+            "navi-theme: ${name}" "$(meta_get "$d" description)" 2>/dev/null || true
+    fi
+    say "$name"
+}
+
+# ---------------------------------------------------------------- previews --
+
+bar_width() {
+    swaymsg -t get_outputs 2>/dev/null | jq -r '.[] | select(.active) | (.width // .modes[0].width) // empty' 2>/dev/null | head -1
+}
+
+# Real screenshots, not mockups: switch, let waybar settle, grim the bar, then
+# put the previous theme back. A rendered approximation would lie about exactly
+# the things these themes are trying to show.
+shoot() { # <name>
+    command -v grim >/dev/null 2>&1 || return 1
+    mkdir -p "$SHOTS"
+    local w; w=$(bar_width)
+    [ -n "$w" ] || w=1366
+    local d; d=$(theme_dir "$1") || return 1
+    local settle="${SHOT_SETTLE:-1.8}"
+
+    cp -f "$d/theme.css" "$STYLE"
+    pkill -SIGUSR2 -x waybar 2>/dev/null || true
+    sleep "$settle"
+    grim -g "0,0 ${w}x56" "$SHOTS/$1.png" 2>/dev/null || return 1
+    return 0
+}
+
+build_previews() { # [only-one-name]
+    # Whatever happens — grim missing, a crash, Ctrl-C — put the user's theme
+    # back. Screenshotting must never leave someone on the wrong bar.
+    local restore; restore=$(current_theme)
+    trap '[ "$restore" != custom ] && apply_theme "$restore" >/dev/null 2>&1' EXIT INT TERM
+
+    local names; names=$([ -n "${1:-}" ] && printf '%s\n' "$1" || all_themes)
+    local made=0
+    for n in $names; do
+        if shoot "$n"; then
+            printf '  captured %s\n' "$n"
+            made=$((made + 1))
+        else
+            printf '  %-18s (no screenshot)\n' "$n"
+        fi
+    done
+    trap - EXIT INT TERM
+    [ "$restore" = custom ] || apply_theme "$restore" >/dev/null 2>&1
+    say "$made preview(s) in $SHOTS"
+}
+
+stale_previews() {
+    local n d
+    for n in $(all_themes); do
+        d=$(theme_dir "$n") || continue
+        [ "$SHOTS/$n.png" -nt "$d/theme.css" ] 2>/dev/null || printf '%s\n' "$n"
+    done
+}
+
+# ------------------------------------------------------------------ picker --
+
+picker() {
+    # rofi's image support is its icon system, not <img> markup — `-markup` and
+    # `-markup-rows` exist but there is no img tag, so <img> in a dmenu entry
+    # renders as literal text. Thumbnails therefore go in through rofi's
+    # documented NUL-separated icon field: "label\0icon-path" per line, with -i.
+    #
+    # Selection is matched by exact string equality against the labels built here.
+    # Parsing a title back out of the entry is what broke earlier: theme names
+    # legitimately contain spaces ("Refined Obsidian"), so a "first word wins"
+    # heuristic could not select some themes at all.
+    local n d title desc shot
+    local -a names=() labels=()
+
+    for n in $(all_themes); do
+        d=$(theme_dir "$n") || continue
+        title=$(meta_get "$d" name); [ -n "$title" ] || title="$n"
+        names+=("$n")
+        labels+=("$title  —  $(meta_get "$d" description)")
+    done
+    [ ${#names[@]} -gt 0 ] || die "no themes found in $USER_THEMES or $SYS_THEMES"
+
+    # Bash cannot hold a NUL inside a variable, so the icon records are written
+    # straight to stdout as they are produced rather than assembled in an array.
+    local choice
+    choice=$(
+        {
+            local i
+            for i in "${!names[@]}"; do
+                n=${names[$i]}
+                shot=""
+                [ -f "$SHOTS/$n.png" ] && shot=$(realpath "$SHOTS/$n.png")
+                if [ -n "$shot" ]; then
+                    printf '%s\0%s\n' "${labels[$i]}" "$shot"
+                else
+                    printf '%s\n' "${labels[$i]}"
+                fi
+            done
+        } | rofi -dmenu -i \
+            -p "navi · waybar theme" \
+            -theme "$HOME/.config/rofi/navi-theme.rasi"
+    )
+
+    [ -n "$choice" ] || return 0
+
+    # rofi may hand back the entry with the icon field still attached
+    choice=$(printf '%s' "$choice" | tr -d '\000')
+
+    local i
+    for i in "${!labels[@]}"; do
+        if [ "${labels[$i]}" = "$choice" ]; then
+            apply_theme "${names[$i]}" >/dev/null 2>&1 && say "${names[$i]}"
+            return 0
+        fi
+    done
+
+    # last resort: substring, so a stray control byte cannot block selection
+    for i in "${!names[@]}"; do
+        case "$choice" in
+            *"${names[$i]}"*|*"$(meta_get "$(theme_dir "${names[$i]}")" name)"*)
+                apply_theme "${names[$i]}" >/dev/null 2>&1 && say "${names[$i]}"
+                return 0 ;;
+        esac
+    done
+    return 0
+}
+
+# --------------------------------------------------------------------- cli ---
+
+cmd="${1:-}"
+
+case "$cmd" in
+    ""|pick|menu)        picker ;;
+    list|ls)
+        cur=$(current_theme)
+        printf '%-20s %s\n' "THEME" "DESCRIPTION"
+        for n in $(all_themes); do
+            d=$(theme_dir "$n") || continue
+            mark=' '; [ "$n" = "$cur" ] && mark='*'
+            printf '%s %-18s %s\n' "$mark" "$n" "$(meta_get "$d" description)"
+        done
+        printf '\n* = active.   navi-theme use <name>   ·   navi-theme (no args) for the visual picker\n'
+        ;;
+    current)  current_theme ;;
+    use|set|apply)
+        [ -n "${2:-}" ] || die "usage: navi-theme use <name>"
+        apply_theme "$2"
+        ;;
+    shot|shots|preview)
+        if [ -n "${2:-}" ]; then
+            restore=$(current_theme)
+            shoot "$2" && say "$SHOTS/$2.png" || die "could not capture '$2' (grim, or waybar not running?)"
+            [ "$restore" = custom ] || apply_theme "$restore" >/dev/null 2>&1
+        else
+            build_previews
+        fi
+        ;;
+    edit)
+        [ -n "${2:-}" ] || die "usage: navi-theme edit <name>"
+        d=$(theme_dir "$2") || die "no theme named '$2'"
+        ${EDITOR:-${VISUAL:-nano}} "$d/theme.css"
+        ;;
+    refresh)  build_previews ;;
+    -h|--help|help)
+        sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
+        ;;
+    *) die "unknown command '$cmd' (try: navi-theme --help)" ;;
+esac
