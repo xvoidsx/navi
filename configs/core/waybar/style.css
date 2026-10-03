@@ -1,211 +1,471 @@
-/* THEME NAME: nightshadeNeon-Glitch */
-/* main stylesheet for wiredWM's 'waybar configuration'
- *	- by rav3ndust
- * a copy of this file should live at /etc/xdg/waybar/style.css */
+/* ============================================================================
+ * WIRED // PATCHBAY
+ * ----------------------------------------------------------------------------
+ * The bar as a signal panel. One lit trace runs the full width, channel ticks
+ * are ruled along it, and every module is soldered onto that trace with a stem
+ * dropping from its underside. The distro that feels alive, wired.
+ *
+ * COST MODEL — read before adding motion.
+ * GTK3 has no partial damage here: any animated property repaints the whole bar,
+ * all Pango text included, at ~15ms a frame. Measured on this machine:
+ *
+ *     no animation ............ 0.2% of a core
+ *     ~1 visible change/sec ... ~18% of a core
+ *     continuous 60Hz ......... ~90% of a core
+ *
+ * Motion is priced per *visible change*, so the budget goes to two deliberate
+ * events: the packet crossing the trace every 16s, and a slow colour drift in
+ * the trace itself. Everything else is static and free after first paint.
+ *
+ * A NOTE ON GRADIENT FADES
+ * `transparent` is rgba(0,0,0,0). Fading a colour to it interpolates through
+ * black and leaves a dark fringe — on the trace that reads as a persistent
+ * black line. Every fade below fades to a zero-alpha copy of its own hue
+ * instead, which is why the wire looks like wire and not like a seam.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ *
+ * The white square the weather module used to show was NOT a missing font.
+ * weather.sh emitted each glyph followed by U+FE0F VARIATION SELECTOR-16, which
+ * forces emoji *presentation*. Pango honoured that and demanded a real colour
+ * emoji font, and the only one installed (Noto Color Emoji) is a fixed 109px
+ * strike that cannot be used at bar size — so GTK drew the .notdef box. The fix
+ * belongs in weather.sh, which now strips the selector in json_escape.
+ *
+ * Noto Color Emoji is deliberately NOT named in this stack for the same reason:
+ * it is a 109px bitmap strike and would downscale to mush at 10px.
+ * ========================================================================== */
+
+@define-color np #ff10f0;
+@define-color ng #39ff14;
+@define-color nc #00ffff;
+@define-color nr #ff3131;
+@define-color nw #ffffff;
+@define-color ob #0a050b;
+
+@define-color np-1 rgba(255, 16, 240, 0.30);
+@define-color np-2 rgba(255, 16, 240, 0.62);
+@define-color ng-1 rgba(57, 255, 20, 0.34);
+@define-color ng-2 rgba(57, 255, 20, 0.66);
+@define-color nc-1 rgba(0, 255, 255, 0.30);
+@define-color nc-2 rgba(0, 255, 255, 0.62);
+@define-color nr-1 rgba(255, 49, 49, 0.55);
+@define-color nw-2 rgba(255, 255, 255, 0.66);
+@define-color nw-3 rgba(255, 255, 255, 0.42);
+@define-color nw-4 rgba(255, 255, 255, 0.22);
+@define-color quiet rgba(184, 184, 184, 0.80);
+
 * {
-    font-size: 10px; /* Font size for better readability */
-    /* font-family: Cascadia Code; */
-    font-family: Noto Sans;
-    font-weight: bold; /* Make all text bold */
+    font-family: "Noto Sans", "Noto Sans Symbols2", sans-serif;
+    font-size: 10px;
+    font-weight: bold;
 }
 
+/* ----------------------------------------------------------------------------
+ * The rail.
+ *
+ * The trace is a real animated border-bottom rather than a background band, so
+ * its colour can actually cycle — background layers are positioned and cannot
+ * interpolate their colour stops. The bloom and the ticks stay background
+ * layers, pinned to the bottom edge.
+ * -------------------------------------------------------------------------- */
 window#waybar {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.85), rgba(15, 15, 15, 0.8)); /* Dark gradient for depth */
-    color: #fdf6e3;
-    padding: 0;
-    margin: 10px; /* Floating effect */
-    border-radius: 15px; /* Smoother base corners */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); /* Modern elevation */
-    animation: neonPulse 5s infinite alternate; /* Subtle bar pulse */
+    color: @nw;
+
+    /* Pure black. The channel ticks that used to run along the bottom fought
+     * the pulsing wire for attention — two competing rhythms in three pixels of
+     * height. With them gone the wire is the only light down there. */
+    background-color: #000000;
+
+    /* 1. the packet: a comet that runs the trace          */
+    background-image:
+        linear-gradient(to right,
+            rgba(0, 255, 255, 0) 0%,
+            rgba(255, 16, 240, 0.50) 36%,
+            rgba(255, 255, 255, 0.92) 50%,
+            rgba(255, 16, 240, 0.50) 64%,
+            rgba(0, 255, 255, 0) 100%),
+        /* 2. the wire's light bleeding up out of the black  */
+        linear-gradient(to bottom,
+            rgba(0, 255, 255, 0) 22px,
+            rgba(0, 255, 255, 0.05) 30px,
+            rgba(0, 255, 255, 0.11) 35px,
+            rgba(0, 255, 255, 0) 36px);
+
+    background-size: 180px 3px, 100% 100%;
+    background-position: -180px 33px, 0 0;
+    background-repeat: no-repeat;
+
+    border-bottom: 2px solid rgba(0, 255, 255, 0.55);
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+
+    /* steps(110) over 16s puts twelve hops inside the first 11% (1.76s) of the
+     * cycle; the rest holds one constant position, which queues no repaint. */
+    animation:
+        packet-run 16s steps(110, end) infinite,
+        trace-live 9s steps(6, end) infinite;
 }
 
-@keyframes neonPulse {
-    from {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 10px rgba(128, 0, 128, 0.2); /* Base state */
-    }
-    to {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 15px rgba(128, 0, 128, 0.3); /* Brighter pulse */
-    }
+@keyframes packet-run {
+    0%   { background-position: -180px 33px, 0 0; }
+    11%  { background-position: 1540px 33px, 0 0; }
+    100% { background-position: 1540px 33px, 0 0; }
 }
 
-#custom-right-arrow-dark,
-#custom-left-arrow-dark {
-    color: #1a1a1a;
-}
-#custom-right-arrow-light,
-#custom-left-arrow-light {
-    color: #292b2e;
-    background: #1a1a1a;
+/* The wire itself, breathing between the three neon hues. */
+@keyframes trace-live {
+    0%   { border-bottom-color: rgba(0, 255, 255, 0.55); }
+    33%  { border-bottom-color: rgba(255, 16, 240, 0.55); }
+    66%  { border-bottom-color: rgba(57, 255, 20, 0.55); }
+    100% { border-bottom-color: rgba(0, 255, 255, 0.55); }
 }
 
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Sockets. A dark plate, a lit ring, and a 1px stem dropping from the underside
+ * to the trace — sized 1x6 and pinned to the bottom edge so it follows the
+ * module whatever its final height turns out to be.
+ * -------------------------------------------------------------------------- */
 #workspaces,
+#window,
 #clock,
-#pulseaudio,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#power-profiles-daemon,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
 #memory,
 #cpu,
-#battery,
 #disk,
-#tray,
-#idle_inhibitor,
+#tray {
+    min-height: 20px;
+    margin: 5px 5px 9px 5px;
+    padding: 2px 8px;
+    color: @nw;
+    background-color: rgba(9, 5, 11, 0.62);
+    background-image:
+        linear-gradient(to bottom,
+            rgba(0, 255, 255, 0) 0,
+            rgba(0, 255, 255, 0) 3px,
+            rgba(0, 255, 255, 0.34) 3px,
+            rgba(0, 255, 255, 0.34) 5px);
+    background-size: 1px 6px;
+    background-position: center bottom;
+    background-repeat: no-repeat;
+    border: 1px solid @nc-1;
+    border-radius: 7px;
+    box-shadow:
+        0 0 9px rgba(0, 255, 255, 0.13),
+        inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.42);
+    animation: neon-cycle 9s steps(6, end) infinite;
+    transition: background-color 400ms ease-out;
+}
+
+/* Low amplitude on purpose: a full neon-to-neon jump turns every step into a
+ * visible strobe, while halving the swing lets the same stepped timing read as
+ * a slow shimmer instead. */
+@keyframes neon-cycle {
+    0%   { color: #86e6e6; border-color: @nc-1; }
+    33%  { color: #e878e0; border-color: @np-1; }
+    66%  { color: #86dc86; border-color: @ng-1; }
+    100% { color: #86e6e6; border-color: @nc-1; }
+}
+
+/* Signature hues — each socket keeps its own resting colour. */
+#custom-wired-launcher,
+#custom-power,
+#clock,
+#power-profiles-daemon { color: #e878e0; }
+
+#network,
 #backlight,
-#power-profiles-daemon {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85)); /* Dark gradient */
-    border: 1px solid rgba(128, 0, 128, 0.4); /* Darker neon pink border */
-    border-radius: 10px; /* Pill shape */
-    padding: 2px 5px; /* Tighter padding */
-    margin: 0 8px; /* Slightly wider spacing */
-    color: #00ffff; /* Default cyan text */
-    font-size: 10px; /* Consistent text size */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3); /* Glassy pink glow */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
-}
+#memory,
+#cpu { color: #86dc86; }
 
-@keyframes glitchText {
-    0% {
-        color: #00ffff; /* Cyan */
-        text-shadow: 0 0 5px rgba(0, 255, 255, 0.5), 1px 1px 0 rgba(0, 0, 0, 0.2);
-    }
-    33% {
-        color: #ff10f0; /* Neon Pink */
-        text-shadow: 0 0 5px rgba(255, 20, 147, 0.5), -1px -1px 0 rgba(0, 0, 0, 0.2);
-    }
-    66% {
-        color: #39ff14; /* Neon Green */
-        text-shadow: 0 0 5px rgba(57, 255, 20, 0.5), 1px -1px 0 rgba(0, 0, 0, 0.2);
-    }
-    100% {
-        color: #00ffff; /* Back to Cyan */
-        text-shadow: 0 0 5px rgba(0, 255, 255, 0.5), -1px 1px 0 rgba(0, 0, 0, 0.2);
-    }
-}
+#custom-volume,
+#idle_inhibitor { color: #86e6e6; }
 
-/* TESTING */
-#custom-wired-launcher {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85)); /* Dark gradient */
-    border: 1px solid rgba(128, 0, 128, 0.4); /* Darker neon pink border */
-    border-radius: 10px; /* Pill shape */
-    padding: 2px 5px; /* Tighter padding */
-    margin: 0 8px; /* Slightly wider spacing */
-    color: #00ffff; /* Cyan to match other modules */
-    font-size: 12px; /* Slightly larger for emoji visibility */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3); /* Glassy pink glow */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
-}
-/* END TESTING */
+#battery { color: @nw-2; }
 
-#workspaces {
-    box-shadow: inset 0 0 10px rgba(128, 0, 128, 0.2); /* Purple inner shadow for depth */
-}
+#custom-wired-launcher,
+#custom-power { font-size: 12px; }
 
+/* Ports, not pills. */
 #workspaces button {
-    padding: 0px 6px; /* Tighter padding */
-    color: #00ffff; /* Default cyan text */
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85)); /* Dark gradient */
-    border: 1px solid rgba(128, 0, 128, 0.4); /* Darker neon pink border */
-    border-radius: 12px; /* Pill shape */
-    transition: all 0.3s ease; /* Smooth transitions */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3); /* Glassy pink glow */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+    min-width: 22px;
+    margin: 0 2px;
+    padding: 1px 6px;
+    color: @nw-3;
+    background-color: rgba(0, 0, 0, 0);
+    border: 1px solid rgba(0, 0, 0, 0);
+    border-radius: 5px;
+    box-shadow: none;
+    text-shadow: none;
 }
 
-#workspaces button.focused {
-    color: #ff10f0; /* Pink neon for active workspace */
-    border: 2px solid #39ff14; /* Green neon border */
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.7), 0 0 10px rgba(57, 255, 20, 0.4), inset 0 0 5px rgba(57, 255, 20, 0.3); /* Enhanced focus glow with inner shine */
-}
+#workspaces button.empty { color: @nw-4; }
 
 #workspaces button:hover {
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.8), 0 0 20px rgba(128, 0, 128, 0.5); /* Brighter glassy pink glow */
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6); /* Enhanced text depth */
+    color: @ng-2;
+    border-color: @ng-1;
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.30);
 }
 
-#workspaces button.inactive {
-    background: linear-gradient(180deg, rgba(200, 0, 0, 0.9), rgba(150, 0, 0, 0.7)); /* Darker red gradient */
-    color: black; /* Inactive text color */
-    border: 1px solid rgba(255, 0, 0, 0.3); /* Red glassy border */
+#workspaces button.focused,
+#workspaces button.active {
+    color: @nw;
+    background-color: rgba(255, 16, 240, 0.18);
+    border-color: @ng-2;
+    box-shadow:
+        0 0 11px rgba(255, 16, 240, 0.55),
+        inset 0 0 7px rgba(255, 16, 240, 0.16);
 }
 
-#pulseaudio {
-    color: #ff10f0; /* Pink neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+/* Title stays quiet so the active controls carry the signal. */
+#window {
+    color: rgba(255, 255, 255, 0.55);
+    border-color: rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    text-shadow: none;
+    animation: none;
 }
 
-#network {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85)); /* Dark gradient */
-    border: 1px solid rgba(128, 0, 128, 0.4); /* Darker neon pink border */
-    border-radius: 10px; /* Pill shape */
-    padding: 2px 5px; /* Tighter padding */
-    margin: 0 8px; /* Slightly wider spacing */
-    color: #ff10f0; /* Pink neon */
-    transition: all 0.3s ease; /* Smooth transition */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3); /* Glassy pink glow */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    text-shadow: none;
+    opacity: 0;
 }
 
-#network:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7), 0 0 15px rgba(128, 0, 128, 0.5); /* Brighter glassy pink glow */
+/* Weather is ambient, not chrome. */
+#custom-weather {
+    margin: 5px 2px 9px 2px;
+    padding: 2px 3px;
+    color: @quiet;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.35);
+    animation: none;
 }
 
-#network.disconnected {
-    color: #ff3131; /* Red for disconnected */
-    border: 1px solid rgba(255, 0, 0, 0.3); /* Red glassy border */
+#custom-weather:hover {
+    color: @nw;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.75);
 }
 
-#memory {
-    color: #39ff14; /* Green neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+/* ----------------------------------------------------------------------------
+ * State semantics.
+ * -------------------------------------------------------------------------- */
+#network.disconnected,
+#battery.critical {
+    color: @nw;
+    background-color: rgba(255, 49, 49, 0.16);
+    border-color: @nr-1;
+    box-shadow: 0 0 12px rgba(255, 49, 49, 0.50);
+    animation: alert-pulse 1.4s steps(6, end) infinite alternate;
 }
 
-#cpu {
-    color: #000000; /* Match original scheme */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+@keyframes alert-pulse {
+    from { box-shadow: 0 0 7px rgba(255, 49, 49, 0.26); }
+    to   { box-shadow: 0 0 20px rgba(255, 49, 49, 0.72); }
 }
 
-#battery {
-    color: #ff10f0; /* Pink neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+#battery.warning { color: #e878e0; border-color: @np-2; animation: none; }
+
+/* Bluetooth: the rune is always the same, a second glyph states the link, colour
+ * finishes the sentence. Never a dot — a filled circle is the bell's job. */
+#bluetooth.off {
+    color: @nw-3;
+    border-color: rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    text-shadow: none;
+    animation: none;
 }
 
-#disk {
-    color: #ff10f0; /* Pink neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+#bluetooth.connected {
+    color: @nc;
+    border-color: @nc-2;
+    background-color: rgba(0, 255, 255, 0.10);
+    box-shadow:
+        0 0 13px rgba(0, 255, 255, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    animation: none;
 }
 
-#clock,
-#clock * { /* Target the clock and all its child elements */
-    color: #39ff14; /* Green neon */
-    font-weight: bold; /* Make clock text bold */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+#bluetooth.connecting {
+    color: #e878e0;
+    border-color: @np-2;
+    animation: agent-pulse 1.2s steps(5, end) infinite alternate;
 }
 
-#idle_inhibitor {
-    color: #ff10f0; /* Pink neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+#custom-update.up-to-date,
+#custom-bell.no-notifs {
+    color: @nw-3;
+    border-color: rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    text-shadow: none;
+    animation: none;
 }
 
-#backlight {
-    color: #39ff14; /* Green neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+#custom-update.updates-available {
+    color: #e878e0;
+    border-color: @np-2;
+    animation: alert-pulse 2s steps(6, end) infinite alternate;
 }
 
-#power-profiles-daemon {
-    color: #ff10f0; /* Pink neon */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+#custom-bell.has-notifs {
+    color: @nc;
+    border-color: @nc-2;
+    box-shadow:
+        0 0 13px rgba(0, 255, 255, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    animation: none;
 }
 
-#custom-power {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(10, 10, 10, 0.85)); /* Dark gradient */
-    border: 1px solid rgba(128, 0, 128, 0.4); /* Darker neon pink border */
-    border-radius: 10px; /* Pill shape */
-    padding: 2px 5px; /* Tighter padding */
-    margin: 0 8px; /* Slightly wider spacing */
-    color: #ff10f0; /* Pink neon */
-    font-size: 12px; /* Slightly larger for emoji visibility */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(128, 0, 128, 0.3); /* Glassy pink glow */
-    animation: glitchText 4s infinite; /* Slower glitch animation */
+/* Agent state. */
+#custom-agent.agent-asleep {
+    color: @nw-3;
+    border-color: rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    text-shadow: none;
+    animation: none;
+}
+
+#custom-agent.agent-ready {
+    color: @nc;
+    border-color: @nc-2;
+    box-shadow:
+        0 0 13px rgba(0, 255, 255, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    animation: none;
+}
+
+#custom-agent.agent-working {
+    color: #86dc86;
+    border-color: @ng-2;
+    animation: agent-pulse 2s steps(6, end) infinite alternate;
+}
+
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: #e878e0;
+    border-color: @np-2;
+    animation: agent-pulse 1.2s steps(5, end) infinite alternate;
+}
+
+@keyframes agent-pulse {
+    from { box-shadow: 0 0 8px rgba(255, 255, 255, 0.10); }
+    to   { box-shadow: 0 0 20px currentColor; }
+}
+
+#custom-volume.muted {
+    color: @nw-3;
+    border-color: rgba(255, 255, 255, 0.18);
+    text-shadow: none;
+    animation: none;
+}
+
+#idle_inhibitor.activated {
+    color: #86dc86;
+    border-color: @ng-2;
+    box-shadow: 0 0 12px rgba(57, 255, 20, 0.36);
+    animation: none;
+}
+
+#custom-nowplaying.idle {
+    color: @nw-3;
+    border-color: rgba(255, 255, 255, 0.13);
+    text-shadow: none;
+    animation: none;
+}
+
+#custom-nowplaying.playing {
+    color: #e878e0;
+    border-color: @np-2;
+    animation: nowplaying-pulse 2.4s steps(6, end) infinite alternate;
+}
+
+#custom-nowplaying.paused {
+    color: @nc;
+    border-color: @nc-2;
+    animation: none;
+}
+
+@keyframes nowplaying-pulse {
+    from { text-shadow: 0 0 5px rgba(255, 16, 240, 0.32); }
+    to   { text-shadow: 0 0 15px rgba(255, 16, 240, 0.80); }
+}
+
+#tray { padding-left: 6px; padding-right: 6px; }
+#tray > .passive { opacity: 0.55; }
+
+#tray > .needs-attention {
+    background-color: rgba(255, 49, 49, 0.18);
+    border-radius: 5px;
+}
+
+/* ----------------------------------------------------------------------------
+ * Hover. Pointer-gated, so these transitions cost nothing while the mouse is
+ * elsewhere — which is what lets the flare linger without a permanent price.
+ * -------------------------------------------------------------------------- */
+#workspaces:hover,
+#clock:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#bluetooth:hover {
+    background-color: rgba(39, 5, 35, 0.72);
+    border-color: @ng-2;
+    box-shadow:
+        0 0 18px rgba(255, 16, 240, 0.42),
+        0 0 32px rgba(57, 255, 20, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    transition: background-color 400ms ease-out, box-shadow 900ms ease-out;
+    animation: none;
 }
 
 #custom-power:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7), 0 0 15px rgba(128, 0, 128, 0.5); /* Brighter glassy pink glow */
+    color: @nr;
+    border-color: @nr-1;
+    box-shadow: 0 0 18px rgba(255, 49, 49, 0.52);
 }
 
+tooltip {
+    color: @nw;
+    background-color: rgba(0, 0, 0, 0.95);
+    background-image: linear-gradient(to bottom, rgba(255, 16, 240, 0.10), rgba(255, 16, 240, 0.02));
+    border: 1px solid @ng-2;
+    border-radius: 7px;
+    box-shadow: 0 0 16px rgba(255, 16, 240, 0.32);
+}
+
+tooltip label { color: @nw; }

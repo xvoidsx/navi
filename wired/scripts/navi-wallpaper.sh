@@ -62,7 +62,27 @@ if command -v mpvpaper >/dev/null 2>&1 && [ -f "$ANIMATED" ]; then
   # only failures logged during THIS probe count — old boots don't trip us
   log_start=$(( $(wc -l <"$LOG" 2>/dev/null || echo 0) + 1 ))
   : >>"$LOG"
-  mpvpaper ALL -o "loop panscan=1" "$ANIMATED" >>"$LOG" 2>&1 &
+  # -p (--auto-pause) with NO -a/--auto-mode on purpose.
+  #
+  # mpvpaper has two different triggers and they are not interchangeable:
+  #   -p alone          fires on TRUE OCCLUSION (the layer-shell surface is
+  #                     genuinely covered)
+  #   -a full|max|active extends that to fire merely because a window is
+  #                     MAXIMIZED, whether or not it actually covers anything
+  # We run with gaps (inner 6 / outer 9), so a maximized tiled window leaves the
+  # wallpaper visible through the gaps and the surface is never occluded —
+  # `-p` therefore stays silent for maximized windows and the gifpapers keep
+  # animating, which is the whole point. It still engages for genuine fullscreen
+  # (an mpv video covers everything), where nobody can see the wallpaper.
+  # Passing -a max here would freeze every gifpaper behind any maximized window.
+  #
+  # no-audio is defensive only: the gifpapers carry no audio track and mpvpaper
+  # opens no /dev/snd or pulse fd. It documents intent and costs nothing.
+  #
+  # Deliberately NOT capping the frame rate: mpv's --fps is documented as a
+  # testing flag that overrides output rate rather than throttling it, and the
+  # gifpapers' frame timing is an intentional part of how they look.
+  mpvpaper ALL -p -o "loop panscan=1 no-audio" "$ANIMATED" >>"$LOG" 2>&1 &
   mpvpid=$!
 
   dead=0

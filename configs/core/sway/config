@@ -37,32 +37,44 @@ set $mod Mod4
 exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP=sway XDG_SESSION_DESKTOP=sway
 
 # set secret store. we use gnome-keyring. a gui to see its content can be called via `seahorse`
-exec --no-startup-id "gnome-keyring-daemon --components=secrets"
+#
+# the value must stay inside quotes: sway's config lexer treats `,` as a token
+# separator, so an unquoted `--components=pkcs11,secrets,ssh` gets split into
+# three tokens and sway aborts the line with "Unknown/invalid command
+# 'secrets'". the daemon never launched, so SSH_AUTH_SOCK and
+# GNOME_KEYRING_CONTROL were never exported into the session and terminals
+# inherited no keyring or agent.
+exec_always --no-startup-id sh -c "gnome-keyring-daemon --start --components=pkcs11,secrets,ssh"
 
 # handle some imports
 exec systemctl --user import-environment DISPLAY WAYLAND_DISPLAY SWAYSOCK PATH
 exec_always --no-startup-id systemctl --user set-environment PATH="/usr/games:$HOME/.local/bin:$PATH"
 
-# set wallpaper
-#exec swaybg -i $HOME/wiredWM/wp/synthwavelain.jpeg
-#exec swaybg -i $HOME/wiredWM/wp/SElain12.png
-exec swaybg -i $HOME/wiredWM/wp/SElain3.jpg
+# set wallpaper — animated-first, static fallback handled inside
+exec /usr/bin/navi-wallpaper
 
-# setting mouse theme
-# we have two options to choose from: Yaru and Adwaita. 
-# both look nice - simply uncomment the one you want to use (yaru is default)
-#seat * xcursor_theme Yaru
-seat * xcursor_theme Adwaita 
+# Hey Lain: warm the voice pipeline at login (~30s, background) so the
+# first Alt+V tap answers fast instead of cold-starting STT+TTS.
+exec /usr/share/navi/hey-lain/bin/warmup.sh
+
+# cursor theme: Bibata Modern Ice — glassy, sharp, very wired.
+# (size 24; every seat, so it applies across the whole session.)
+seat * xcursor_theme Bibata-Modern-Ice 24
 
 # make windows float or tile by default.
 #for_window [class="[.]*"] floating enable
+
+# navi-notifs floats — it's a quick viewer, not a workspace resident.
+for_window [title="navi-notifs"] floating enable
 
 # - - for window title bars - -
 for_window [class="^.*"] border pixel 2
 
 # - - for gaps - -
-gaps inner 3
-gaps outer 3
+# inner 6 / outer 9 — the woodstock '69. gifpapers get their frame,
+# windows keep their breathing room.
+gaps inner 6
+gaps outer 9
 
 # for border colors - nightshadeNeon theme
 client.focused          #ff10f0 #000000 #39ff14 #39ff14 #ff10f0
@@ -89,17 +101,34 @@ exec swayidle \
     timeout 900 'systemctl suspend' \
     before-sleep 'nslock'
 
-exec --no-startup-id sh -c "sleep 1 && blueman-applet &"
+# Blueman tray/applet: retired.
+#
+# blueman-tray is a legacy X11 XEmbed tray host. On this pure-Wayland session it
+# has no X display to reparent icons onto, so it never mapped a window and never
+# showed anything — `xlsclients` on :1 reports zero clients and `busctl` shows
+# org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems is an empty list.
+# It was silently holding ~103 MB (blueman-applet 55 MB + blueman-tray 45 MB +
+# obexd 2 MB) at 0% CPU.
+#
+# Waybar's own `tray` module is the real StatusNotifierItem host and is kept in
+# config.jsonc. Bluetooth status now comes from waybar's `bluetooth` module,
+# which talks to org.bluez over D-Bus and does not depend on the applet.
+# exec --no-startup-id sh -c "sleep 1 && blueman-applet &"
 exec --no-startup-id dunst
-exec_always --no-startup-id sh -c "sleep 1 && meteo-qt &"
 exec --no-startup-id lxpolkit
+# Volume OSD: listens to PipeWire/Pulse events, pops a bottom-center meter.
+exec --no-startup-id /usr/share/navi/wired/scripts/navi-volume-osd.sh
 
 # Use pactl to adjust volume
 set $refresh_i3status killall -SIGUSR1 i3status
-bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +10% && $refresh_i3status && notify-send "wired helper" "volume +10"
-bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -10% && $refresh_i3status && notify-send "wired helper" "volume -10"
-bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && $refresh_i3status && notify-send "wired helper" "volume muted"
+bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +10% && $refresh_i3status
+bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -10% && $refresh_i3status
+bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && $refresh_i3status
 bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && $refresh_i3status
+
+# Hey Lain: tap Alt+V to start listening, tap again to stop + transcribe + reply.
+# --no-repeat is load-bearing: without it, holding the key flaps the toggle.
+bindsym --no-repeat Alt+v exec /usr/share/navi/hey-lain/bin/toggle.sh
 
 floating_modifier $mod
 
@@ -110,13 +139,16 @@ bindsym $mod+Return exec alacritty
 bindsym $mod+Shift+q kill
 
 # bindings for turning gaps on and off
-bindsym $mod+g exec --no-startup-id "swaymsg 'gaps inner 3; gaps outer 3' && notify-send 'wired helper' 'Gaps enabled.'"
-bindsym $mod+Shift+g exec --no-startup-id "swaymsg 'gaps inner 0; gaps outer 0' && notify-send 'wired helper' 'Gaps disabled.'"
+bindsym $mod+g exec --no-startup-id "swaymsg 'gaps inner all set 6; gaps outer all set 9' && notify-send 'wired helper' 'Gaps enabled.'"
+bindsym $mod+Shift+g exec --no-startup-id "swaymsg 'gaps inner all set 0; gaps outer all set 0' && notify-send 'wired helper' 'Gaps disabled.'"
 
 # navi launchers
 bindsym $mod+d exec dmenu_run -fn "NotoSans-10" -nb black -nf pink -sb green -sf red -p "nightshade - run command: "
 bindsym $mod+Shift+a exec --no-startup-id i3-dmenu-desktop --dmenu='dmenu -fn "NotoSans-10" -i -nb black -nf pink -sb green -sf red -p "nightshade - Applications List: "'
-bindsym $mod+Tab exec --no-startup-id "rofi -show combi drun,run"
+bindsym $mod+Tab exec --no-startup-id "rofi -show combi -combi-modi window,drun,run"
+# Alt+Tab: thumbnail window switcher (single-flight; repeat = next tile).
+bindsym --no-repeat Mod1+Tab exec --no-startup-id /usr/share/navi/wired/scripts/navi-switcher.sh
+bindsym --no-repeat Mod1+Shift+Tab exec --no-startup-id /usr/share/navi/wired/scripts/navi-switcher.sh --prev
 
 # other useful binds
 bindsym $mod+Shift+n exec --no-startup-id "dunstctl history-pop"
@@ -124,22 +156,25 @@ bindsym $mod+c exec --no-startup-id "gsimplecal"
 bindsym Mod1+c exec --no-startup-id "alacritty -e calcurse"
 bindsym $mod+Shift+f exec --no-startup-id "nemo"
 bindsym Caps_Lock exec --no-startup-id "notify-send 'wired helper' 'Caps Lock pressed.'"
-bindsym $mod+p exec --no-startup-id "grimshot savecopy area $HOME/Pictures/Screenshots/$(date -Ins).png --notify"
+bindsym $mod+p exec --no-startup-id "navishot"
+# waybar theme picker: real screenshots, switch applied live via SIGUSR2.
+bindsym Mod1+t exec --no-startup-id "navi-theme"
 bindsym Mod1+h exec --no-startup-id "alacritty -e htop"
 bindsym Mod1+s exec --no-startup-id "alacritty -e vim /tmp/$(date -I).txt"
 bindsym Mod1+e exec --no-startup-id "remoji"
 
 # browser keybinds
-# alt+B for gecko-based browser
-# alt+Shift+B for chromium-based browser
-bindsym Mod1+b exec --no-startup-id "firefox-nightly"
-bindsym Mod1+Shift+b exec --no-startup-id "brave-browser-nightly"
+# alt+B for firefox-esr
+# alt+Shift+B for the default browser (follows navi-browser — Brave unless changed)
+bindsym Mod1+b exec --no-startup-id "firefox-esr"
+bindsym Mod1+Shift+b exec --no-startup-id "navi-browser-run"
 
 # navi-Q (pop-up terminal/agent)
 # alt+A for pop-up agent
 # alt+shift+A for pop-up terminal
 bindsym Mod1+a exec "navi-Q agent"
 bindsym Mod1+Shift+a exec "navi-Q terminal"
+bindsym $mod+Ctrl+h exec --no-startup-id "alacritty -e herdr"
 
 # change focus
 bindsym $mod+j focus left
@@ -257,5 +292,6 @@ exec "setxkbmap -layout us,de"
 default_border pixel 3
 # make system suspend when lid is closed (for laptops)
 bindswitch lid:on exec 'systemctl suspend'
+
 
 
