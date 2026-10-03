@@ -69,10 +69,11 @@ if [ -n "$DIMS" ]; then
   COLS="${DIMS%x*}"
   LINES="${DIMS#*x}"
   # kitty has no cell-exact CLI flag like alacritty's window.dimensions.
-  # Measured 2026-10-03 on T440p: 808px/79cols=10.2, 552px/24lines=23.
-  # Using 10x23 plus 10px window padding.
-  PX_W=$(( COLS * 10 + 10 ))
-  PX_H=$(( LINES * 23 + 10 ))
+  # Measured 2026-10-03 on T440p at 12pt: 808px/79cols=10.2, 552px/24lines=23.
+  # Mods run at 10pt (10/12 = 0.833 scale): ~8.5px/col, ~19px/line.
+  # Plus 10px window padding.
+  PX_W=$(( COLS * 17 / 2 + 10 ))
+  PX_H=$(( LINES * 19 + 10 ))
   KITTY_OPTS=(--override "initial_window_width=${PX_W}" --override "initial_window_height=${PX_H}")
   # per-mod font size (navi-networking's dense layout needs smaller text)
   if [ -n "${FONT_SIZE:-}" ]; then
