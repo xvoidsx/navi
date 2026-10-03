@@ -311,11 +311,11 @@ func lastLine(out string) string {
 }
 
 func connectDevice(mac string) error {
-	return btAction("connect "+mac, "Connection successful")
+	return btAction("connect "+mac, "Connection successful", "Already connected")
 }
 
 func disconnectDevice(mac string) error {
-	return btAction("disconnect "+mac, "Successful disconnected")
+	return btAction("disconnect "+mac, "Successful disconnected", "Not connected")
 }
 
 func removeDevice(mac string) error {
@@ -327,7 +327,7 @@ func trustDevice(mac string, trust bool) error {
 	if !trust {
 		verb = "untrust"
 	}
-	return btAction(verb+" "+mac, "trust succeeded")
+	return btAction(verb+" "+mac, "trust succeeded", "already")
 }
 
 func setPower(on bool) error {
@@ -335,7 +335,8 @@ func setPower(on bool) error {
 	if on {
 		v = "on"
 	}
-	return btAction("power "+v, "Changing power "+v+" succeeded")
+	// "already" covers the case where it's in the desired state.
+	return btAction("power "+v, "Changing power "+v+" succeeded", "already")
 }
 
 func setDiscoverable(on bool) error {
@@ -351,11 +352,13 @@ func setScan(on bool) error {
 	if on {
 		v = "on"
 	}
-	marker := "Discovery started"
+	// Accept multiple success markers: BlueZ wording varies by version
+	// and state ("already discovering" if a scan is running).
+	markers := []string{"Discovery started", "Discovery already"}
 	if !on {
-		marker = "Discovery stopped"
+		markers = []string{"Discovery stopped", "No discovery"}
 	}
-	return btAction("scan "+v, marker)
+	return btAction("scan "+v, markers...)
 }
 
 // ── pairing session ─────────────────────────────────────────────────
