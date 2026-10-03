@@ -967,6 +967,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "navi-bluetooth: %v\n", err)
 		os.Exit(1)
 	}
-	_ = setScan(false)
+	stopScanKeeper()
 	time.Sleep(50 * time.Millisecond)
 }

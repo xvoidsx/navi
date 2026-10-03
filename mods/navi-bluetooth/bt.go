@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -347,18 +348,67 @@ func setDiscoverable(on bool) error {
 	return btAction("discoverable "+v, "Changing discoverable "+v+" succeeded")
 }
 
+// scanKeeper holds a persistent bluetoothctl process that keeps
+// discovery alive. One-shot `scan on` + `quit` tells BlueZ to stop
+// discovery when the client disconnects. This keeps the client alive.
+type scanKeeper struct {
+	cmd   *exec.Cmd
+	stdin io.WriteCloser
+}
+
+var keeper *scanKeeper
+var keeperMu sync.Mutex
+
+// ensureScanKeeper starts the persistent scanner if not running.
+func ensureScanKeeper() error {
+	keeperMu.Lock()
+	defer keeperMu.Unlock()
+	if keeper != nil {
+		return nil // already running
+	}
+	cmd := exec.Command("bluetoothctl")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	// Discard output — we only need the process alive to hold discovery.
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	keeper = &scanKeeper{cmd: cmd, stdin: stdin}
+	// Start discovery on the persistent connection.
+	fmt.Fprintln(stdin, "scan on")
+	return nil
+}
+
+// stopScanKeeper ends discovery and kills the persistent process.
+func stopScanKeeper() {
+	keeperMu.Lock()
+	defer keeperMu.Unlock()
+	if keeper == nil {
+		return
+	}
+	fmt.Fprintln(keeper.stdin, "scan off")
+	fmt.Fprintln(keeper.stdin, "quit")
+	keeper.stdin.Close()
+	done := make(chan struct{})
+	go func() { keeper.cmd.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		keeper.cmd.Process.Kill()
+	}
+	keeper = nil
+}
+
 func setScan(on bool) error {
-	v := "off"
 	if on {
-		v = "on"
+		return ensureScanKeeper()
 	}
-	// Accept multiple success markers: BlueZ wording varies by version
-	// and state ("already discovering" if a scan is running).
-	markers := []string{"Discovery started", "Discovery already"}
-	if !on {
-		markers = []string{"Discovery stopped", "No discovery"}
-	}
-	return btAction("scan "+v, markers...)
+	stopScanKeeper()
+	return nil
 }
 
 // ── pairing session ─────────────────────────────────────────────────
