@@ -512,7 +512,12 @@ func startPairWithName(mac, name string) (*pairSession, error) {
 	// Without this, BlueZ does Numeric Comparison (yes/no) which
 	// makes no sense for a keyboard with no display.
 	if isAppleDevice(name) {
+		// Unregister any existing agent first, then register ours.
+		// The default agent may already be registered with wrong caps.
+		fmt.Fprintln(stdin, "agent off")
+		time.Sleep(200 * time.Millisecond)
 		fmt.Fprintln(stdin, "agent DisplayOnly")
+		time.Sleep(200 * time.Millisecond)
 		fmt.Fprintln(stdin, "default-agent")
 		time.Sleep(500 * time.Millisecond)
 	}
