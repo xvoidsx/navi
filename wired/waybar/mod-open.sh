@@ -42,7 +42,7 @@ shift
 # Dimensions are frame width+4 x frame height+1 (tight around the fixed frames).
 case "$(basename "$1")" in
 navi-nowplaying) DIMS="66x21" ;;
-navi-networking) DIMS="80x44" ;;
+navi-networking) DIMS="68x37" ;;
 navi-calendar) DIMS="66x30" ;;
 navi-audio) DIMS="66x20" ;;
 navi-bluetooth) DIMS="66x25" ;;
