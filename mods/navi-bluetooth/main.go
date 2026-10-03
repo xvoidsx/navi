@@ -87,6 +87,7 @@ type model struct {
 	working      bool
 	loading      bool
 	width        int
+	scanFrame    int // animation frame for the scanning radar
 	pairSess     *pairSession
 	pairDev      device
 	pairPrompt   pairEvent
@@ -111,8 +112,16 @@ func (m model) Init() tea.Cmd {
 		m.tx.Init(),
 		func() tea.Msg { return startMsg{} },
 		pollTickCmd(),
+		scanAnimCmd(),
 	)
 }
+
+// scanAnimCmd ticks the scanning radar animation.
+func scanAnimCmd() tea.Cmd {
+	return tea.Tick(200*time.Millisecond, func(time.Time) tea.Msg { return scanAnimMsg{} })
+}
+
+type scanAnimMsg struct{}
 
 func pollTickCmd() tea.Cmd {
 	return tea.Tick(5*time.Second, func(time.Time) tea.Msg { return pollTickMsg{} })
@@ -232,6 +241,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(cmds...)
 
+	case scanAnimMsg:
+		m.scanFrame++
+		return m, scanAnimCmd()
+
 	case snapshotMsg:
 		m.loading = false
 		m.working = false
@@ -318,6 +331,16 @@ func (m model) handlePairEvent(ev pairEvent) (tea.Model, tea.Cmd) {
 	case pairDone:
 		dev := m.pairDev
 		m.endPair()
+		// Apple HID devices: auto-trust so the HID profile establishes.
+		// Everything else asks (existing behavior).
+		if isAppleDevice(dev.name) {
+			m.screen = screenMain
+			m.working = true
+			m.status = "paired — trusting " + dev.name + " for auto-connect…"
+			m.statusErr = false
+			return m, opCmd("trusted "+dev.name+" — it will auto-connect",
+				func() error { return trustDevice(dev.mac, true) })
+		}
 		m.screen = screenTrustAsk
 		m.trustDev = dev
 		m.status = "paired with " + dev.name
@@ -511,7 +534,7 @@ func (m model) answerPair(ans string) {
 }
 
 // smartAction is Enter: available → pair, paired → connect,
-// connected → disconnect.
+// connected → disconnect. Apple HID devices get trust+connect.
 func (m model) smartAction() (tea.Model, tea.Cmd) {
 	d, ok := m.cursorDevice()
 	if !ok {
@@ -524,6 +547,10 @@ func (m model) smartAction() (tea.Model, tea.Cmd) {
 			func() error { return disconnectDevice(d.mac) })
 	case d.paired:
 		m.working = true
+		if isAppleDevice(d.name) {
+			return m, opCmd("trusting + connecting "+d.name+"…",
+				func() error { return connectAppleDevice(d.mac) })
+		}
 		return m, opCmd("connecting to "+d.name+"…",
 			func() error { return connectDevice(d.mac) })
 	default:
@@ -565,6 +592,12 @@ func pairPumpCmd(sess *pairSession) tea.Cmd {
 	}
 }
 
+// scanRadar renders a little radar sweep animation for the scanning state.
+func scanRadar(frame int) string {
+	frames := []string{"◐", "◓", "◑", "◒"}
+	return theme.Spinner(frame) + " " + frames[frame%len(frames)]
+}
+
 // ── view ────────────────────────────────────────────────────────────
 
 func (m model) View() string {
@@ -593,6 +626,8 @@ func (m model) viewMain() string {
 		b.WriteString(theme.Error.Render("  ○ adapter is off — press P to power on") + "\n")
 	case m.adapter.discoverable:
 		b.WriteString(theme.Dimmed.Render("  ◉ discoverable — nearby devices can see this machine") + "\n")
+	case m.scanning:
+		b.WriteString("  " + scanRadar(m.scanFrame) + theme.Dimmed.Render(" scanning for devices…") + "\n")
 	default:
 		b.WriteString("\n")
 	}

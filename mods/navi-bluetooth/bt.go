@@ -221,7 +221,27 @@ func upowerBattery(mac string) (int, bool) {
 	return 0, false
 }
 
-// ── one-shot actions ────────────────────────────────────────────────
+// isAppleDevice reports whether the device name looks like Apple hardware.
+// Apple HID devices (Magic Keyboard/Mouse/Trackpad) are finicky: they need
+// explicit trust before the HID profile will establish, and they benefit
+// from a connect right after trust.
+func isAppleDevice(name string) bool {
+	n := strings.ToLower(name)
+	return strings.Contains(n, "apple") ||
+		strings.Contains(n, "magic keyboard") ||
+		strings.Contains(n, "magic mouse") ||
+		strings.Contains(n, "magic trackpad")
+}
+
+// connectAppleDevice trusts then connects — the sequence Apple HID needs.
+func connectAppleDevice(mac string) error {
+	if err := trustDevice(mac, true); err != nil {
+		return fmt.Errorf("trust: %w", err)
+	}
+	// Brief pause: BlueZ needs a moment after trust before HID connects.
+	time.Sleep(500 * time.Millisecond)
+	return connectDevice(mac)
+}
 
 // btAction runs a single command and reports success by looking for a
 // success marker; on failure it returns the last meaningful output line.
