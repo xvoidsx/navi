@@ -10,7 +10,7 @@
 
 set -uo pipefail
 
-kitty --title "navi-notifs" -e navi-notifs &
+alacritty --title "navi-notifs" -e navi-notifs &
 # NOTE: kitty sizing now uses measured ratios (10x23, T440p 2026-10-03).
 sleep 0.5
 

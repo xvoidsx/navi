@@ -5,9 +5,8 @@
 # usage: mod-open.sh <window-title> <command> [args...]
 #
 # fitted windows: every mod gets a terminal sized to its own frame
-# (COLSxLINES cells, converted to pixels for kitty via measured ratios),
-# so the rounded frame isn't drowned in dead terminal space. the table
-# below is the
+# (COLSxLINES cells, via alacritty -o window.dimensions), so the rounded
+# frame isn't drowned in dead terminal space. the table below is the
 # family geometry — tweak a number here, never at the callers. commands
 # not listed (herdr, the update click script, anything future) fall back
 # to the old 640x760 pixel resize.
@@ -64,20 +63,17 @@ esac
 FONT_SIZE="10.0"
 
 FLOAT_CMDS="floating enable, move position center"
-KITTY_OPTS=()
+ALACRITTY_OPTS=()
 if [ -n "$DIMS" ]; then
   COLS="${DIMS%x*}"
   LINES="${DIMS#*x}"
-  # kitty has no cell-exact CLI flag like alacritty's window.dimensions.
-  # Measured 2026-10-03 on T440p at 12pt: 808px/79cols=10.2, 552px/24lines=23.
-  # Mods run at 10pt (10/12 = 0.833 scale): ~8.5px/col, ~19px/line.
-  # Plus 10px window padding.
-  PX_W=$(( COLS * 17 / 2 + 10 ))
-  PX_H=$(( LINES * 19 + 10 ))
-  KITTY_OPTS=(--override "initial_window_width=${PX_W}" --override "initial_window_height=${PX_H}")
-  # per-mod font size (navi-networking's dense layout needs smaller text)
+  # cell-exact sizing via alacritty -o window.dimensions.
+  # kitty was tried (2026-10-03) but its pixel approximation was
+  # inconsistent. alacritty's cell-exact is load-bearing for mod UX.
+  ALACRITTY_OPTS=(-o "window.dimensions.columns=$COLS" -o "window.dimensions.lines=$LINES")
+  # 10pt font for denser layouts (measured 2026-10-03)
   if [ -n "${FONT_SIZE:-}" ]; then
-    KITTY_OPTS+=(--override "font_size=${FONT_SIZE}")
+    ALACRITTY_OPTS+=(-o "font.size=${FONT_SIZE}")
   fi
 else
   # unknown command: the old pixel resize, as before.
@@ -115,7 +111,7 @@ if [ -f "$AGENTS_ENV" ]; then
   set -a; . "$AGENTS_ENV" 2>/dev/null; set +a
 fi
 
-kitty --title "$TITLE" --listen-on "unix:/tmp/kitty-${TITLE// /-}.sock" "${KITTY_OPTS[@]}" -e "$@" &
+alacritty --title "$TITLE" "${ALACRITTY_OPTS[@]}" -e "$@" &
 term_pid=$!
 
 if [ "$COMPOSITOR" = "sway" ]; then
