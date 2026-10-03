@@ -66,10 +66,9 @@ if [ -n "$DIMS" ]; then
   LINES="${DIMS#*x}"
   # kitty has no cell-exact CLI flag like alacritty's window.dimensions.
   # T440p maximized measured 10x23, but that includes chrome floating
-  # windows don't have. Using 8x18 as a conservative middle ground —
-  # tune if windows are still off.
+  # windows don't have. Using 8x17 — tune if windows are still off.
   PX_W=$(( COLS * 8 + 10 ))
-  PX_H=$(( LINES * 18 + 10 ))
+  PX_H=$(( LINES * 17 + 10 ))
   KITTY_OPTS=(--override "initial_window_width=${PX_W}" --override "initial_window_height=${PX_H}")
 else
   # unknown command: the old pixel resize, as before.

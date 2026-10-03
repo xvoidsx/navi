@@ -271,19 +271,9 @@ mode "resize" {
 }
 bindsym $mod+r mode "resize"
 
-# Bar
-bar {
-    position top
-    swaybar_command waybar
-    font pango:Noto Sans 10
-    colors {
-        focused_workspace #ff10f0 #000000e5 #39FF14
-        inactive_workspace #000000 #000000e5 #ff3131
-        separator #ff10f0
-        statusline #ff10f0
-        background #000000e5
-    }
-}
+# Bar: waybar is launched via the systemd user service (waybar.service),
+# not here. The bar{} block was removed 2026-10-03 — having both caused
+# double waybars after navi-update.
 
 # custom conky
 exec --no-startup-id "sleep 2 && conky &"
