@@ -238,6 +238,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Don't stomp a pairing ceremony with a refresh.
 		if m.screen == screenMain && m.pairSess == nil {
 			cmds = append(cmds, snapshotCmd())
+			// If we want to be scanning but BlueZ stopped discovery,
+			// restart it. Discovery times out on its own.
+			if m.scanning && !m.adapter.discovering && m.adapter.powered {
+				cmds = append(cmds, opCmd("restarting discovery…",
+					func() error { return setScan(true) }))
+			}
 		}
 		return m, tea.Batch(cmds...)
 
