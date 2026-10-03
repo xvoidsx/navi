@@ -67,6 +67,8 @@ type pairTimeoutMsg struct{}
 
 type pollTickMsg struct{}
 
+type scanErrMsg struct{ err string }
+
 // ── model ───────────────────────────────────────────────────────────
 
 type row struct {
@@ -88,6 +90,7 @@ type model struct {
 	loading      bool
 	width        int
 	scanFrame    int // animation frame for the scanning radar
+	scanErr      string // last scan error, shown in UI
 	pairSess     *pairSession
 	pairDev      device
 	pairPrompt   pairEvent
@@ -241,11 +244,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// If we want to be scanning but BlueZ stopped discovery,
 			// restart it. Discovery times out on its own.
 			if m.scanning && !m.adapter.discovering && m.adapter.powered {
-				cmds = append(cmds, opCmd("restarting discovery…",
-					func() error { return setScan(true) }))
+				cmds = append(cmds, func() tea.Msg {
+					if err := setScan(true); err != nil {
+						return scanErrMsg{err: err.Error()}
+					}
+					return scanErrMsg{}
+				})
 			}
 		}
 		return m, tea.Batch(cmds...)
+
+	case scanErrMsg:
+		if msg.err != "" {
+			m.scanErr = msg.err
+		} else {
+			m.scanErr = ""
+		}
+		return m, nil
 
 	case scanAnimMsg:
 		m.scanFrame++
@@ -632,6 +647,8 @@ func (m model) viewMain() string {
 		b.WriteString(theme.Error.Render("  ○ adapter is off — press P to power on") + "\n")
 	case m.adapter.discoverable:
 		b.WriteString(theme.Dimmed.Render("  ◉ discoverable — nearby devices can see this machine") + "\n")
+	case m.scanning && m.scanErr != "":
+		b.WriteString(theme.Error.Render("  × scan failed: "+m.scanErr) + "\n")
 	case m.scanning:
 		b.WriteString("  " + scanRadar(m.scanFrame) + theme.Dimmed.Render(" scanning for devices…") + "\n")
 	default:
@@ -937,9 +954,14 @@ func main() {
 	}
 	// Ensure the adapter is powered — don't depend on blueman-applet
 	// or any other tool having done it. Then start scanning.
-	_ = setPower(true)
-	time.Sleep(300 * time.Millisecond)
-	_ = setScan(true)
+	// Surface errors to stderr so they don't get swallowed.
+	if err := setPower(true); err != nil {
+		fmt.Fprintf(os.Stderr, "navi-bluetooth: power on failed: %v\n", err)
+	}
+	time.Sleep(500 * time.Millisecond)
+	if err := setScan(true); err != nil {
+		fmt.Fprintf(os.Stderr, "navi-bluetooth: scan on failed: %v\n", err)
+	}
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "navi-bluetooth: %v\n", err)
