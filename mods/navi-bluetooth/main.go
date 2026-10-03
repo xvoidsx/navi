@@ -45,6 +45,7 @@ const (
 	screenPairing
 	screenPIN
 	screenTrustAsk
+	screenAppleHelp
 )
 
 // ── messages ────────────────────────────────────────────────────────
@@ -477,6 +478,13 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, snapshotCmd()
 		}
 		return m, nil
+	case screenAppleHelp:
+		switch k {
+		case "esc", "q":
+			m.screen = screenMain
+			return m, snapshotCmd()
+		}
+		return m, nil
 	}
 
 	// screenMain
@@ -584,6 +592,12 @@ func (m model) smartAction() (tea.Model, tea.Cmd) {
 }
 
 func (m model) beginPair(d device) (tea.Model, tea.Cmd) {
+	// Apple keyboards need the D-Bus agent — bluetoothctl can't do it.
+	if isAppleDevice(d.name) {
+		m.screen = screenAppleHelp
+		m.pairDev = d
+		return m, nil
+	}
 	sess, err := startPairWithName(d.mac, d.name)
 	if err != nil {
 		m.status = "× could not start pairing: " + err.Error()
@@ -638,6 +652,8 @@ func (m model) View() string {
 		body = m.viewPIN()
 	case screenTrustAsk:
 		body = m.viewTrustAsk()
+	case screenAppleHelp:
+		body = m.viewAppleHelp()
 	}
 	return theme.FrameFixed(frameWidth, "navi bluetooth", m.adapter.powered, m.tx.View(frameWidth), body, btBodyRows)
 }
@@ -885,6 +901,19 @@ func (m model) viewTrustAsk() string {
 	b.WriteString(theme.Dimmed.Render("  trusted devices auto-connect when in range.") + "\n\n")
 	b.WriteString("  " + theme.Selected.Render("y") + theme.Dimmed.Render(" trust   ") +
 		theme.Selected.Render("n") + theme.Dimmed.Render(" skip") + "\n")
+	return b.String()
+}
+
+func (m model) viewAppleHelp() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(theme.Header.Render("  Apple keyboard pairing") + "\n\n")
+	b.WriteString(theme.Dimmed.Render("  Apple keyboards need a D-Bus agent, not bluetoothctl.") + "\n")
+	b.WriteString(theme.Dimmed.Render("  Run this in another terminal:") + "\n\n")
+	b.WriteString("  " + theme.Selected.Render("navi-bt-agent "+m.pairDev.mac) + "\n\n")
+	b.WriteString(theme.Dimmed.Render("  It will show a passkey — type it on the keyboard,") + "\n")
+	b.WriteString(theme.Dimmed.Render("  then press Enter on the keyboard.") + "\n\n")
+	b.WriteString(theme.Dimmed.Render("  esc back") + "\n")
 	return b.String()
 }
 
