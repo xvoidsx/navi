@@ -110,7 +110,7 @@ if [ -f "$AGENTS_ENV" ]; then
   set -a; . "$AGENTS_ENV" 2>/dev/null; set +a
 fi
 
-kitty --title "$TITLE" "${KITTY_OPTS[@]}" -e "$@" &
+kitty --title "$TITLE" --listen-on "unix:/tmp/kitty-${TITLE// /-}.sock" "${KITTY_OPTS[@]}" -e "$@" &
 term_pid=$!
 
 if [ "$COMPOSITOR" = "sway" ]; then
