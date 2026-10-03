@@ -42,18 +42,18 @@ shift
 # Dimensions are frame width+4 x frame height+1 (tight around the fixed frames).
 case "$(basename "$1")" in
 navi-agents-config) DIMS="87x27" ;;
-navi-audio) DIMS="73x20" ;;
+navi-audio) DIMS="69x20" ;;
 navi-bluetooth) DIMS="68x24" ;;
 navi-browser) DIMS="74x31" ;;
-navi-calendar) DIMS="68x29" ;;
+navi-calendar) DIMS="69x30" ;;
 navi-display) DIMS="67x26" ;;
 navi-get) DIMS="75x39" ;;
 navi-extras) DIMS="70x30" ;;  # estimate, tune as needed
 navi-lain-config) DIMS="70x23" ;;
 navi-networking) DIMS="69x38" ;;
-navi-notifs) DIMS="69x29" ;;
+navi-notifs) DIMS="68x29" ;;
 navi-power) DIMS="67x26" ;;
-navi-reminders) DIMS="68x24" ;;
+navi-reminders) DIMS="69x24" ;;
 navi-weather) DIMS="68x24" ;;
 wiredrop) DIMS="66x23" ;;
 *) DIMS="" ;;
