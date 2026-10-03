@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# navi-terminal — the right terminal for this session.
+#
+# foot on Wayland (lighter, 25MB vs 80MB), alacritty on X11 (foot is
+# Wayland-only). Passes all args through.
+#
+# Usage: navi-terminal [-e command ...]
+#   Behaves like the underlying terminal's -e flag.
+
+set -uo pipefail
+
+if [ -n "${WAYLAND_DISPLAY:-}" ] && command -v foot >/dev/null 2>&1; then
+    exec foot "$@"
+elif command -v alacritty >/dev/null 2>&1; then
+    exec alacritty "$@"
+else
+    echo "navi-terminal: no suitable terminal found (need foot or alacritty)" >&2
+    exit 1
+fi
