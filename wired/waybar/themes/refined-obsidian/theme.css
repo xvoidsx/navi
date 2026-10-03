@@ -56,7 +56,7 @@
 @define-color quiet rgba(184, 184, 184, 0.80);
 
 * {
-    font-family: "Noto Sans", "Noto Sans Symbols2", sans-serif;
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", sans-serif;
     font-size: 10px;
     font-weight: bold;
 }

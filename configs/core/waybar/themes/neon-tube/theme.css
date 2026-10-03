@@ -37,7 +37,7 @@
 @define-color glass rgba(6, 2, 8, 0.82);
 
 * {
-    font-family: "Noto Sans", "Noto Sans Symbols2", sans-serif;
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", sans-serif;
     font-size: 10px;
     font-weight: bold;
 }
