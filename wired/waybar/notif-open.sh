@@ -10,7 +10,7 @@
 
 set -uo pipefail
 
-alacritty --title "navi-notifs" -e navi-notifs &
+kitty --title "navi-notifs" -e navi-notifs &
 sleep 0.5
 
 if [ -n "${SWAYSOCK:-}" ] && command -v swaymsg >/dev/null 2>&1; then

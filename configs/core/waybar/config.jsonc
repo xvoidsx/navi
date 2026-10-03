@@ -136,7 +136,7 @@
         "format-connected": "{icon} 󰃧",
         "format-disconnected": "{icon} 󰁨",
         "tooltip-format": "{status}",
-        "on-click": "blueman-manager",
+        "on-click": "navi-bluetooth",
         "on-scroll-up": "bluetoothctl power on",
         "on-scroll-down": "bluetoothctl power off",
         "tooltip": true
