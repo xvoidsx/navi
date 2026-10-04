@@ -690,9 +690,14 @@ func (a *naviAgent) DisplayPinCode(device dbus.ObjectPath, pincode string) *dbus
 }
 
 // RequestConfirmation asks the user to approve a Numeric Comparison code.
-// The input device (keyboard) confirms on its side automatically.
+// Input devices (keyboards/mice) auto-confirm: their firmware confirms on
+// their side without displaying anything, so prompting the user to "compare"
+// is theater. macOS-instant pairing for the devices that need it most.
 func (a *naviAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) *dbus.Error {
 	d := a.backend.lookupDevice(device)
+	if isInputDevice(d.Name) {
+		return nil // auto-approve keyboards/mice/trackpads
+	}
 	resp := make(chan bool, 1)
 	a.backend.emit(PairConfirmEvent{Device: d, Passkey: passkey, Resp: resp})
 	if <-resp {

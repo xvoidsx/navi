@@ -106,6 +106,7 @@ type model struct {
 	// D-Bus backend (nil when falling back to bluetoothctl)
 	backend      *BlueZBackend
 	useDBus      bool
+	dbusErr      string // persistent D-Bus init failure, shown in adapter line
 	// Pending agent response channels (for native pairing)
 	pairRespBool   chan bool
 	pairRespUint32 chan uint32
@@ -326,8 +327,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dbusInitMsg:
 		if msg.err != nil {
 			// D-Bus unavailable — fall back to bluetoothctl.
+			// Keep the specific error visible in the adapter line.
 			m.useDBus = false
-			m.status = "D-Bus unavailable, using bluetoothctl"
+			m.dbusErr = msg.err.Error()
+			m.status = "D-Bus unavailable — using bluetoothctl"
 			m.statusErr = true
 			return m, snapshotCmd()
 		}
@@ -961,6 +964,8 @@ func (m model) viewMain() string {
 
 	// Adapter line: always exactly one line so the frame never shifts.
 	switch {
+	case m.dbusErr != "":
+		b.WriteString(theme.Error.Render("  × D-Bus: "+truncateRunes(m.dbusErr, 50)) + "\n")
 	case !m.adapter.powered:
 		b.WriteString(theme.Error.Render("  ○ adapter is off — press P to power on") + "\n")
 	case m.adapter.discoverable:
