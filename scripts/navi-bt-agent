@@ -4,7 +4,10 @@
 Registers a DisplayOnly agent via D-Bus, which forces BlueZ to use
 Passkey Entry (type on keyboard) instead of Numeric Comparison (yes/no).
 
-Usage: navi-bt-agent <MAC>
+Usage:
+  navi-bt-agent           Scan for keyboards, pick one interactively
+  navi-bt-agent <MAC>     Pair a specific device by MAC address
+
 Then type the displayed passkey on the keyboard and press Enter.
 """
 
@@ -69,11 +72,90 @@ class Agent(dbus.service.Object):
     def Cancel(self):
         print("Pairing cancelled")
 
+
+def is_keyboard(props):
+    """Heuristic: is this Device1 property dict a keyboard?"""
+    icon = str(props.get("Icon", "") or "")
+    if "keyboard" in icon:
+        return True
+    name = str(props.get("Name", "") or props.get("Alias", "") or "")
+    nl = name.lower()
+    if "keyboard" in nl or "magic keyboard" in nl or "apple" in nl:
+        return True
+    try:
+        cls = int(props.get("Class", 0))
+        # Major class 0x05 (peripheral), minor 0x40 (keyboard)
+        if (cls & 0x1F00) == 0x0500 and (cls & 0xFF) & 0x40:
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+
+def device_label(props):
+    name = str(props.get("Name", "") or props.get("Alias", "") or "Unknown")
+    addr = str(props.get("Address", "?"))
+    paired = "paired" if props.get("Paired") else "new"
+    return f"{name} ({addr}) [{paired}]"
+
+
+def scan_for_keyboards(bus, adapter, manager, seconds=12):
+    """Start discovery, wait, return [(path, props)] of keyboard-like devices."""
+    try:
+        adapter.StartDiscovery()
+    except dbus.DBusException:
+        pass  # already discovering
+    print(f"Scanning for keyboards ({seconds}s)...")
+    # Pump the GLib loop briefly so InterfacesAdded events arrive
+    ctx = GLib.MainContext.default()
+    end = time.time() + seconds
+    while time.time() < end:
+        while ctx.pending():
+            ctx.iteration(False)
+        time.sleep(0.2)
+    try:
+        adapter.StopDiscovery()
+    except dbus.DBusException:
+        pass
+
+    found = []
+    for path, ifaces in manager.GetManagedObjects().items():
+        props = ifaces.get("org.bluez.Device1")
+        if not props:
+            continue
+        if is_keyboard(props):
+            found.append((path, props))
+    return found
+
+
+def pick_device(found):
+    if not found:
+        print("No keyboards found. Make sure it's powered on and discoverable,")
+        print("then try again.")
+        return None
+    if len(found) == 1:
+        path, props = found[0]
+        print(f"Found: {device_label(props)}")
+        return path
+    print("\nKeyboards found:")
+    for i, (path, props) in enumerate(found, 1):
+        print(f"  {i}. {device_label(props)}")
+    while True:
+        try:
+            choice = input("Pick one (number): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return None
+        if choice.isdigit() and 1 <= int(choice) <= len(found):
+            return found[int(choice) - 1][0]
+        print("Invalid choice, try again.")
+
 def main():
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <MAC>", file=sys.stderr)
+    mac = None
+    if len(sys.argv) == 2:
+        mac = sys.argv[1].upper().replace("-", ":")
+    elif len(sys.argv) > 2:
+        print(f"Usage: {sys.argv[0]} [MAC]", file=sys.stderr)
         sys.exit(1)
-    mac = sys.argv[1].upper().replace("-", ":")
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     bus = dbus.SystemBus()
@@ -108,19 +190,25 @@ def main():
     agent_manager.RequestDefaultAgent(AGENT_PATH)
     print(f"Agent registered with capability: {CAPABILITY}")
 
-    # Find and pair the device
+    # Find the device: by MAC, or interactive keyboard scan
     device_path = None
-    for path, interfaces in objects.items():
-        if "org.bluez.Device1" in interfaces:
-            addr = interfaces["org.bluez.Device1"].get("Address", "")
-            if str(addr).upper() == mac:
-                device_path = path
-                break
-
-    if not device_path:
-        print(f"Device {mac} not found. Make sure it's discoverable.", file=sys.stderr)
-        print("Run 'bluetoothctl scan on' in another terminal first.", file=sys.stderr)
-        sys.exit(1)
+    if mac:
+        for path, interfaces in objects.items():
+            if "org.bluez.Device1" in interfaces:
+                addr = interfaces["org.bluez.Device1"].get("Address", "")
+                if str(addr).upper() == mac:
+                    device_path = path
+                    break
+        if not device_path:
+            print(f"Device {mac} not found. Make sure it's discoverable.", file=sys.stderr)
+            print("Run without arguments to scan for keyboards instead.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        found = scan_for_keyboards(bus, adapter, manager)
+        device_path = pick_device(found)
+        if not device_path:
+            sys.exit(1)
+        mac = "selected device"
 
     device = dbus.Interface(bus.get_object("org.bluez", device_path),
                             "org.bluez.Device1")
