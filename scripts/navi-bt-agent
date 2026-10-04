@@ -282,14 +282,25 @@ def main():
         print(f"Pair failed: {err}", file=sys.stderr)
         sys.exit(1)
 
+    # Use the Properties interface for Get/Set (not Device1 directly)
+    props = dbus.Interface(bus.get_object("org.bluez", device_path),
+                           "org.freedesktop.DBus.Properties")
+
     # Check if paired
     try:
-        paired = device.Get("org.bluez.Device1", "Paired")
+        paired = props.Get("org.bluez.Device1", "Paired")
         if paired:
             print("Paired successfully!")
-            # Trust it
-            device.Set("org.bluez.Device1", "Trusted", dbus.Boolean(True))
+            # Trust it so it auto-connects
+            props.Set("org.bluez.Device1", "Trusted", dbus.Boolean(True))
             print("Trusted.")
+            # Connect the HID profile
+            print("Connecting...")
+            try:
+                device.Connect()
+                print("Connected! Try typing on the keyboard.")
+            except dbus.DBusException as e:
+                print(f"Connect: {e} (may already be connected)")
         else:
             print("Not paired.")
     except Exception as e:
