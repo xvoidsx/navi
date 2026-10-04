@@ -362,7 +362,40 @@ type BlueZBackend struct {
 	devices map[dbus.ObjectPath]BlueZDevice
 	agent   *naviAgent
 
+	// pairTarget is the device the user explicitly chose to pair.
+	// The agent checks this first — it eliminates the lookup race where
+	// BlueZ calls RequestConfirmation before our discovery cache has the
+	// device, which was causing blank passkeys and missed auto-confirm.
+	pairTarget    BlueZDevice
+	pairTargetSet bool
+
 	closed chan struct{}
+}
+
+// SetPairTarget records the device the user chose to pair.
+func (b *BlueZBackend) SetPairTarget(d BlueZDevice) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.pairTarget = d
+	b.pairTargetSet = true
+}
+
+// SetPairTargetByPath records the pairing target by D-Bus path,
+// fetching fresh properties if needed.
+func (b *BlueZBackend) SetPairTargetByPath(path dbus.ObjectPath) {
+	d := b.lookupDevice(path)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.pairTarget = d
+	b.pairTargetSet = true
+}
+
+// ClearPairTarget clears the pairing target.
+func (b *BlueZBackend) ClearPairTarget() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.pairTarget = BlueZDevice{}
+	b.pairTargetSet = false
 }
 
 // NewBlueZBackend connects to the system bus and finds the first adapter.
@@ -793,6 +826,26 @@ func (a *naviAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) 
 			result = dbus.NewError("org.bluez.Error.Failed", []interface{}{"agent panic"})
 		}
 	}()
+	// Prefer the explicit pair target — the user chose this device, so we
+	// know what it is even if the discovery cache hasn't caught up.
+	a.backend.mu.Lock()
+	if a.backend.pairTargetSet && a.backend.pairTarget.Path == device {
+		d := a.backend.pairTarget
+		a.backend.mu.Unlock()
+		if d.Kind == DeviceKeyboard || d.Kind == DeviceMouse || d.Kind == DeviceTrackpad || isInputDevice(d.Name) {
+			return nil // auto-approve keyboards/mice/trackpads
+		}
+		// Non-input device: prompt via UI.
+		resp := make(chan bool, 1)
+		a.backend.emit(PairConfirmEvent{Device: d, Passkey: passkey, Resp: resp})
+		if <-resp {
+			return nil
+		}
+		return dbus.NewError("org.bluez.Error.Rejected", []interface{}{"rejected by user"})
+	}
+	a.backend.mu.Unlock()
+
+	// Fallback: lookup (may be empty on cache miss).
 	d := a.backend.lookupDevice(device)
 	// Check Kind (from Icon/Class/UUID) as well as name — the name may
 	// not have resolved yet when the callback fires.

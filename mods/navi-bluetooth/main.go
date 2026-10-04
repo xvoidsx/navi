@@ -905,17 +905,22 @@ func (m model) beginPair(d device) (tea.Model, tea.Cmd) {
 		m.statusErr = false
 		backend := m.backend
 		path := d.path
+		// Stash the target so the agent's RequestConfirmation can
+		// auto-confirm without a cache lookup race.
+		backend.SetPairTargetByPath(dbusObjectPath(path))
 		return m, tea.Batch(
 			func() tea.Msg {
 				// Re-assert our agent: Blueman/bluetoothctl may have
 				// stolen the default slot since startup.
 				if err := backend.EnsureDefaultAgent(); err != nil {
+					backend.ClearPairTarget()
 					return dbusPairDoneMsg{err: fmt.Errorf("agent: %w", err)}
 				}
 				var pairErr error
 				done := make(chan struct{})
 				backend.PairAsync(dbusObjectPath(path), func(err error) {
 					pairErr = err
+					backend.ClearPairTarget()
 					close(done)
 				})
 				<-done
