@@ -207,3 +207,39 @@ func TestValidMAC(t *testing.T) {
 		t.Fatal("invalid MAC accepted")
 	}
 }
+
+func TestIsInputDevice(t *testing.T) {
+	cases := []struct {
+		name string
+		want bool
+	}{
+		{"Keyboard", true},                    // BlueZ generic name
+		{"Magic Keyboard", true},              // Apple
+		{"Apple Magic Mouse", true},           // Apple
+		{"Logitech MX Keys", true},            // brand keyboard
+		{"My Mouse", true},                    // generic mouse
+		{"Trackpad", true},                    // trackpad
+		{"AirPods Pro", false},                // audio, not input
+		{"Pixel 8", false},                    // phone, not input
+		{"JBL Speaker", false},                // audio
+		{"", false},                           // empty
+	}
+	for _, c := range cases {
+		if got := isInputDevice(c.name); got != c.want {
+			t.Errorf("isInputDevice(%q) = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestDisplayNameNeverBareMAC(t *testing.T) {
+	// A device with no name must not show a bare MAC.
+	d := BlueZDevice{Address: "04:69:F8:DA:18:E4", Kind: DeviceKeyboard}
+	if got := d.DisplayName(); got == "04:69:F8:DA:18:E4" {
+		t.Errorf("DisplayName returned bare MAC: %q", got)
+	}
+	// Named device shows its name.
+	d2 := BlueZDevice{Address: "04:69:F8:DA:18:E4", Name: "Magic Keyboard", Kind: DeviceKeyboard}
+	if got := d2.DisplayName(); got != "Magic Keyboard" {
+		t.Errorf("DisplayName = %q, want %q", got, "Magic Keyboard")
+	}
+}

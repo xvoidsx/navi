@@ -39,6 +39,21 @@ type device struct {
 	paired    bool
 	connected bool
 	battery   int // -1 = unknown
+	kind      DeviceKind
+	path      string // D-Bus object path (empty when using bluetoothctl fallback)
+}
+
+// fromBlueZ converts a backend device to the UI model.
+func fromBlueZ(d BlueZDevice) device {
+	return device{
+		mac:       d.Address,
+		name:      d.DisplayName(),
+		paired:    d.Paired,
+		connected: d.Connected,
+		battery:   -1,
+		kind:      d.Kind,
+		path:      string(d.Path),
+	}
 }
 
 // adapterState is the controller state from `show`.
@@ -282,6 +297,7 @@ func isInputDevice(name string) bool {
 	n := strings.ToLower(name)
 	return isAppleDevice(name) ||
 		strings.Contains(n, "keyboard") ||
+		strings.Contains(n, "keys") ||
 		strings.Contains(n, "mouse") ||
 		strings.Contains(n, "trackpad") ||
 		strings.Contains(n, "trackpoint")

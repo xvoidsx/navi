@@ -19,8 +19,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/godbus/dbus/v5"
 	"github.com/rav3ndust/navi-theme"
 )
+
+// dbusObjectPath converts a stored path string back to a D-Bus object path.
+func dbusObjectPath(s string) dbus.ObjectPath { return dbus.ObjectPath(s) }
 
 // frameWidth is the family-standard mod window width. Views assume it.
 var frameWidth = 62
@@ -99,6 +103,13 @@ type model struct {
 	removeDev    device
 	trustDev     device
 	pairTimedOut bool
+	// D-Bus backend (nil when falling back to bluetoothctl)
+	backend      *BlueZBackend
+	useDBus      bool
+	// Pending agent response channels (for native pairing)
+	pairRespBool   chan bool
+	pairRespUint32 chan uint32
+	pairRespString chan string
 }
 
 func initialModel() model {
@@ -111,12 +122,54 @@ func initialModel() model {
 	}
 }
 
+// BlueZ backend Tea messages.
+type dbusInitMsg struct {
+	backend *BlueZBackend
+	err     error
+}
+type dbusEventMsg struct{ ev BlueZEvent }
+type dbusPairDoneMsg struct{ err error }
+
+// dbusInitCmd tries to bring up the native backend.
+func dbusInitCmd() tea.Msg {
+	backend, err := NewBlueZBackend()
+	if err != nil {
+		return dbusInitMsg{err: err}
+	}
+	if err := backend.SetPowered(true); err != nil {
+		// non-fatal; continue
+	}
+	if err := backend.Watch(); err != nil {
+		backend.Close()
+		return dbusInitMsg{err: err}
+	}
+	if err := backend.RegisterAgent(); err != nil {
+		// non-fatal; pairing callbacks just won't work
+	}
+	if err := backend.StartDiscovery(); err != nil {
+		// non-fatal
+	}
+	return dbusInitMsg{backend: backend}
+}
+
+// dbusPumpCmd waits for the next backend event.
+func dbusPumpCmd(backend *BlueZBackend) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-backend.Events()
+		if !ok {
+			return nil
+		}
+		return dbusEventMsg{ev: ev}
+	}
+}
+
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		m.tx.Init(),
 		func() tea.Msg { return startMsg{} },
 		pollTickCmd(),
 		scanAnimCmd(),
+		dbusInitCmd,
 	)
 }
 
@@ -143,6 +196,33 @@ func opCmd(note string, fn func() error) tea.Cmd {
 		err := fn()
 		return opMsg{err: err, note: note}
 	}
+}
+
+// humanizeDBusError translates raw D-Bus errors into plain language.
+// Normies should never see "org.bluez.Error.Failed".
+func humanizeDBusError(err error) string {
+	if err == nil {
+		return ""
+	}
+	s := err.Error()
+	switch {
+	case strings.Contains(s, "br-connection-create-socket"):
+		return "couldn't reach it — tap a key to wake it up and try again"
+	case strings.Contains(s, "AuthenticationFailed"):
+		return "pairing didn't go through — is it in pairing mode?"
+	case strings.Contains(s, "AlreadyExists"):
+		return "already paired"
+	case strings.Contains(s, "NotReady"):
+		return "Bluetooth isn't ready yet — try again in a moment"
+	case strings.Contains(s, "NotAvailable"):
+		return "no Bluetooth adapter found"
+	case strings.Contains(s, "org.bluez.Error."):
+		// Strip the D-Bus prefix, keep the rest.
+		if i := strings.LastIndex(s, "."); i >= 0 && i+1 < len(s) {
+			return strings.ToLower(s[i+1 : i+2]) + s[i+2:]
+		}
+	}
+	return s
 }
 
 // ── row building ────────────────────────────────────────────────────
@@ -235,7 +315,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case startMsg:
 		m.loading = true
+		// If the D-Bus backend is up, devices stream in via events.
+		// Otherwise fall back to the bluetoothctl snapshot.
+		if m.useDBus {
+			return m, nil
+		}
 		return m, snapshotCmd()
+
+	case dbusInitMsg:
+		if msg.err != nil {
+			// D-Bus unavailable — fall back to bluetoothctl.
+			m.useDBus = false
+			m.status = "D-Bus unavailable, using bluetoothctl"
+			m.statusErr = true
+			return m, snapshotCmd()
+		}
+		m.backend = msg.backend
+		m.useDBus = true
+		m.loading = false
+		// Seed from current devices.
+		m.devs = nil
+		for _, d := range m.backend.Devices() {
+			m.devs = append(m.devs, fromBlueZ(d))
+		}
+		m.rebuildRows()
+		return m, dbusPumpCmd(m.backend)
+
+	case dbusEventMsg:
+		return m.handleDBusEvent(msg.ev)
+
+	case pairTimeoutMsg:
+		if m.screen == screenPairing || m.screen == screenPIN {
+			m.endPair()
+			m.status = "× pairing timed out"
+			m.statusErr = true
+			m.screen = screenMain
+		}
+		return m, nil
 
 	case pollTickMsg:
 		cmds := []tea.Cmd{pollTickCmd()}
@@ -312,19 +428,147 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pairEventMsg:
 		return m.handlePairEvent(msg.ev)
 
-	case pairTimeoutMsg:
-		if m.screen == screenPairing || m.screen == screenPIN {
+	case dbusPairDoneMsg:
+		m.clearPairResp()
+		if msg.err != nil {
 			m.endPair()
-			m.status = "× pairing timed out"
+			m.status = "× pairing failed: " + humanizeDBusError(msg.err)
 			m.statusErr = true
 			m.screen = screenMain
+			return m, nil
 		}
+		// Paired! Auto-trust input devices, ask for others.
+		dev := m.pairDev
+		m.endPair()
+		if isInputDevice(dev.name) {
+			m.screen = screenMain
+			m.working = true
+			m.status = "paired — trusting " + dev.name + "…"
+			backend := m.backend
+			path := dbusObjectPath(dev.path)
+			return m, func() tea.Msg {
+				if err := backend.SetTrusted(path, true); err != nil {
+					return opMsg{err: err, note: "paired but trust failed"}
+				}
+				if err := backend.Connect(path); err != nil {
+					return opMsg{err: nil, note: "paired and trusted — tap a key if it doesn't connect"}
+				}
+				return opMsg{err: nil, note: "trusted " + dev.name + " — it will auto-connect"}
+			}
+		}
+		m.screen = screenTrustAsk
+		m.trustDev = dev
+		m.status = "paired with " + dev.name
+		m.statusErr = false
 		return m, nil
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
 	return m, nil
+}
+
+// handleDBusEvent processes backend events and re-arms the pump.
+func (m model) handleDBusEvent(ev BlueZEvent) (tea.Model, tea.Cmd) {
+	pump := func() tea.Cmd {
+		if m.backend != nil {
+			return dbusPumpCmd(m.backend)
+		}
+		return nil
+	}
+	switch e := ev.(type) {
+	case DeviceAddedEvent:
+		m.upsertDevice(fromBlueZ(e.Device))
+		m.loading = false
+		return m, pump()
+	case DeviceUpdatedEvent:
+		m.upsertDevice(fromBlueZ(e.Device))
+		if m.pairDev.path != "" && m.pairDev.path == string(e.Device.Path) {
+			m.pairDev = fromBlueZ(e.Device)
+		}
+		return m, pump()
+	case DeviceRemovedEvent:
+		m.removeDeviceByPath(string(e.Path))
+		return m, pump()
+	case DiscoveryEvent:
+		m.adapter.discovering = e.Discovering
+		return m, pump()
+	case PairDisplayPasskeyEvent:
+		m.pairDev = fromBlueZ(e.Device)
+		m.pairPrompt = pairEvent{kind: pairPromptDisplay, text: fmt.Sprintf("%06d", e.Passkey)}
+		m.screen = screenPairing
+		return m, pump()
+	case PairConfirmEvent:
+		m.pairDev = fromBlueZ(e.Device)
+		m.pairPrompt = pairEvent{kind: pairPromptPasskey, text: fmt.Sprintf("%06d", e.Passkey)}
+		m.pairRespBool = e.Resp
+		m.screen = screenPairing
+		return m, pump()
+	case PairRequestPasskeyEvent:
+		m.pairDev = fromBlueZ(e.Device)
+		m.pairPrompt = pairEvent{kind: pairPromptPasskey, text: ""}
+		m.pairRespUint32 = e.Resp
+		m.pinBuf = ""
+		m.screen = screenPIN
+		return m, pump()
+	case PairRequestPINEvent:
+		m.pairDev = fromBlueZ(e.Device)
+		m.pairRespString = e.Resp
+		m.pinBuf = ""
+		m.screen = screenPIN
+		return m, pump()
+	case PairCancelledEvent:
+		m.clearPairResp()
+		if m.screen == screenPairing || m.screen == screenPIN {
+			m.screen = screenMain
+			m.status = "pairing cancelled"
+			m.statusErr = false
+		}
+		return m, pump()
+	case AuthorizeEvent:
+		m.pairDev = fromBlueZ(e.Device)
+		m.pairPrompt = pairEvent{kind: pairPromptAuthorize, text: e.UUID}
+		m.pairRespBool = e.Resp
+		m.screen = screenPairing
+		return m, pump()
+	}
+	return m, pump()
+}
+
+// upsertDevice adds or updates a device in the list.
+func (m *model) upsertDevice(d device) {
+	for i, existing := range m.devs {
+		if existing.mac == d.mac && d.mac != "" {
+			m.devs[i] = d
+			m.rebuildRows()
+			return
+		}
+		if existing.path == d.path && d.path != "" {
+			m.devs[i] = d
+			m.rebuildRows()
+			return
+		}
+	}
+	m.devs = append(m.devs, d)
+	m.rebuildRows()
+}
+
+// removeDeviceByPath removes a device by its D-Bus path.
+func (m *model) removeDeviceByPath(path string) {
+	for i, d := range m.devs {
+		if d.path == path {
+			m.devs = append(m.devs[:i], m.devs[i+1:]...)
+			m.rebuildRows()
+			return
+		}
+	}
+}
+
+// clearPairResp releases any pending agent response channels.
+func (m *model) clearPairResp() {
+	m.pairRespBool = nil
+	m.pairRespUint32 = nil
+	m.pairRespString = nil
 }
 
 func (m model) handlePairEvent(ev pairEvent) (tea.Model, tea.Cmd) {
@@ -559,11 +803,38 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) answerPair(ans string) {
+	// Legacy bluetoothctl session.
 	if m.pairSess != nil {
 		select {
 		case m.pairSess.Answers <- ans:
 		default:
 		}
+		return
+	}
+	// Native D-Bus agent: route to the pending response channel.
+	switch {
+	case m.pairRespBool != nil:
+		select {
+		case m.pairRespBool <- (ans == "yes"):
+		default:
+		}
+		m.pairRespBool = nil
+	case m.pairRespUint32 != nil:
+		var v uint32 = 0xFFFFFFFF // sentinel = cancelled
+		if _, err := fmt.Sscanf(ans, "%d", &v); err != nil {
+			v = 0xFFFFFFFF
+		}
+		select {
+		case m.pairRespUint32 <- v:
+		default:
+		}
+		m.pairRespUint32 = nil
+	case m.pairRespString != nil:
+		select {
+		case m.pairRespString <- ans:
+		default:
+		}
+		m.pairRespString = nil
 	}
 }
 
@@ -593,12 +864,31 @@ func (m model) smartAction() (tea.Model, tea.Cmd) {
 }
 
 func (m model) beginPair(d device) (tea.Model, tea.Cmd) {
-	// Apple keyboards need the D-Bus agent — bluetoothctl can't do it.
-	if isAppleDevice(d.name) {
-		m.screen = screenAppleHelp
+	// Native D-Bus pairing when the backend is up — works for every
+	// device type. BlueZ calls the right agent callback automatically.
+	if m.useDBus && m.backend != nil && d.path != "" {
 		m.pairDev = d
-		return m, nil
+		m.screen = screenPairing
+		m.pairPrompt = pairEvent{} // waiting for the first agent callback
+		m.status = "pairing with " + d.name + "…"
+		m.statusErr = false
+		backend := m.backend
+		path := d.path
+		return m, tea.Batch(
+			func() tea.Msg {
+				var pairErr error
+				done := make(chan struct{})
+				backend.PairAsync(dbusObjectPath(path), func(err error) {
+					pairErr = err
+					close(done)
+				})
+				<-done
+				return dbusPairDoneMsg{err: pairErr}
+			},
+			tea.Tick(90*time.Second, func(time.Time) tea.Msg { return pairTimeoutMsg{} }),
+		)
 	}
+	// Fallback: bluetoothctl-based pairing.
 	sess, err := startPairWithName(d.mac, d.name)
 	if err != nil {
 		m.status = "× could not start pairing: " + err.Error()
@@ -756,10 +1046,12 @@ func (m model) viewDeviceRow(devIdx int) string {
 	focused := m.cursor == rowIndexOf(m.rows, devIdx)
 
 	cursor := "  "
-	name := theme.Normal.Render(truncateRunes(d.name, 30))
+	// Kind emoji + friendly name — never a bare MAC.
+	label := d.kind.Emoji() + " " + d.name
+	name := theme.Normal.Render(truncateRunes(label, 30))
 	if focused {
 		cursor = theme.Selected.Render("› ")
-		name = theme.Selected.Render(truncateRunes(d.name, 30))
+		name = theme.Selected.Render(truncateRunes(label, 30))
 	}
 	dot := theme.DotOff.Render("○")
 	if d.connected {
