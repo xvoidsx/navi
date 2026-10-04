@@ -623,8 +623,19 @@ func (b *BlueZBackend) unregisterAgent() {
 	b.agent = nil
 }
 
-// RegisterAgent registers our KeyboardDisplay agent as the default.
+// RegisterAgent registers our DisplayOnly agent as the default.
 func (b *BlueZBackend) RegisterAgent() error { return b.registerAgent() }
+
+// EnsureDefaultAgent re-asserts our agent as the default. Other Bluetooth
+// managers (Blueman, bluetoothctl) register their own agents and can steal
+// the default slot; call this before pairing to take it back.
+func (b *BlueZBackend) EnsureDefaultAgent() error {
+	if b.agent == nil {
+		return b.registerAgent()
+	}
+	mgr := b.conn.Object("org.bluez", "/org/bluez")
+	return mgr.Call("org.bluez.AgentManager1.RequestDefaultAgent", 0, agentPath).Err
+}
 
 func (b *BlueZBackend) lookupDevice(path dbus.ObjectPath) BlueZDevice {
 	b.mu.Lock()

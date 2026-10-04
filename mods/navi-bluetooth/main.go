@@ -23,6 +23,9 @@ import (
 	"github.com/rav3ndust/navi-theme"
 )
 
+// buildCommit is stamped at push time via -ldflags; falls back to "dev".
+var buildCommit = "dev"
+
 // dbusObjectPath converts a stored path string back to a D-Bus object path.
 func dbusObjectPath(s string) dbus.ObjectPath { return dbus.ObjectPath(s) }
 
@@ -886,6 +889,11 @@ func (m model) beginPair(d device) (tea.Model, tea.Cmd) {
 		path := d.path
 		return m, tea.Batch(
 			func() tea.Msg {
+				// Re-assert our agent: Blueman/bluetoothctl may have
+				// stolen the default slot since startup.
+				if err := backend.EnsureDefaultAgent(); err != nil {
+					return dbusPairDoneMsg{err: fmt.Errorf("agent: %w", err)}
+				}
 				var pairErr error
 				done := make(chan struct{})
 				backend.PairAsync(dbusObjectPath(path), func(err error) {
@@ -1285,8 +1293,11 @@ func main() {
 		case "--dump":
 			dumpSample()
 			return
+		case "--version", "-v":
+			fmt.Println("navi-bluetooth " + buildCommit)
+			return
 		case "--help", "-h":
-			fmt.Fprintln(os.Stderr, "usage: navi-bluetooth [--dump]")
+			fmt.Fprintln(os.Stderr, "usage: navi-bluetooth [--dump] [--version]")
 			os.Exit(0)
 		}
 	}
