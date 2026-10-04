@@ -589,7 +589,7 @@ func (b *BlueZBackend) emit(ev BlueZEvent) {
 // Agent1 implementation
 // ---------------------------------------------------------------------------
 
-// naviAgent implements org.bluez.Agent1 with KeyboardDisplay capability.
+// naviAgent implements org.bluez.Agent1 with DisplayOnly capability.
 // Callbacks that need user input emit events with response channels;
 // the Tea model answers them.
 type naviAgent struct {
@@ -602,7 +602,10 @@ func (b *BlueZBackend) registerAgent() error {
 		return fmt.Errorf("export agent: %w", err)
 	}
 	mgr := b.conn.Object("org.bluez", "/org/bluez")
-	if err := mgr.Call("org.bluez.AgentManager1.RegisterAgent", 0, agentPath, "KeyboardDisplay").Err; err != nil {
+	// DisplayOnly, not KeyboardDisplay: the Magic Keyboard's firmware
+	// handles DisplayOnly hosts (auto-confirms) but rejects pairing when
+	// the host claims DisplayYesNo. Proven by btmon 2026-10-04.
+	if err := mgr.Call("org.bluez.AgentManager1.RegisterAgent", 0, agentPath, "DisplayOnly").Err; err != nil {
 		return fmt.Errorf("register agent: %w", err)
 	}
 	if err := mgr.Call("org.bluez.AgentManager1.RequestDefaultAgent", 0, agentPath).Err; err != nil {
