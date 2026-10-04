@@ -94,8 +94,8 @@ exec --no-startup-id dunst
 # Network management
 exec --no-startup-id nm-applet
 
-# Bluetooth
-exec --no-startup-id sh -c "sleep 1 && blueman-applet &"
+# Bluetooth: navi-bluetooth (native BlueZ D-Bus) replaces blueman-applet.
+# Removed 2026-10-04.
 
 # Weather
 exec --no-startup-id sh -c "sleep 1 && meteo-qt &"
