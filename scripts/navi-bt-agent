@@ -13,6 +13,7 @@ Then type the displayed passkey on the keyboard and press Enter.
 
 import sys
 import time
+import threading
 import dbus
 import dbus.service
 import dbus.mainloop.glib
@@ -51,9 +52,12 @@ class Agent(dbus.service.Object):
     def DisplayPasskey(self, device, passkey, entered):
         print(f"\n{'='*50}")
         print(f"  TYPE THIS ON THE KEYBOARD: {passkey:06d}")
+        if entered:
+            print(f"  ({entered}/6 digits entered so far)")
         print(f"  Then press Enter on the keyboard.")
         print(f"{'='*50}\n")
-        # Don't return — BlueZ waits for the keyboard to send the passkey
+        # Don't return anything special — BlueZ waits for the keyboard
+        # to send the passkey back over the air.
 
     @dbus.service.method("org.bluez.Agent1",
                          in_signature="os", out_signature="")
@@ -213,21 +217,54 @@ def main():
     device = dbus.Interface(bus.get_object("org.bluez", device_path),
                             "org.bluez.Device1")
     print(f"Pairing with {mac}...")
-    try:
-        device.Pair()
-        print("Pairing initiated. Type the passkey on the keyboard.")
-    except dbus.DBusException as e:
-        print(f"Pair failed: {e}", file=sys.stderr)
-        sys.exit(1)
+    print("Tip: if the keyboard is asleep, tap a key on it now to wake it.")
 
     global mainloop
     mainloop = GLib.MainLoop()
-    # Timeout after 60 seconds
-    GLib.timeout_add_seconds(60, lambda: (print("Timeout"), mainloop.quit(), False)[2])
-    try:
-        mainloop.run()
-    except KeyboardInterrupt:
-        pass
+
+    def attempt_pair():
+        """Run blocking Pair() in a thread while the GLib loop dispatches
+        agent callbacks (DisplayPasskey etc.) in the main thread."""
+        result = {}
+
+        def do_pair():
+            try:
+                device.Pair()
+                result["ok"] = True
+            except dbus.DBusException as e:
+                result["error"] = e
+            finally:
+                GLib.idle_add(mainloop.quit)
+
+        # Safety timeout so we never hang forever
+        GLib.timeout_add_seconds(
+            120, lambda: (print("Timed out waiting for pairing."),
+                          mainloop.quit(), False)[2])
+
+        t = threading.Thread(target=do_pair, daemon=True)
+        t.start()
+        try:
+            mainloop.run()
+        except KeyboardInterrupt:
+            pass
+        t.join(timeout=5)
+        return result
+
+    pair_result = attempt_pair()
+    err = pair_result.get("error")
+    if err and "Page Timeout" in str(err):
+        print("\nThe keyboard didn't answer — it was probably asleep.")
+        try:
+            input("Tap a key on the keyboard to wake it, then press Enter here to retry... ")
+        except (EOFError, KeyboardInterrupt):
+            sys.exit(1)
+        print("Retrying...")
+        pair_result = attempt_pair()
+        err = pair_result.get("error")
+
+    if err:
+        print(f"Pair failed: {err}", file=sys.stderr)
+        sys.exit(1)
 
     # Check if paired
     try:
