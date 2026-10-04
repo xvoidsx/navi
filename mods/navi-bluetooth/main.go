@@ -1306,6 +1306,14 @@ func main() {
 		}
 	}()
 
+	// Log main() entry: distinguishes init() death from main() death.
+	if dir := os.ExpandEnv("$HOME/.local/share/navi/navi-bluetooth"); dir != "" {
+		if f, err := os.OpenFile(dir+"/startup.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			fmt.Fprintf(f, "main pid=%d args=%v at %s\n", os.Getpid(), os.Args, time.Now().Format(time.RFC3339))
+			f.Close()
+		}
+	}
+
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "--dump":

@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -339,6 +340,15 @@ var agentPath = dbus.ObjectPath(agentPathBase)
 
 func init() {
 	agentPath = dbus.ObjectPath(fmt.Sprintf("%s/%d", agentPathBase, os.Getpid()))
+	// Early init log: if we never see "main started" in the log, the
+	// process died in init() or was killed externally.
+	if dir := os.ExpandEnv("$HOME/.local/share/navi/navi-bluetooth"); dir != "" {
+		os.MkdirAll(dir, 0755)
+		if f, err := os.OpenFile(dir+"/startup.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			fmt.Fprintf(f, "init pid=%d at %s\n", os.Getpid(), time.Now().Format(time.RFC3339))
+			f.Close()
+		}
+	}
 }
 
 // BlueZBackend owns the system-bus connection, discovery, and the agent.
