@@ -344,13 +344,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case dbusInitMsg:
 		if msg.err != nil {
-			// D-Bus unavailable — fall back to bluetoothctl.
-			// Keep the specific error visible in the adapter line.
+			// D-Bus unavailable — show the error and stay in a degraded
+			// state. The bluetoothctl fallback is disabled: it spawns
+			// agents that conflict with ours and masks D-Bus issues.
 			m.useDBus = false
+			m.backend = nil
 			m.dbusErr = msg.err.Error()
-			m.status = "D-Bus unavailable — using bluetoothctl"
+			m.loading = false
+			m.status = "Bluetooth unavailable: " + msg.err.Error()
 			m.statusErr = true
-			return m, snapshotCmd()
+			return m, nil
 		}
 		m.backend = msg.backend
 		m.useDBus = true
@@ -378,9 +381,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pollTickMsg:
 		cmds := []tea.Cmd{pollTickCmd()}
 		// D-Bus backend: discovery is event-driven, no polling or
-		// bluetoothctl needed. Polling here would MGMT-spam BlueZ
-		// and stomp pairing ceremonies.
-		if m.useDBus {
+		// bluetoothctl needed. If D-Bus failed, stay degraded —
+		// don't poll bluetoothctl (agent conflicts).
+		if m.useDBus || m.dbusErr != "" {
 			return m, tea.Batch(cmds...)
 		}
 		// Don't stomp a pairing ceremony with a refresh.
