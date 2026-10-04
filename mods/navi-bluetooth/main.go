@@ -136,7 +136,22 @@ type dbusEventMsg struct{ ev BlueZEvent }
 type dbusPairDoneMsg struct{ err error }
 
 // dbusInitCmd tries to bring up the native backend.
-func dbusInitCmd() tea.Msg {
+func dbusInitCmd() (msg tea.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Log goroutine panics and report failure; otherwise
+			// dbusInitMsg never arrives and the TUI silently sits
+			// in fallback mode with no D-Bus error shown.
+			dir := os.ExpandEnv("$HOME/.local/share/navi/navi-bluetooth")
+			os.MkdirAll(dir, 0755)
+			if f, err := os.OpenFile(dir+"/panic.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				fmt.Fprintf(f, "=== panic in dbusInitCmd at %s ===\n%v\n%s\n\n",
+					time.Now().Format(time.RFC3339), r, debug.Stack())
+				f.Close()
+			}
+			msg = dbusInitMsg{err: fmt.Errorf("backend panic: %v", r)}
+		}
+	}()
 	backend, err := NewBlueZBackend()
 	if err != nil {
 		return dbusInitMsg{err: err}
@@ -321,12 +336,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case startMsg:
 		m.loading = true
-		// If the D-Bus backend is up, devices stream in via events.
-		// Otherwise fall back to the bluetoothctl snapshot.
-		if m.useDBus {
-			return m, nil
-		}
-		return m, snapshotCmd()
+		// Don't snapshot yet — wait for dbusInitMsg. If D-Bus comes up,
+		// we seed from it. If it fails, dbusInitMsg triggers the
+		// bluetoothctl fallback. Firing snapshotCmd here races D-Bus
+		// init and the snapshot overwrites D-Bus devices with MACs.
+		return m, nil
 
 	case dbusInitMsg:
 		if msg.err != nil {
