@@ -369,8 +369,16 @@ type BlueZBackend struct {
 	pairTarget    BlueZDevice
 	pairTargetSet bool
 
+	// lastConnectAttempt throttles auto-connect per device, so a keyboard
+	// that is merely asleep doesn't get a Connect() call every tick.
+	lastConnectAttempt map[dbus.ObjectPath]time.Time
+
 	closed chan struct{}
 }
+
+// autoConnectCooldown is how long to wait before asking BlueZ to reconnect
+// the same device again.
+const autoConnectCooldown = 20 * time.Second
 
 // SetPairTarget records the device the user chose to pair.
 func (b *BlueZBackend) SetPairTarget(d BlueZDevice) {
@@ -405,10 +413,11 @@ func NewBlueZBackend() (*BlueZBackend, error) {
 		return nil, fmt.Errorf("system bus: %w", err)
 	}
 	b := &BlueZBackend{
-		conn:    conn,
-		events:  make(chan BlueZEvent, 64),
-		devices: make(map[dbus.ObjectPath]BlueZDevice),
-		closed:  make(chan struct{}),
+		conn:               conn,
+		events:             make(chan BlueZEvent, 64),
+		devices:            make(map[dbus.ObjectPath]BlueZDevice),
+		lastConnectAttempt: make(map[dbus.ObjectPath]time.Time),
+		closed:             make(chan struct{}),
 	}
 	// Find adapter
 	objs, err := b.getManagedObjects()
@@ -683,6 +692,90 @@ func (b *BlueZBackend) emit(ev BlueZEvent) {
 	case b.events <- ev:
 	case <-b.closed:
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Keeping the view honest
+// ---------------------------------------------------------------------------
+
+// ResyncDevices re-reads every known device from BlueZ and emits an update
+// for each.
+//
+// Without this the UI depends entirely on D-Bus signals, and a single
+// missed one leaves a row showing stale state until the user hits 'r'. That
+// is not hypothetical: it looked exactly like "the keyboard refuses to
+// reconnect" when it was really a dropped signal. Cheap insurance, called
+// from the poll tick.
+func (b *BlueZBackend) ResyncDevices() {
+	b.mu.Lock()
+	paths := make([]dbus.ObjectPath, 0, len(b.devices))
+	for p := range b.devices {
+		paths = append(paths, p)
+	}
+	b.mu.Unlock()
+
+	for _, p := range paths {
+		props := b.getDeviceProps(p)
+		if props == nil {
+			continue
+		}
+		d := deviceFromProps(p, props)
+		b.mu.Lock()
+		b.devices[p] = d
+		b.mu.Unlock()
+		b.emit(DeviceUpdatedEvent{Device: d})
+	}
+}
+
+// AutoConnectInputDevices nudges BlueZ to reconnect trusted input devices
+// that are bonded but not connected.
+//
+// BlueZ normally gets there by itself — measured on an Apple Magic
+// Keyboard, roughly three seconds after the side switch comes back on. This
+// is the safety net for the devices it does *not* auto-connect (older
+// bonds made before Trusted was set, some headsets), and it means a
+// keyboard that is merely off does not need the user to open the manager
+// and press enter.
+//
+// Only trusted, already-paired input devices are touched: this never pairs
+// anything new and never touches a device the user hasn't connected before.
+// Connect() blocks for as long as the attempt takes, so each one runs on
+// its own goroutine.
+func (b *BlueZBackend) AutoConnectInputDevices() []dbus.ObjectPath {
+	now := time.Now()
+	var todo []BlueZDevice
+
+	b.mu.Lock()
+	for p, d := range b.devices {
+		if d.Connected || !d.Paired || !d.Trusted {
+			continue
+		}
+		if !isInputDeviceKind(d) {
+			continue
+		}
+		if last, ok := b.lastConnectAttempt[p]; ok && now.Sub(last) < autoConnectCooldown {
+			continue
+		}
+		b.lastConnectAttempt[p] = now
+		todo = append(todo, d)
+	}
+	b.mu.Unlock()
+
+	paths := make([]dbus.ObjectPath, 0, len(todo))
+	for _, d := range todo {
+		paths = append(paths, d.Path)
+		d := d
+		tracef("auto-connect: %s (%s) is trusted+paired but not connected",
+			d.DisplayName(), d.Address)
+		go func() {
+			if err := b.Connect(d.Path); err != nil {
+				tracef("auto-connect: %s -> %v", d.Address, err)
+				return
+			}
+			tracef("auto-connect: %s connected", d.Address)
+		}()
+	}
+	return paths
 }
 
 // ---------------------------------------------------------------------------

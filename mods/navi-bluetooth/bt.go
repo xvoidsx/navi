@@ -39,6 +39,7 @@ type device struct {
 	mac       string
 	name      string
 	paired    bool
+	trusted   bool // Trusted — BlueZ only auto-connects trusted devices
 	connected bool
 	battery   int // -1 = unknown
 	kind      DeviceKind
@@ -51,6 +52,7 @@ func fromBlueZ(d BlueZDevice) device {
 		mac:       d.Address,
 		name:      d.DisplayName(),
 		paired:    d.Paired,
+		trusted:   d.Trusted,
 		connected: d.Connected,
 		battery:   -1,
 		kind:      d.Kind,
@@ -68,6 +70,7 @@ func (d device) toBlueZ() BlueZDevice {
 		Name:      d.name,
 		Kind:      d.kind,
 		Paired:    d.paired,
+		Trusted:   d.trusted,
 		Connected: d.connected,
 	}
 }

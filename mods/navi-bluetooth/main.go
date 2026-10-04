@@ -460,10 +460,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case pollTickMsg:
 		cmds := []tea.Cmd{pollTickCmd()}
-		// D-Bus backend: discovery is event-driven, no polling or
-		// bluetoothctl needed. If D-Bus failed, stay degraded —
-		// don't poll bluetoothctl (agent conflicts).
-		if m.useDBus || m.dbusErr != "" {
+		// D-Bus backend: discovery is event-driven, no bluetoothctl
+		// polling needed. But "event-driven" must not mean "trust the
+		// signals blindly" — a dropped PropertiesChanged leaves a row
+		// stale until the user presses 'r'. So resync from the backend,
+		// and nudge any trusted input device that is bonded but not
+		// connected. If D-Bus failed, stay degraded: don't fall back to
+		// bluetoothctl (agent conflicts).
+		if m.useDBus && m.backend != nil {
+			backend := m.backend
+			return m, tea.Batch(append(cmds, func() tea.Msg {
+				backend.AutoConnectInputDevices()
+				backend.ResyncDevices()
+				return nil
+			})...)
+		}
+		if m.dbusErr != "" {
 			return m, tea.Batch(cmds...)
 		}
 		// Don't stomp a pairing ceremony with a refresh.
@@ -1225,6 +1237,13 @@ func (m model) viewDeviceRow(devIdx int) string {
 		state = theme.Dimmed.Render("connected")
 	case d.paired:
 		state = theme.Dimmed.Render("paired")
+		// A trusted input device that isn't connected is usually just
+		// asleep or out of range — BlueZ brings it back on its own in a
+		// couple of seconds and we nudge it if it doesn't. Saying "paired"
+		// reads like the user is the one holding things up.
+		if d.trusted && isInputDeviceKind(d.toBlueZ()) {
+			state = theme.Dimmed.Render("reconnecting…")
+		}
 	}
 
 	left := cursor + dot + " " + name

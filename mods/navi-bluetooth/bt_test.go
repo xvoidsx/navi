@@ -271,3 +271,62 @@ func TestDisplayNameRejectsMACAlias(t *testing.T) {
 		t.Errorf("DisplayName returned MAC-like %q", got)
 	}
 }
+
+// TestIsInputDeviceKindStructural pins the rule that decides two things a
+// user notices: whether RequestConfirmation auto-approves, and whether we
+// auto-connect a device that came back. Name is the weakest signal — the
+// Magic Keyboard advertises as the literal string "Keyboard" and never
+// resolves to a product name — so Icon and Class must carry it.
+func TestIsInputDeviceKindStructural(t *testing.T) {
+	cases := []struct {
+		name string
+		dev  BlueZDevice
+		want bool
+	}{
+		{
+			name: "icon alone is enough (the Magic Keyboard's real shape)",
+			dev:  BlueZDevice{Name: "Keyboard", Icon: "input-keyboard", Class: 0x2540, Kind: DeviceKeyboard},
+			want: true,
+		},
+		{
+			name: "class alone is enough, name never resolved",
+			dev:  BlueZDevice{Class: 0x2540, Kind: DeviceKeyboard},
+			want: true,
+		},
+		{
+			name: "kind set by the classifier",
+			dev:  BlueZDevice{Kind: DeviceMouse},
+			want: true,
+		},
+		{
+			name: "name only, generic BlueZ string",
+			dev:  BlueZDevice{Name: "Keyboard"},
+			want: true,
+		},
+		{
+			name: "trackpad by kind",
+			dev:  BlueZDevice{Kind: DeviceTrackpad},
+			want: true,
+		},
+		{
+			name: "headset is not an input device",
+			dev:  BlueZDevice{Name: "WH-1000XM4", Icon: "audio-headset", Kind: DeviceAudio},
+			want: false,
+		},
+		{
+			name: "phone is not an input device",
+			dev:  BlueZDevice{Name: "Pixel 8", Icon: "phone", Kind: DevicePhone},
+			want: false,
+		},
+		{
+			name: "nothing known at all must not be auto-connected",
+			dev:  BlueZDevice{},
+			want: false,
+		},
+	}
+	for _, c := range cases {
+		if got := isInputDeviceKind(c.dev); got != c.want {
+			t.Errorf("isInputDeviceKind(%s) = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
