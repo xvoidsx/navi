@@ -13,7 +13,6 @@ Then type the displayed passkey on the keyboard and press Enter.
 
 import sys
 import time
-import threading
 import dbus
 import dbus.service
 import dbus.mainloop.glib
@@ -67,9 +66,22 @@ class Agent(dbus.service.Object):
     @dbus.service.method("org.bluez.Agent1",
                          in_signature="ou", out_signature="")
     def RequestConfirmation(self, device, passkey):
-        # Should not happen with DisplayOnly, but handle it
-        print(f"RequestConfirmation {passkey:06d} — auto-rejecting (wrong method)")
-        raise dbus.DBusException("Rejected")
+        # Numeric Comparison: BlueZ negotiated this instead of Passkey
+        # Entry. The keyboard has no display, so it likely auto-confirms
+        # (or a keypress counts). Ask the user; don't auto-reject.
+        print(f"\n{'='*50}")
+        print(f"  CONFIRM THIS CODE: {passkey:06d}")
+        print(f"  Does it look right? Press Enter on the Magic Keyboard")
+        print(f"  too (that may be its confirmation).")
+        print(f"{'='*50}")
+        try:
+            ans = input("  Confirm? (y/n): ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            raise dbus.DBusException("org.bluez.Error.Canceled: user cancelled")
+        if ans in ("y", "yes", ""):
+            print("  Confirmed.")
+            return
+        raise dbus.DBusException("org.bluez.Error.Rejected: user rejected")
 
     @dbus.service.method("org.bluez.Agent1",
                          in_signature="", out_signature="")
@@ -223,31 +235,35 @@ def main():
     mainloop = GLib.MainLoop()
 
     def attempt_pair():
-        """Run blocking Pair() in a thread while the GLib loop dispatches
-        agent callbacks (DisplayPasskey etc.) in the main thread."""
+        """Call Pair() asynchronously; the GLib loop stays up to dispatch
+        agent callbacks. No threads — dbus-python is not thread-safe
+        (heap corruption / tcache crashes)."""
         result = {}
 
-        def do_pair():
-            try:
-                device.Pair()
-                result["ok"] = True
-            except dbus.DBusException as e:
-                result["error"] = e
-            finally:
-                GLib.idle_add(mainloop.quit)
+        def on_reply():
+            result["ok"] = True
+            mainloop.quit()
+
+        def on_error(e):
+            result["error"] = e
+            mainloop.quit()
+
+        # timeout unit: safe either way — the GLib timeout below is the
+        # real guard (120s). If dbus unit is ms this is 120s; if seconds,
+        # effectively infinite and GLib still bounds us.
+        device.Pair(reply_handler=on_reply,
+                    error_handler=on_error,
+                    timeout=120000)
 
         # Safety timeout so we never hang forever
         GLib.timeout_add_seconds(
             120, lambda: (print("Timed out waiting for pairing."),
                           mainloop.quit(), False)[2])
 
-        t = threading.Thread(target=do_pair, daemon=True)
-        t.start()
         try:
             mainloop.run()
         except KeyboardInterrupt:
             pass
-        t.join(timeout=5)
         return result
 
     pair_result = attempt_pair()
