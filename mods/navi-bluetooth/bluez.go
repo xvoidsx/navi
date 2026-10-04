@@ -12,6 +12,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
@@ -313,7 +314,15 @@ func (AuthorizeEvent) bluezEvent()          {}
 // Backend
 // ---------------------------------------------------------------------------
 
-const agentPath = dbus.ObjectPath("/org/xvoidsx/navi/bluetooth/agent")
+const agentPathBase = "/org/xvoidsx/navi/bluetooth/agent"
+
+// agentPath is unique per process to avoid conflicts with stale
+// registrations from crashed instances.
+var agentPath = dbus.ObjectPath(agentPathBase)
+
+func init() {
+	agentPath = dbus.ObjectPath(fmt.Sprintf("%s/%d", agentPathBase, os.Getpid()))
+}
 
 // BlueZBackend owns the system-bus connection, discovery, and the agent.
 type BlueZBackend struct {

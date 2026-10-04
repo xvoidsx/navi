@@ -1314,6 +1314,27 @@ func main() {
 		case "--version", "-v":
 			fmt.Println("navi-bluetooth " + buildCommit)
 			return
+		case "--test-dbus":
+			backend, err := NewBlueZBackend()
+			if err != nil {
+				fmt.Println("FAIL: NewBlueZBackend:", err)
+				os.Exit(1)
+			}
+			defer backend.Close()
+			if err := backend.Watch(); err != nil {
+				fmt.Println("FAIL: Watch:", err)
+				os.Exit(1)
+			}
+			if err := backend.RegisterAgent(); err != nil {
+				fmt.Println("FAIL: RegisterAgent:", err)
+				os.Exit(1)
+			}
+			fmt.Println("OK: D-Bus backend up, agent registered at", agentPath)
+			fmt.Println("Devices:")
+			for _, d := range backend.Devices() {
+				fmt.Printf("  %s (%s) kind=%s paired=%v\n", d.DisplayName(), d.Address, d.Kind, d.Paired)
+			}
+			return
 		case "--help", "-h":
 			fmt.Fprintln(os.Stderr, "usage: navi-bluetooth [--dump] [--version]")
 			os.Exit(0)
