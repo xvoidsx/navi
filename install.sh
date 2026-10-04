@@ -67,7 +67,7 @@ PKGS=(
   # navi-bluetooth (eiri): BlueZ for bluetoothctl, upower for the headset
   # battery fallback when a device doesn't report Battery Percentage itself.
   bluez upower
-  arandr nemo rofi xss-lock feh pandoc volumeicon-alsa polybar blueman dunst
+  arandr nemo rofi xss-lock feh pandoc volumeicon-alsa polybar dunst
   flameshot meteo-qt pasystray ffmpeg mpv kitty stterm surf conky-all suckless-tools zathura zathura-pdf-poppler maim xdotool xclip
   lxpolkit lxappearance vim nnn cmus cava amfora sway swaylock
   swayidle swaybg grimshot xdg-desktop-portal-wlr qt5ct tty-clock wf-recorder
