@@ -144,7 +144,8 @@ func dbusInitCmd() tea.Msg {
 		return dbusInitMsg{err: err}
 	}
 	if err := backend.RegisterAgent(); err != nil {
-		// non-fatal; pairing callbacks just won't work
+		backend.Close()
+		return dbusInitMsg{err: fmt.Errorf("agent registration: %w", err)}
 	}
 	if err := backend.StartDiscovery(); err != nil {
 		// non-fatal
@@ -355,6 +356,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case pollTickMsg:
 		cmds := []tea.Cmd{pollTickCmd()}
+		// D-Bus backend: discovery is event-driven, no polling or
+		// bluetoothctl needed. Polling here would MGMT-spam BlueZ
+		// and stomp pairing ceremonies.
+		if m.useDBus {
+			return m, tea.Batch(cmds...)
+		}
 		// Don't stomp a pairing ceremony with a refresh.
 		if m.screen == screenMain && m.pairSess == nil {
 			cmds = append(cmds, snapshotCmd())
