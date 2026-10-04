@@ -27,6 +27,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/godbus/dbus/v5"
 )
 
 // btTimeout bounds every one-shot bluetoothctl invocation.
@@ -53,6 +55,20 @@ func fromBlueZ(d BlueZDevice) device {
 		battery:   -1,
 		kind:      d.Kind,
 		path:      string(d.Path),
+	}
+}
+
+// toBlueZ converts the UI model back to the backend's view, so a device the
+// list already classified can be handed to the agent without a re-lookup
+// that might come back with less information than the user was shown.
+func (d device) toBlueZ() BlueZDevice {
+	return BlueZDevice{
+		Path:      dbus.ObjectPath(d.path),
+		Address:   d.mac,
+		Name:      d.name,
+		Kind:      d.kind,
+		Paired:    d.paired,
+		Connected: d.connected,
 	}
 }
 
@@ -445,11 +461,16 @@ func setScan(on bool) error {
 // pairEventKind classifies one line of pair-session output.
 type pairEventKind int
 
+// The prompt kinds are distinct because BlueZ's Agent1 callbacks are
+// distinct, and each asks the user for something different. Collapsing
+// "approve this code" and "type a code" into one kind is how a TUI ends up
+// telling someone to type a number they were only supposed to approve.
 const (
-	pairPromptPasskey   pairEventKind = iota // text = "583920" — confirm yes/no
-	pairPromptDisplay                        // text = "583920" — type it on the device, no confirmation
-	pairPromptPIN                            // enter PIN digits
-	pairPromptAuthorize                      // text = service desc — yes/no
+	pairPromptPasskey      pairEventKind = iota // text = "583920" — Numeric Comparison, approve/reject
+	pairPromptDisplay                           // text = "583920" — type it on the device, no reply
+	pairPromptPasskeyEnter                      // user types a passkey on THIS computer
+	pairPromptPIN                               // user types a legacy PIN
+	pairPromptAuthorize                         // text = service desc — allow/deny
 	pairDone
 	pairFailed // text = reason
 )

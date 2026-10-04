@@ -28,11 +28,17 @@ bluetoothctl pair 04:69:F8:DA:18:E4
 # → org.bluez.Error.AuthenticationFailed
 ```
 
-The default `bluetoothctl` agent couldn't complete the pairing. The root cause
-was never fully isolated, but the working theory is that bluetoothctl's
-interactive agent doesn't handle the Numeric Comparison flow cleanly for this
-keyboard — or the pairing timed out waiting for user confirmation that never
-arrived in the right form.
+The default `bluetoothctl` agent couldn't complete the pairing.
+
+> **UPDATE (2026-10-04, later session).** The likely reason: `bluetoothctl`
+> registers a `KeyboardDisplay`-class agent, and this keyboard's firmware
+> handles a `DisplayOnly` host cleanly but is unhappy with the more capable
+> one (§4b). That is still a *theory* — nobody has A/B tested the capability
+> against this keyboard.
+>
+> It also stopped being the interesting question. The real reason
+> `navi-bluetooth` failed to pair **anything** was a crash in our own code —
+> see `PAIRING-POSTMORTEM.md`.
 
 ### 2b. Guessing IO capabilities — SUPERSEDED
 
@@ -289,12 +295,25 @@ name resolves.
 on weird hardware.
 
 Instead:
-1. Register `KeyboardDisplay` (most capable agent)
+1. Register `DisplayOnly` — **not** `KeyboardDisplay`. This contradicts what
+   this section originally said; see the correction note below.
 2. Let BlueZ call the right callback for each device
 3. Render a beautiful screen per callback
 4. Classify devices for DISPLAY (names, icons) — never for flow logic
 
 The callback IS the flow selector. This is the key architectural insight.
+
+> **CORRECTION (2026-10-04, later session).** This section originally said to
+> register `KeyboardDisplay`, which directly contradicted §4b of this same
+> document. `DisplayOnly` is deliberate and proven; the Magic Keyboard's
+> firmware handles a DisplayOnly host and auto-confirms cleanly. Do not
+> "upgrade" the capability. See `PAIRING-POSTMORTEM.md` §7.
+
+One caveat on point 4: classification for *flow decisions* is not the same as
+classification for display. `RequestConfirmation` does need to know whether
+the device is a keyboard — to auto-approve instead of prompting — and it uses
+`Icon` → `Class of Device` for that, never the name. On this keyboard the
+name never resolves past the generic `"Keyboard"`.
 
 ### 5d. Normie-First Error Messages
 
@@ -346,7 +365,11 @@ Total time from `y` to typing wirelessly: seconds.
 - [ ] **Multiple keyboards** — what if two "Keyboard" devices are discovered?
 - [ ] **Battery level** — BlueZ exposes battery via Device1; show it in the UI?
 - [ ] **The `DisplayPinCode` callback** — currently a no-op; needs a UI screen
-- [ ] **Service authorization** — currently auto-allows; should it prompt?
+- [ ] **Service authorization** — auto-allows for input devices now (see
+      postmortem §4b); prompting for everything else is still untested
+- [ ] **`AuthorizeService` reaching a human** — never exercised on hardware
+- [ ] **The §4b claim that the keyboard rejects a DisplayYesNo host** —
+      believed from btmon, never A/B tested
 
 ---
 
@@ -355,6 +378,11 @@ Total time from `y` to typing wirelessly: seconds.
 | File | Purpose |
 |------|---------|
 | `scripts/navi-bt-agent` | Working Python prototype (the one that cracked it) |
+| **`PAIRING-POSTMORTEM.md`** | **Why navi-bluetooth paired nothing — read next** |
+| `bluez.go` | Native BlueZ D-Bus backend + the Agent1 implementation |
+| `agenttrace.go` | `--trace-pair <MAC>` — headless agent, logs every callback |
+| `bluez_test.go` | Hermetic regression tests over a private `dbus-daemon` |
+| `bluez_live_test.go` | Hardware test: `NAVI_BT_LIVE=1 go test -run TestLive` |
 | `mods/navi-bluetooth/bluez.go` | Native Go D-Bus backend (in progress) |
 | `mods/navi-bluetooth/bt.go` | Legacy bluetoothctl wrapper (fallback) |
 | `mods/navi-bluetooth/main.go` | Bubble Tea UI |
@@ -365,9 +393,22 @@ Total time from `y` to typing wirelessly: seconds.
 
 ## 9. The One-Sentence Summary
 
-**Stop guessing what the hardware wants — run btmon, read the IO Capability
-Exchange, register the most capable D-Bus agent you can, and render beautifully
-for whichever callback BlueZ fires.**
+**Stop guessing what the hardware wants — run btmon (or `--trace-pair`), read
+the IO Capability Exchange, register `DisplayOnly`, and render beautifully for
+whichever callback BlueZ fires.**
+
+(The original phrasing here was "register the most capable D-Bus agent you
+can". That is wrong — see §5c and `PAIRING-POSTMORTEM.md` §7. The
+capability you advertise feeds the IO-capability exchange, and the spec's
+lookup table — not your ambition — picks the association model.)
+
+---
+
+## 10. What came after this document
+
+`PAIRING-POSTMORTEM.md` — why `navi-bluetooth` failed to pair *anything* while
+`navi-bt-agent` worked, and the five latent bugs found alongside the fix. Read
+that one next; it supersedes §2a and §5c here.
 
 ---
 

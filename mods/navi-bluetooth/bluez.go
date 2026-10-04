@@ -15,8 +15,8 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
-	"time"
 	"sync"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 )
@@ -317,9 +317,9 @@ type PairRequestPINEvent struct {
 }
 type PairCancelledEvent struct{}
 type AuthorizeEvent struct {
-	Device  BlueZDevice
-	UUID    string
-	Resp    chan bool
+	Device BlueZDevice
+	UUID   string
+	Resp   chan bool
 }
 
 func (PairDisplayPasskeyEvent) bluezEvent() {}
@@ -406,7 +406,7 @@ func NewBlueZBackend() (*BlueZBackend, error) {
 	}
 	b := &BlueZBackend{
 		conn:    conn,
-		events: make(chan BlueZEvent, 64),
+		events:  make(chan BlueZEvent, 64),
 		devices: make(map[dbus.ObjectPath]BlueZDevice),
 		closed:  make(chan struct{}),
 	}
@@ -496,9 +496,15 @@ func (b *BlueZBackend) Pair(path dbus.ObjectPath) error {
 }
 
 // PairAsync initiates pairing without blocking; result goes to the callback.
+//
+// org.bluez.Device1.Pair takes NO arguments. Object.Go's signature is
+// Go(method, flags, ch, args ...interface{}), so a trailing nil here is
+// swallowed by the variadic as one real argument and godbus computes
+// SignatureOf(nil) — a nil dereference that kills the process before the
+// call is ever sent. Leave the argument list empty.
 func (b *BlueZBackend) PairAsync(path dbus.ObjectPath, done func(error)) {
 	obj := b.conn.Object("org.bluez", path)
-	call := obj.Go("org.bluez.Device1.Pair", 0, nil, nil)
+	call := obj.Go("org.bluez.Device1.Pair", 0, nil)
 	go func() {
 		err := (<-call.Done).Err
 		done(err)
@@ -717,6 +723,18 @@ func (b *BlueZBackend) unregisterAgent() {
 	b.agent = nil
 }
 
+// isInputDeviceKind reports whether a BlueZDevice is a keyboard, mouse, or
+// trackpad — from Icon/Class/UUIDs, falling back to the name. The name may
+// still be BlueZ's generic "Keyboard" (or empty) at pairing time, so the
+// structural signals are checked first.
+func isInputDeviceKind(d BlueZDevice) bool {
+	switch d.Kind {
+	case DeviceKeyboard, DeviceMouse, DeviceTrackpad:
+		return true
+	}
+	return isInputDevice(d.Name)
+}
+
 // RegisterAgent registers our DisplayOnly agent as the default.
 func (b *BlueZBackend) RegisterAgent() error { return b.registerAgent() }
 
@@ -750,26 +768,46 @@ func (b *BlueZBackend) lookupDevice(path dbus.ObjectPath) BlueZDevice {
 }
 
 // Release is called when the agent is unregistered.
-func (a *naviAgent) Release() *dbus.Error { return nil }
+func (a *naviAgent) Release() *dbus.Error {
+	tracef("Release()")
+	return nil
+}
 
-// AuthorizeService auto-allows service authorization for paired input
-// devices; otherwise asks via the UI.
+// AuthorizeService decides whether a device may use a service.
+//
+// BlueZ asks once per discovered service, and the asks can overlap. For an
+// input device — or anything already trusted — there is no decision a
+// non-technical user can usefully make, and blocking the whole UI on it is
+// what kept the keyboard from ever settling. Auto-allow those; ask for the
+// rest.
 func (a *naviAgent) AuthorizeService(device dbus.ObjectPath, uuid string) *dbus.Error {
+	tracef("AuthorizeService(device=%s, uuid=%s)", device, uuid)
 	d := a.backend.lookupDevice(device)
-	resp := make(chan bool, 1)
-	a.backend.emit(AuthorizeEvent{Device: d, UUID: uuid, Resp: resp})
-	if <-resp {
+	traceDevice("  resolved", d)
+	if d.Trusted || isInputDeviceKind(d) {
+		tracePolicy("AuthorizeService", device, "AUTO-ALLOW", "trusted or input device")
 		return nil
 	}
+	resp := make(chan bool, 1)
+	a.backend.emit(AuthorizeEvent{Device: d, UUID: uuid, Resp: resp})
+	tracePolicy("AuthorizeService", device, "ASK UI", "blocking on resp chan")
+	if <-resp {
+		tracePolicy("AuthorizeService", device, "ALLOW", "")
+		return nil
+	}
+	tracePolicy("AuthorizeService", device, "REJECT", "")
 	return dbus.NewError("org.bluez.Error.Rejected", []interface{}{"rejected by user"})
 }
 
 // RequestPinCode asks the user to type a legacy PIN.
 func (a *naviAgent) RequestPinCode(device dbus.ObjectPath) (string, *dbus.Error) {
+	tracef("RequestPinCode(device=%s)", device)
 	d := a.backend.lookupDevice(device)
+	traceDevice("  resolved", d)
 	resp := make(chan string, 1)
 	a.backend.emit(PairRequestPINEvent{Device: d, Resp: resp})
 	pin := <-resp
+	tracef("  -> PIN returned len=%d", len(pin))
 	if pin == "" {
 		return "", dbus.NewError("org.bluez.Error.Canceled", []interface{}{"cancelled"})
 	}
@@ -778,28 +816,36 @@ func (a *naviAgent) RequestPinCode(device dbus.ObjectPath) (string, *dbus.Error)
 
 // RequestPasskey asks the user to type a passkey on THIS computer.
 func (a *naviAgent) RequestPasskey(device dbus.ObjectPath) (uint32, *dbus.Error) {
+	tracef("RequestPasskey(device=%s)", device)
 	d := a.backend.lookupDevice(device)
+	traceDevice("  resolved", d)
 	resp := make(chan uint32, 1)
 	a.backend.emit(PairRequestPasskeyEvent{Device: d, Resp: resp})
 	passkey := <-resp
 	// 0xFFFFFFFF sentinel = cancelled (can't send "empty" uint32)
 	if passkey == 0xFFFFFFFF {
+		tracef("  -> cancelled")
 		return 0, dbus.NewError("org.bluez.Error.Canceled", []interface{}{"cancelled"})
 	}
+	tracef("  -> passkey %06d", passkey)
 	return passkey, nil
 }
 
 // DisplayPasskey shows a code for the user to type ON THE DEVICE.
 // No response needed — BlueZ waits for the device.
 func (a *naviAgent) DisplayPasskey(device dbus.ObjectPath, passkey uint32, entered uint16) *dbus.Error {
+	tracef("DisplayPasskey(device=%s, passkey=%06d, entered=%d)", device, passkey, entered)
 	d := a.backend.lookupDevice(device)
+	traceDevice("  resolved", d)
 	a.backend.emit(PairDisplayPasskeyEvent{Device: d, Passkey: passkey, Entered: entered})
 	return nil
 }
 
 // DisplayPinCode shows a PIN for legacy pairing.
 func (a *naviAgent) DisplayPinCode(device dbus.ObjectPath, pincode string) *dbus.Error {
+	tracef("DisplayPinCode(device=%s, pincode=%s)", device, pincode)
 	d := a.backend.lookupDevice(device)
+	traceDevice("  resolved", d)
 	// Reuse the display-passkey event path with a string; the UI handles it.
 	_ = d
 	_ = pincode
@@ -819,6 +865,8 @@ func (a *naviAgent) withAgentRecover() {
 // their side without displaying anything, so prompting the user to "compare"
 // is theater. macOS-instant pairing for the devices that need it most.
 func (a *naviAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) (result *dbus.Error) {
+	tracef("RequestConfirmation(device=%s, passkey=%06d)", device, passkey)
+	a.backend.tracePairTarget("RequestConfirmation")
 	defer func() {
 		if r := recover(); r != nil {
 			a.backend.logPanic("agent RequestConfirmation", r)
@@ -833,11 +881,18 @@ func (a *naviAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) 
 	if a.backend.pairTargetSet && a.backend.pairTarget.Path == device {
 		d := a.backend.pairTarget
 		a.backend.mu.Unlock()
+		traceDevice("  pairTarget", d)
+		// A stashed target with no classification at all means the lookup
+		// failed when the pair began. Fall through to a fresh lookup below
+		// rather than asking the user to approve a code for their own
+		// keyboard.
 		if d.Kind != DeviceUnknown || d.Name != "" {
-			if d.Kind == DeviceKeyboard || d.Kind == DeviceMouse || d.Kind == DeviceTrackpad || isInputDevice(d.Name) {
+			if isInputDeviceKind(d) {
+				tracePolicy("RequestConfirmation", device, "AUTO-APPROVE", "input device")
 				return nil // auto-approve keyboards/mice/trackpads
 			}
 			// Non-input device: prompt via UI.
+			tracePolicy("RequestConfirmation", device, "ASK UI", "not an input device")
 			resp := make(chan bool, 1)
 			a.backend.emit(PairConfirmEvent{Device: d, Passkey: passkey, Resp: resp})
 			if <-resp {
@@ -846,17 +901,21 @@ func (a *naviAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) 
 			return dbus.NewError("org.bluez.Error.Rejected", []interface{}{"rejected by user"})
 		}
 		// Empty target — fall through to fresh lookup below.
+		tracef("  pairTarget is unclassified; doing a fresh lookup")
 	} else {
 		a.backend.mu.Unlock()
 	}
 
 	// Fallback: lookup (may be empty on cache miss).
 	d := a.backend.lookupDevice(device)
+	traceDevice("  fallback lookup", d)
 	// Check Kind (from Icon/Class/UUID) as well as name — the name may
 	// not have resolved yet when the callback fires.
-	if d.Kind == DeviceKeyboard || d.Kind == DeviceMouse || d.Kind == DeviceTrackpad || isInputDevice(d.Name) {
+	if isInputDeviceKind(d) {
+		tracePolicy("RequestConfirmation", device, "AUTO-APPROVE", "input device")
 		return nil // auto-approve keyboards/mice/trackpads
 	}
+	tracePolicy("RequestConfirmation", device, "ASK UI", "not an input device")
 	resp := make(chan bool, 1)
 	a.backend.emit(PairConfirmEvent{Device: d, Passkey: passkey, Resp: resp})
 	if <-resp {
@@ -867,6 +926,7 @@ func (a *naviAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) 
 
 // Cancel aborts any in-flight pairing UI.
 func (a *naviAgent) Cancel() *dbus.Error {
+	tracef("Cancel()")
 	a.backend.emit(PairCancelledEvent{})
 	return nil
 }

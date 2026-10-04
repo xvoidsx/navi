@@ -53,7 +53,6 @@ const (
 	screenPairing
 	screenPIN
 	screenTrustAsk
-	screenAppleHelp
 )
 
 // ── messages ────────────────────────────────────────────────────────
@@ -98,7 +97,7 @@ type model struct {
 	working      bool
 	loading      bool
 	width        int
-	scanFrame    int // animation frame for the scanning radar
+	scanFrame    int    // animation frame for the scanning radar
 	scanErr      string // last scan error, shown in UI
 	pairSess     *pairSession
 	pairDev      device
@@ -108,13 +107,94 @@ type model struct {
 	trustDev     device
 	pairTimedOut bool
 	// D-Bus backend (nil when falling back to bluetoothctl)
-	backend      *BlueZBackend
-	useDBus      bool
-	dbusErr      string // persistent D-Bus init failure, shown in adapter line
-	// Pending agent response channels (for native pairing)
-	pairRespBool   chan bool
-	pairRespUint32 chan uint32
-	pairRespString chan string
+	backend *BlueZBackend
+	useDBus bool
+	dbusErr string // persistent D-Bus init failure, shown in adapter line
+	// pairQueue holds agent questions awaiting the user, oldest first.
+	// A queue, not single slots: BlueZ can have several callbacks in
+	// flight at once (AuthorizeService fires once per service), and
+	// overwriting a slot orphaned the earlier channel — its agent method
+	// then blocked forever and BlueZ waited forever for that reply.
+	pairQueue []*pendingPrompt
+}
+
+// pendingPrompt is one agent callback waiting on the user. Exactly one of
+// the response channels is non-nil, matching the kind.
+type pendingPrompt struct {
+	kind pairEventKind
+	text string
+	dev  device
+
+	boolResp   chan bool
+	uint32Resp chan uint32
+	strResp    chan string
+}
+
+// answer delivers the user's response and reports whether it had somewhere
+// to go. A prompt with no channel left is a no-op, not a crash.
+func (p *pendingPrompt) answer(a string) bool {
+	switch {
+	case p.boolResp != nil:
+		p.boolResp <- (a == "yes")
+	case p.uint32Resp != nil:
+		var v uint32 = 0xFFFFFFFF // sentinel = cancelled
+		if _, err := fmt.Sscanf(a, "%d", &v); err != nil {
+			v = 0xFFFFFFFF
+		}
+		p.uint32Resp <- v
+	case p.strResp != nil:
+		p.strResp <- a
+	default:
+		return false
+	}
+	return true
+}
+
+// reject answers every outstanding prompt negatively so no agent method is
+// left blocked on a channel nobody will ever write to.
+func (p *pendingPrompt) reject() {
+	switch {
+	case p.boolResp != nil:
+		p.boolResp <- false
+	case p.uint32Resp != nil:
+		p.uint32Resp <- 0xFFFFFFFF
+	case p.strResp != nil:
+		p.strResp <- ""
+	}
+}
+
+// pushPrompt queues an agent question and shows it when it reaches the front.
+func (m *model) pushPrompt(p *pendingPrompt) {
+	m.pairQueue = append(m.pairQueue, p)
+	m.showHeadPrompt()
+}
+
+// showHeadPrompt projects the oldest queued question onto the view.
+func (m *model) showHeadPrompt() {
+	if len(m.pairQueue) == 0 {
+		return
+	}
+	p := m.pairQueue[0]
+	m.pairPrompt = pairEvent{kind: p.kind, text: p.text}
+	m.pairDev = p.dev
+	switch p.kind {
+	case pairPromptPIN, pairPromptPasskeyEnter:
+		m.screen = screenPIN
+	default:
+		m.screen = screenPairing
+	}
+}
+
+// popPrompt removes the answered question and shows whatever is next.
+func (m *model) popPrompt() {
+	if len(m.pairQueue) == 0 {
+		return
+	}
+	m.pairQueue = m.pairQueue[1:]
+	if len(m.pairQueue) == 0 {
+		return
+	}
+	m.showHeadPrompt()
 }
 
 func initialModel() model {
@@ -240,7 +320,7 @@ func humanizeDBusError(err error) string {
 	case strings.Contains(s, "org.bluez.Error."):
 		// Strip the D-Bus prefix, keep the rest.
 		if i := strings.LastIndex(s, "."); i >= 0 && i+1 < len(s) {
-			return strings.ToLower(s[i+1 : i+2]) + s[i+2:]
+			return strings.ToLower(s[i+1:i+2]) + s[i+2:]
 		}
 	}
 	return s
@@ -525,28 +605,35 @@ func (m model) handleDBusEvent(ev BlueZEvent) (tea.Model, tea.Cmd) {
 		m.adapter.discovering = e.Discovering
 		return m, pump()
 	case PairDisplayPasskeyEvent:
-		m.pairDev = fromBlueZ(e.Device)
-		m.pairPrompt = pairEvent{kind: pairPromptDisplay, text: fmt.Sprintf("%06d", e.Passkey)}
-		m.screen = screenPairing
+		m.pushPrompt(&pendingPrompt{
+			kind: pairPromptDisplay,
+			text: fmt.Sprintf("%06d", e.Passkey),
+			dev:  fromBlueZ(e.Device),
+		})
 		return m, pump()
 	case PairConfirmEvent:
-		m.pairDev = fromBlueZ(e.Device)
-		m.pairPrompt = pairEvent{kind: pairPromptPasskey, text: fmt.Sprintf("%06d", e.Passkey)}
-		m.pairRespBool = e.Resp
-		m.screen = screenPairing
+		m.pushPrompt(&pendingPrompt{
+			kind:     pairPromptPasskey,
+			text:     fmt.Sprintf("%06d", e.Passkey),
+			dev:      fromBlueZ(e.Device),
+			boolResp: e.Resp,
+		})
 		return m, pump()
 	case PairRequestPasskeyEvent:
-		m.pairDev = fromBlueZ(e.Device)
-		m.pairPrompt = pairEvent{kind: pairPromptPasskey, text: ""}
-		m.pairRespUint32 = e.Resp
+		m.pushPrompt(&pendingPrompt{
+			kind:       pairPromptPasskeyEnter,
+			dev:        fromBlueZ(e.Device),
+			uint32Resp: e.Resp,
+		})
 		m.pinBuf = ""
-		m.screen = screenPIN
 		return m, pump()
 	case PairRequestPINEvent:
-		m.pairDev = fromBlueZ(e.Device)
-		m.pairRespString = e.Resp
+		m.pushPrompt(&pendingPrompt{
+			kind:    pairPromptPIN,
+			dev:     fromBlueZ(e.Device),
+			strResp: e.Resp,
+		})
 		m.pinBuf = ""
-		m.screen = screenPIN
 		return m, pump()
 	case PairCancelledEvent:
 		m.clearPairResp()
@@ -557,10 +644,12 @@ func (m model) handleDBusEvent(ev BlueZEvent) (tea.Model, tea.Cmd) {
 		}
 		return m, pump()
 	case AuthorizeEvent:
-		m.pairDev = fromBlueZ(e.Device)
-		m.pairPrompt = pairEvent{kind: pairPromptAuthorize, text: e.UUID}
-		m.pairRespBool = e.Resp
-		m.screen = screenPairing
+		m.pushPrompt(&pendingPrompt{
+			kind:     pairPromptAuthorize,
+			text:     e.UUID,
+			dev:      fromBlueZ(e.Device),
+			boolResp: e.Resp,
+		})
 		return m, pump()
 	}
 	return m, pump()
@@ -595,11 +684,15 @@ func (m *model) removeDeviceByPath(path string) {
 	}
 }
 
-// clearPairResp releases any pending agent response channels.
+// clearPairResp rejects and discards every outstanding agent prompt. Each
+// pending callback must get *some* reply or its agent method stays blocked
+// and BlueZ waits out the whole bonding timeout.
 func (m *model) clearPairResp() {
-	m.pairRespBool = nil
-	m.pairRespUint32 = nil
-	m.pairRespString = nil
+	for _, p := range m.pairQueue {
+		p.reject()
+	}
+	m.pairQueue = nil
+	m.pinBuf = ""
 }
 
 func (m model) handlePairEvent(ev pairEvent) (tea.Model, tea.Cmd) {
@@ -663,7 +756,8 @@ func (m *model) endPair() {
 		m.pairSess.Close()
 		m.pairSess = nil
 	}
-	m.pinBuf = ""
+	// Never leave an agent callback blocked on a channel we've abandoned.
+	m.clearPairResp()
 	m.pairTimedOut = false
 }
 
@@ -754,13 +848,6 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, snapshotCmd()
 		}
 		return m, nil
-	case screenAppleHelp:
-		switch k {
-		case "esc", "q":
-			m.screen = screenMain
-			return m, snapshotCmd()
-		}
-		return m, nil
 	}
 
 	// screenMain
@@ -842,31 +929,18 @@ func (m model) answerPair(ans string) {
 		}
 		return
 	}
-	// Native D-Bus agent: route to the pending response channel.
-	switch {
-	case m.pairRespBool != nil:
-		select {
-		case m.pairRespBool <- (ans == "yes"):
-		default:
-		}
-		m.pairRespBool = nil
-	case m.pairRespUint32 != nil:
-		var v uint32 = 0xFFFFFFFF // sentinel = cancelled
-		if _, err := fmt.Sscanf(ans, "%d", &v); err != nil {
-			v = 0xFFFFFFFF
-		}
-		select {
-		case m.pairRespUint32 <- v:
-		default:
-		}
-		m.pairRespUint32 = nil
-	case m.pairRespString != nil:
-		select {
-		case m.pairRespString <- ans:
-		default:
-		}
-		m.pairRespString = nil
+	// Native D-Bus agent: answer the oldest queued question. Answering pops
+	// it, so a second queued prompt (BlueZ asks once per service) surfaces
+	// instead of being silently overwritten.
+	mm := m
+	if len(mm.pairQueue) == 0 {
+		return
 	}
+	head := mm.pairQueue[0]
+	if !head.answer(ans) {
+		return
+	}
+	mm.popPrompt()
 }
 
 // smartAction is Enter: available → pair, paired → connect,
@@ -931,10 +1005,22 @@ func (m model) beginPair(d device) (tea.Model, tea.Cmd) {
 		backend := m.backend
 		path := d.path
 		// Stash the target so the agent's RequestConfirmation can
-		// auto-confirm without a cache lookup race.
-		backend.SetPairTargetByPath(dbusObjectPath(path))
+		// auto-confirm without a cache lookup race. Pass the device the
+		// list already classified — re-looking it up by path can lose the
+		// Icon/Class/name that make "is this a keyboard?" decidable.
+		backend.SetPairTarget(d.toBlueZ())
 		return m, tea.Batch(
-			func() tea.Msg {
+			func() (msg tea.Msg) {
+				// A panic inside a Bubble Tea command is not caught by
+				// main's recover: it takes the process down and, launched
+				// from a panel launcher, the window just vanishes. Turn it
+				// into a visible status line instead.
+				defer func() {
+					if r := recover(); r != nil {
+						backend.ClearPairTarget()
+						msg = dbusPairDoneMsg{err: fmt.Errorf("pairing crashed: %v", r)}
+					}
+				}()
 				// Re-assert our agent: Blueman/bluetoothctl may have
 				// stolen the default slot since startup.
 				if err := backend.EnsureDefaultAgent(); err != nil {
@@ -1009,8 +1095,6 @@ func (m model) View() string {
 		body = m.viewPIN()
 	case screenTrustAsk:
 		body = m.viewTrustAsk()
-	case screenAppleHelp:
-		body = m.viewAppleHelp()
 	}
 	return theme.FrameFixed(frameWidth, "navi bluetooth", m.adapter.powered, m.tx.View(frameWidth), body, btBodyRows)
 }
@@ -1227,9 +1311,18 @@ func (m model) viewPairing() string {
 		b.WriteString("  " + theme.Selected.Render(m.pairPrompt.text) + "\n\n")
 		b.WriteString(theme.Dimmed.Render("  waiting for you to type it… (esc cancels)") + "\n")
 	} else if m.pairPrompt.kind == pairPromptPasskey {
+		// Numeric Comparison. Be honest about what the code is for: a
+		// keyboard auto-confirms and shows nothing, so there is nothing
+		// to match — while a headset or phone may well be showing the
+		// same number, in which case matching it is the whole point.
+		hint := "if your device shows a number too, check they match."
+		switch m.pairDev.kind {
+		case DeviceKeyboard, DeviceMouse, DeviceTrackpad:
+			hint = "the keyboard confirms automatically."
+		}
 		b.WriteString(theme.Dimmed.Render("  approve pairing — code:") + "\n\n")
 		b.WriteString("  " + theme.Selected.Render(m.pairPrompt.text) + "\n\n")
-		b.WriteString(theme.Dimmed.Render("  the keyboard confirms automatically.") + "\n")
+		b.WriteString(theme.Dimmed.Render("  "+hint) + "\n")
 		b.WriteString("  " + theme.Selected.Render("y") + theme.Dimmed.Render(" approve   ") +
 			theme.Selected.Render("n") + theme.Dimmed.Render(" reject") + "\n")
 	} else if m.pairPrompt.kind == pairPromptAuthorize {
@@ -1241,6 +1334,12 @@ func (m model) viewPairing() string {
 		b.WriteString("  " + theme.Spinner(0) + " " + theme.Dimmed.Render("waiting for the device…") + "\n")
 		b.WriteString(theme.Dimmed.Render("  esc cancels") + "\n")
 	}
+	// BlueZ can queue more than one question (it asks to authorize each
+	// service). Say so, or the second prompt looks like the first was lost.
+	if n := len(m.pairQueue); n > 1 {
+		b.WriteString("\n" + theme.Dimmed.Render(
+			fmt.Sprintf("  %d more step(s) queued after this one", n-1)) + "\n")
+	}
 	if m.status != "" && !m.statusErr {
 		b.WriteString("\n" + theme.Dimmed.Render("  "+m.status) + "\n")
 	}
@@ -1248,9 +1347,13 @@ func (m model) viewPairing() string {
 }
 
 func (m model) viewPIN() string {
+	what := "PIN"
+	if m.pairPrompt.kind == pairPromptPasskeyEnter {
+		what = "passkey"
+	}
 	var b strings.Builder
 	b.WriteString("\n")
-	b.WriteString(theme.Header.Render("  enter PIN for "+truncateRunes(m.pairDev.name, 42)) + "\n\n")
+	b.WriteString(theme.Header.Render("  enter "+what+" for "+truncateRunes(m.pairDev.name, 40)) + "\n\n")
 	b.WriteString("  " + theme.Input.Render(strings.Repeat("•", len(m.pinBuf))+"▌") + "\n\n")
 	b.WriteString(theme.Dimmed.Render("  enter submits · esc cancels") + "\n")
 	return b.String()
@@ -1263,19 +1366,6 @@ func (m model) viewTrustAsk() string {
 	b.WriteString(theme.Dimmed.Render("  trusted devices auto-connect when in range.") + "\n\n")
 	b.WriteString("  " + theme.Selected.Render("y") + theme.Dimmed.Render(" trust   ") +
 		theme.Selected.Render("n") + theme.Dimmed.Render(" skip") + "\n")
-	return b.String()
-}
-
-func (m model) viewAppleHelp() string {
-	var b strings.Builder
-	b.WriteString("\n")
-	b.WriteString(theme.Header.Render("  Apple keyboard pairing") + "\n\n")
-	b.WriteString(theme.Dimmed.Render("  Apple keyboards need a D-Bus agent, not bluetoothctl.") + "\n")
-	b.WriteString(theme.Dimmed.Render("  Run this in another terminal:") + "\n\n")
-	b.WriteString("  " + theme.Selected.Render("navi-bt-agent "+m.pairDev.mac) + "\n\n")
-	b.WriteString(theme.Dimmed.Render("  It will show a passkey — type it on the keyboard,") + "\n")
-	b.WriteString(theme.Dimmed.Render("  then press Enter on the keyboard.") + "\n\n")
-	b.WriteString(theme.Dimmed.Render("  esc back") + "\n")
 	return b.String()
 }
 
@@ -1399,8 +1489,22 @@ func main() {
 				fmt.Printf("  %s (%s) kind=%s paired=%v\n", d.DisplayName(), d.Address, d.Kind, d.Paired)
 			}
 			return
+		case "--trace-pair":
+			// Headless, fully-instrumented pairing run. Same naviAgent the
+			// TUI drives, but every callback is logged so a pairing that
+			// "does nothing" leaves evidence.
+			mac := ""
+			if len(os.Args) > 2 {
+				mac = strings.ToUpper(os.Args[2])
+			}
+			if mac == "" {
+				fmt.Fprintln(os.Stderr, "usage: navi-bluetooth --trace-pair <MAC>")
+				os.Exit(2)
+			}
+			os.Exit(runTracePair(mac, traceApprove))
 		case "--help", "-h":
-			fmt.Fprintln(os.Stderr, "usage: navi-bluetooth [--dump] [--version]")
+			fmt.Fprintln(os.Stderr, "usage: navi-bluetooth [--dump] [--version] "+
+				"[--test-dbus] [--trace-pair <MAC>]")
 			os.Exit(0)
 		}
 	}
