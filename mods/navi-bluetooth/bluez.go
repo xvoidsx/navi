@@ -827,22 +827,28 @@ func (a *naviAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) 
 	}()
 	// Prefer the explicit pair target — the user chose this device, so we
 	// know what it is even if the discovery cache hasn't caught up.
+	// But if the target is empty (lookup failed), do a fresh lookup
+	// instead of auto-failing the Kind check.
 	a.backend.mu.Lock()
 	if a.backend.pairTargetSet && a.backend.pairTarget.Path == device {
 		d := a.backend.pairTarget
 		a.backend.mu.Unlock()
-		if d.Kind == DeviceKeyboard || d.Kind == DeviceMouse || d.Kind == DeviceTrackpad || isInputDevice(d.Name) {
-			return nil // auto-approve keyboards/mice/trackpads
+		if d.Kind != DeviceUnknown || d.Name != "" {
+			if d.Kind == DeviceKeyboard || d.Kind == DeviceMouse || d.Kind == DeviceTrackpad || isInputDevice(d.Name) {
+				return nil // auto-approve keyboards/mice/trackpads
+			}
+			// Non-input device: prompt via UI.
+			resp := make(chan bool, 1)
+			a.backend.emit(PairConfirmEvent{Device: d, Passkey: passkey, Resp: resp})
+			if <-resp {
+				return nil
+			}
+			return dbus.NewError("org.bluez.Error.Rejected", []interface{}{"rejected by user"})
 		}
-		// Non-input device: prompt via UI.
-		resp := make(chan bool, 1)
-		a.backend.emit(PairConfirmEvent{Device: d, Passkey: passkey, Resp: resp})
-		if <-resp {
-			return nil
-		}
-		return dbus.NewError("org.bluez.Error.Rejected", []interface{}{"rejected by user"})
+		// Empty target — fall through to fresh lookup below.
+	} else {
+		a.backend.mu.Unlock()
 	}
-	a.backend.mu.Unlock()
 
 	// Fallback: lookup (may be empty on cache miss).
 	d := a.backend.lookupDevice(device)
