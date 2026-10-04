@@ -101,22 +101,8 @@ exec swayidle \
     timeout 900 'systemctl suspend' \
     before-sleep 'nslock'
 
-# Blueman tray/applet: retired.
-#
-# blueman-tray is a legacy X11 XEmbed tray host. On this pure-Wayland session it
-# has no X display to reparent icons onto, so it never mapped a window and never
-# showed anything — `xlsclients` on :1 reports zero clients and `busctl` shows
-# org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems is an empty list.
-# It was silently holding ~103 MB (blueman-applet 55 MB + blueman-tray 45 MB +
-# obexd 2 MB) at 0% CPU.
-#
-# Waybar's own `tray` module is the real StatusNotifierItem host and is kept in
-# config.jsonc. Bluetooth status now comes from waybar's `bluetooth` module,
-# which talks to org.bluez over D-Bus and does not depend on the applet.
-# blueman-applet is back (2026-10-03): the waybar bluetooth module's on-click
-# never worked reliably, and the applet is the proven solution for now.
-# The bluetooth stack needs a proper rework — tracked separately.
-exec --no-startup-id sh -c "sleep 1 && blueman-applet &"
+# Bluetooth: navi-bluetooth (native BlueZ D-Bus) replaces blueman-applet.
+# Removed 2026-10-04 — pairing works natively now, the applet (~103 MB) is gone.
 exec --no-startup-id dunst
 exec --no-startup-id lxpolkit
 # Volume OSD: listens to PipeWire/Pulse events, pops a bottom-center meter.
