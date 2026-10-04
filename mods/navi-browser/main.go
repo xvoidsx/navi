@@ -107,11 +107,11 @@ var browserTable = []browserDef{
 		ExtrasID:  "chrome",
 	},
 	{
-		ID: "yandex", Name: "Yandex Browser",
-		Blurb:     "The new arrival — its own take on the Chromium experience.",
-		Binaries:  []string{"yandex-browser"},
-		PolicyDir: "/etc/yandex-browser/policies/managed",
-		ExtrasID:  "yandex",
+		ID: "chrome-canary", Name: "Google Chrome Canary",
+		Blurb:     "Bleeding-edge Chrome — for life on the cutting edge.",
+		Binaries:  []string{"google-chrome-unstable"},
+		PolicyDir: "/etc/opt/chrome/policies/managed",
+		ExtrasID:  "chrome-canary",
 	},
 }
 

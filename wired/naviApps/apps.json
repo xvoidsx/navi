@@ -1339,6 +1339,18 @@
     "icon": "🌐"
   },
   {
+    "id": "native-chrome-canary",
+    "name": "Google Chrome Canary",
+    "summary": "Bleeding-edge Chrome, straight from Google's apt repo.",
+    "category": "Internet",
+    "source": "native",
+    "package": "chrome-canary",
+    "install": "navi-extras --install chrome-canary",
+    "remove": "doas apt remove -y google-chrome-unstable",
+    "homepage": "https://www.google.com/chrome/canary/",
+    "icon": "🐤"
+  },
+  {
     "id": "native-firefox-nightly",
     "name": "Firefox Nightly",
     "summary": "Bleeding-edge Firefox, straight from Mozilla's apt repo.",
@@ -1384,18 +1396,6 @@
     "install": "navi-extras --install edge",
     "remove": "doas apt remove -y microsoft-edge-stable",
     "homepage": "https://www.microsoft.com/edge",
-    "icon": "🌐"
-  },
-  {
-    "id": "native-yandex",
-    "name": "Yandex Browser",
-    "summary": "Yandex's Chromium-based browser — from Yandex's own apt repo.",
-    "category": "Internet",
-    "source": "native",
-    "package": "yandex",
-    "install": "navi-extras --install yandex",
-    "remove": "doas apt remove -y yandex-browser-stable",
-    "homepage": "https://browser.yandex.com",
     "icon": "🌐"
   },
   {

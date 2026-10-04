@@ -14,7 +14,7 @@ import (
 func testApps() []app {
 	return []app{
 		{ID: "native-edge", Name: "Microsoft Edge", Summary: "Microsoft's Chromium-based browser", Category: "Internet", Source: "native", Package: "edge", Install: "navi-extras --install edge", Remove: "doas apt remove -y microsoft-edge-stable"},
-		{ID: "native-yandex", Name: "Yandex Browser", Summary: "Yandex's Chromium-based browser", Category: "Internet", Source: "native", Package: "yandex", Install: "navi-extras --install yandex", Remove: "doas apt remove -y yandex-browser-stable"},
+		{ID: "native-chrome-canary", Name: "Google Chrome Canary", Summary: "Bleeding-edge Chromium-based browser", Category: "Internet", Source: "native", Package: "chrome-canary", Install: "navi-extras --install chrome-canary", Remove: "doas apt remove -y google-chrome-unstable"},
 		{ID: "web-navi-radio", Name: "navi radio", Summary: "Our own music app", Category: "navi", Source: "webapp", Package: "navi-radio", Install: "navi-webapp navi-radio"},
 		{ID: "agent-ollama", Name: "Ollama", Summary: "Run open models locally", Category: "AI", Source: "agent", Install: "ollama"},
 	}
@@ -29,14 +29,14 @@ func TestApplyFilter(t *testing.T) {
 		t.Fatalf("expected 2 browser hits, got %d", len(m.filtered))
 	}
 
-	m.input.SetValue("yandex")
+	m.input.SetValue("canary")
 	m.applyFilter()
-	if len(m.filtered) != 1 || m.filtered[0].ID != "native-yandex" {
-		t.Fatalf("expected just yandex, got %+v", m.filtered)
+	if len(m.filtered) != 1 || m.filtered[0].ID != "native-chrome-canary" {
+		t.Fatalf("expected just canary, got %+v", m.filtered)
 	}
 
 	// multi-token AND
-	m.input.SetValue("chromium yandex")
+	m.input.SetValue("chromium canary")
 	m.applyFilter()
 	if len(m.filtered) != 1 {
 		t.Fatalf("expected 1 AND hit, got %d", len(m.filtered))
@@ -110,14 +110,14 @@ func TestIsInstalledAgent(t *testing.T) {
 }
 
 func TestIsInstalledNativeExtras(t *testing.T) {
-	extras := map[string]string{"edge": "installed", "yandex": "missing"}
+	extras := map[string]string{"edge": "installed", "chrome-canary": "missing"}
 	a := app{Source: "native", Install: "navi-extras --install edge", Package: "edge"}
 	if !isInstalled(a, extras, nil) {
 		t.Fatal("edge should read installed from extras state")
 	}
-	a.Install = "navi-extras --install yandex"
+	a.Install = "navi-extras --install chrome-canary"
 	if isInstalled(a, extras, nil) {
-		t.Fatal("yandex should read missing from extras state")
+		t.Fatal("canary should read missing from extras state")
 	}
 	// nil extras (navi-extras unusable) never claims installed
 	if isInstalled(a, nil, nil) {
@@ -204,7 +204,7 @@ func TestBrowseViewRenders(t *testing.T) {
 
 	m := newModel(testApps())
 	out := m.View()
-	for _, want := range []string{"navi-get", "Microsoft Edge", "Yandex Browser", "navi radio", "Ollama"} {
+	for _, want := range []string{"navi-get", "Microsoft Edge", "Google Chrome Canary", "navi radio", "Ollama"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("view missing %q", want)
 		}
@@ -213,8 +213,8 @@ func TestBrowseViewRenders(t *testing.T) {
 	m.input.SetValue("ollama")
 	m.applyFilter()
 	out = m.View()
-	if strings.Contains(out, "Yandex Browser") {
-		t.Fatal("filtered view should not contain Yandex Browser")
+	if strings.Contains(out, "Google Chrome Canary") {
+		t.Fatal("filtered view should not contain Google Chrome Canary")
 	}
 	if !strings.Contains(out, "Ollama") {
 		t.Fatal("filtered view should contain Ollama")
@@ -292,7 +292,7 @@ func TestTabTogglesShortcutMode(t *testing.T) {
 // Esc with text in the box clears the query instead of quitting.
 func TestEscClearsQuery(t *testing.T) {
 	m := newModel(testApps())
-	m.input.SetValue("yandex")
+	m.input.SetValue("canary")
 	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = next.(model)
 	if isQuit(cmd) {
