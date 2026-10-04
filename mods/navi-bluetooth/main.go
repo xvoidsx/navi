@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -1288,6 +1289,23 @@ func dumpSample() {
 // ── main ────────────────────────────────────────────────────────────
 
 func main() {
+	// Recover from panics and log the stack trace for debugging.
+	// Without this, a panic kills the program with no useful info.
+	defer func() {
+		if r := recover(); r != nil {
+			logDir := os.ExpandEnv("$HOME/.local/share/navi/navi-bluetooth")
+			os.MkdirAll(logDir, 0755)
+			f, err := os.OpenFile(logDir+"/panic.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err == nil {
+				fmt.Fprintf(f, "=== panic at %s ===\n%v\n%s\n\n",
+					time.Now().Format(time.RFC3339), r, debug.Stack())
+				f.Close()
+			}
+			// Re-panic so Bubble Tea's handler still runs.
+			panic(r)
+		}
+	}()
+
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "--dump":
