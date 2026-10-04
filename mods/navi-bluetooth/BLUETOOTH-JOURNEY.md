@@ -150,18 +150,25 @@ There's no configuration to change this; it's physics.
 KeyboardDisplay  >  DisplayYesNo  >  DisplayOnly  >  NoInputNoOutput
 ```
 
-- **KeyboardDisplay**: Can show codes AND accept input. Most capable.
-  This is what navi-bluetooth should use — it lets BlueZ pick the best
-  method for each device.
+- **KeyboardDisplay**: Can show codes AND accept input. Most capable in theory.
 - **DisplayYesNo**: Can show codes and get yes/no. Good for most cases.
 - **DisplayOnly**: Can show codes but can't get confirmation... except BlueZ
   still calls RequestConfirmation and the agent CAN respond. (This is what
   the Python prototype used successfully.)
 - **NoInputNoOutput**: Just Works only. No MITM protection.
 
-**Key insight:** Register the MOST capable agent you can (`KeyboardDisplay`).
-BlueZ will call the right callback for each device. You don't need to predict
-the flow — the callback IS the flow.
+**Key insight (corrected 2026-10-04):** Bigger is NOT always better. The Magic
+Keyboard's firmware REJECTS pairing when the host claims DisplayYesNo — it
+apparently tries full two-sided Numeric Comparison and fails because it can't
+display. With DisplayOnly, the keyboard auto-confirms cleanly. btmon proved
+this: same keyboard, same BlueZ, only the host IO cap changed.
+
+**navi-bluetooth uses DisplayOnly.** It's proven with the Magic Keyboard, and
+it handles phones (RequestConfirmation), headsets (Just Works), and most
+other devices. The only loss vs KeyboardDisplay is devices where the HOST
+must type a passkey (rare legacy keyboards) — acceptable tradeoff.
+
+Don't assume "most capable agent" is the right choice. Test with real hardware.
 
 ### 4c. The org.bluez.Agent1 Callbacks
 
