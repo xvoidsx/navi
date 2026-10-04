@@ -702,9 +702,9 @@ func (b *BlueZBackend) registerAgent() error {
 	if err := mgr.Call("org.bluez.AgentManager1.RegisterAgent", 0, agentPath, "DisplayOnly").Err; err != nil {
 		return fmt.Errorf("register agent: %w", err)
 	}
-	if err := mgr.Call("org.bluez.AgentManager1.RequestDefaultAgent", 0, agentPath).Err; err != nil {
-		return fmt.Errorf("default agent: %w", err)
-	}
+	// Do NOT request default agent (bluetui doesn't either): BlueZ
+	// automatically uses the calling application's agent for its own
+	// Pair() calls. Claiming default can conflict with other agents.
 	b.agent = agent
 	return nil
 }
@@ -720,15 +720,14 @@ func (b *BlueZBackend) unregisterAgent() {
 // RegisterAgent registers our DisplayOnly agent as the default.
 func (b *BlueZBackend) RegisterAgent() error { return b.registerAgent() }
 
-// EnsureDefaultAgent re-asserts our agent as the default. Other Bluetooth
-// managers (Blueman, bluetoothctl) register their own agents and can steal
-// the default slot; call this before pairing to take it back.
+// EnsureDefaultAgent re-registers our agent if needed. We don't claim
+// the default slot (BlueZ uses our agent for our own Pair() calls
+// automatically); this just makes sure the registration exists.
 func (b *BlueZBackend) EnsureDefaultAgent() error {
 	if b.agent == nil {
 		return b.registerAgent()
 	}
-	mgr := b.conn.Object("org.bluez", "/org/bluez")
-	return mgr.Call("org.bluez.AgentManager1.RequestDefaultAgent", 0, agentPath).Err
+	return nil
 }
 
 func (b *BlueZBackend) lookupDevice(path dbus.ObjectPath) BlueZDevice {
