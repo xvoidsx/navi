@@ -514,10 +514,18 @@ func (b *BlueZBackend) FindByAddress(addr string) (BlueZDevice, bool) {
 
 // Watch starts forwarding ObjectManager and PropertiesChanged signals.
 func (b *BlueZBackend) Watch() error {
-	// ObjectManager signals
+	// ObjectManager signals (InterfacesAdded/Removed) — match by interface
+	// only; BlueZ emits them from the service root and path filtering is
+	// fragile across BlueZ versions.
 	if err := b.conn.AddMatchSignal(
-		dbus.WithMatchObjectPath("/"),
 		dbus.WithMatchInterface("org.freedesktop.DBus.ObjectManager"),
+		dbus.WithMatchMember("InterfacesAdded"),
+	); err != nil {
+		return err
+	}
+	if err := b.conn.AddMatchSignal(
+		dbus.WithMatchInterface("org.freedesktop.DBus.ObjectManager"),
+		dbus.WithMatchMember("InterfacesRemoved"),
 	); err != nil {
 		return err
 	}
