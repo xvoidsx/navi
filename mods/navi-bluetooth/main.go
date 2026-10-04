@@ -1337,7 +1337,16 @@ func main() {
 				fmt.Println("FAIL: RegisterAgent:", err)
 				os.Exit(1)
 			}
+			if err := backend.SetPowered(true); err != nil {
+				fmt.Println("WARN: SetPowered:", err)
+			}
+			if err := backend.StartDiscovery(); err != nil {
+				fmt.Println("FAIL: StartDiscovery:", err)
+				os.Exit(1)
+			}
 			fmt.Println("OK: D-Bus backend up, agent registered at", agentPath)
+			fmt.Println("Scanning for 8 seconds...")
+			time.Sleep(8 * time.Second)
 			fmt.Println("Devices:")
 			for _, d := range backend.Devices() {
 				fmt.Printf("  %s (%s) kind=%s paired=%v\n", d.DisplayName(), d.Address, d.Kind, d.Paired)
