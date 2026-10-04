@@ -639,8 +639,18 @@ func (b *BlueZBackend) EnsureDefaultAgent() error {
 
 func (b *BlueZBackend) lookupDevice(path dbus.ObjectPath) BlueZDevice {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	if d, ok := b.devices[path]; ok {
+		b.mu.Unlock()
+		return d
+	}
+	b.mu.Unlock()
+	// Cache miss (race between discovery signal and pairing request):
+	// fetch fresh properties directly from BlueZ.
+	if props := b.getDeviceProps(path); props != nil {
+		d := deviceFromProps(path, props)
+		b.mu.Lock()
+		b.devices[path] = d
+		b.mu.Unlock()
 		return d
 	}
 	return BlueZDevice{Path: path}
@@ -709,7 +719,9 @@ func (a *naviAgent) DisplayPinCode(device dbus.ObjectPath, pincode string) *dbus
 // is theater. macOS-instant pairing for the devices that need it most.
 func (a *naviAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) *dbus.Error {
 	d := a.backend.lookupDevice(device)
-	if isInputDevice(d.Name) {
+	// Check Kind (from Icon/Class/UUID) as well as name — the name may
+	// not have resolved yet when the callback fires.
+	if d.Kind == DeviceKeyboard || d.Kind == DeviceMouse || d.Kind == DeviceTrackpad || isInputDevice(d.Name) {
 		return nil // auto-approve keyboards/mice/trackpads
 	}
 	resp := make(chan bool, 1)
