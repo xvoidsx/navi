@@ -876,6 +876,31 @@ func (m model) smartAction() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	// D-Bus mode: use the backend, never bluetoothctl.
+	if m.useDBus && m.backend != nil && d.path != "" {
+		path := dbusObjectPath(d.path)
+		backend := m.backend
+		switch {
+		case d.connected:
+			m.working = true
+			return m, opCmd("disconnecting "+d.name+"…",
+				func() error { return backend.Disconnect(path) })
+		case d.paired:
+			m.working = true
+			return m, func() tea.Msg {
+				if err := backend.SetTrusted(path, true); err != nil {
+					return opMsg{err: err, note: "trust failed"}
+				}
+				if err := backend.Connect(path); err != nil {
+					return opMsg{err: err, note: "connect failed: " + humanizeDBusError(err)}
+				}
+				return opMsg{err: nil, note: "connected to " + d.name}
+			}
+		default:
+			return m.beginPair(d)
+		}
+	}
+	// Fallback: bluetoothctl wrappers.
 	switch {
 	case d.connected:
 		m.working = true
