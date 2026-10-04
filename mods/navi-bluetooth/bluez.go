@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 	"time"
 	"sync"
@@ -543,6 +544,11 @@ func (b *BlueZBackend) Watch() error {
 }
 
 func (b *BlueZBackend) signalLoop(ch chan *dbus.Signal) {
+	defer func() {
+		if r := recover(); r != nil {
+			b.logPanic("signalLoop", r)
+		}
+	}()
 	for {
 		select {
 		case <-b.closed:
@@ -553,6 +559,17 @@ func (b *BlueZBackend) signalLoop(ch chan *dbus.Signal) {
 			}
 			b.handleSignal(sig)
 		}
+	}
+}
+
+// logPanic writes a goroutine panic to the panic log.
+func (b *BlueZBackend) logPanic(where string, r interface{}) {
+	dir := os.ExpandEnv("$HOME/.local/share/navi/navi-bluetooth")
+	os.MkdirAll(dir, 0755)
+	if f, err := os.OpenFile(dir+"/panic.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		fmt.Fprintf(f, "=== goroutine panic in %s at %s ===\n%v\n%s\n\n",
+			where, time.Now().Format(time.RFC3339), r, debug.Stack())
+		f.Close()
 	}
 }
 
@@ -757,11 +774,25 @@ func (a *naviAgent) DisplayPinCode(device dbus.ObjectPath, pincode string) *dbus
 	return nil
 }
 
+// withAgentRecover wraps agent D-Bus methods so a panic becomes a logged
+// entry instead of killing the process.
+func (a *naviAgent) withAgentRecover() {
+	if r := recover(); r != nil {
+		a.backend.logPanic("agent", r)
+	}
+}
+
 // RequestConfirmation asks the user to approve a Numeric Comparison code.
 // Input devices (keyboards/mice) auto-confirm: their firmware confirms on
 // their side without displaying anything, so prompting the user to "compare"
 // is theater. macOS-instant pairing for the devices that need it most.
-func (a *naviAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) *dbus.Error {
+func (a *naviAgent) RequestConfirmation(device dbus.ObjectPath, passkey uint32) (result *dbus.Error) {
+	defer func() {
+		if r := recover(); r != nil {
+			a.backend.logPanic("agent RequestConfirmation", r)
+			result = dbus.NewError("org.bluez.Error.Failed", []interface{}{"agent panic"})
+		}
+	}()
 	d := a.backend.lookupDevice(device)
 	// Check Kind (from Icon/Class/UUID) as well as name — the name may
 	// not have resolved yet when the callback fires.
