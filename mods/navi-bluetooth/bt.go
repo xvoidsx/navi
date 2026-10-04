@@ -274,6 +274,19 @@ func isAppleDevice(name string) bool {
 		strings.Contains(n, "magic trackpad")
 }
 
+// isInputDevice reports whether the name looks like a keyboard, mouse,
+// or trackpad — including generic names like "Keyboard" that BlueZ
+// assigns before the real name resolves. These auto-trust after pairing
+// so normie users never have to hunt a MAC in the terminal.
+func isInputDevice(name string) bool {
+	n := strings.ToLower(name)
+	return isAppleDevice(name) ||
+		strings.Contains(n, "keyboard") ||
+		strings.Contains(n, "mouse") ||
+		strings.Contains(n, "trackpad") ||
+		strings.Contains(n, "trackpoint")
+}
+
 // connectAppleDevice trusts then connects — the sequence Apple HID needs.
 func connectAppleDevice(mac string) error {
 	if err := trustDevice(mac, true); err != nil {

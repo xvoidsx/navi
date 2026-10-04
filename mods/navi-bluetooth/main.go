@@ -357,9 +357,10 @@ func (m model) handlePairEvent(ev pairEvent) (tea.Model, tea.Cmd) {
 	case pairDone:
 		dev := m.pairDev
 		m.endPair()
-		// Apple HID devices: auto-trust so the HID profile establishes.
+		// Input devices: auto-trust so the HID profile establishes.
+		// No MAC hunting in the terminal for normie users.
 		// Everything else asks (existing behavior).
-		if isAppleDevice(dev.name) {
+		if isInputDevice(dev.name) {
 			m.screen = screenMain
 			m.working = true
 			m.status = "paired — trusting " + dev.name + " for auto-connect…"
@@ -866,9 +867,10 @@ func (m model) viewPairing() string {
 		b.WriteString("  " + theme.Selected.Render(m.pairPrompt.text) + "\n\n")
 		b.WriteString(theme.Dimmed.Render("  waiting for you to type it… (esc cancels)") + "\n")
 	} else if m.pairPrompt.kind == pairPromptPasskey {
-		b.WriteString(theme.Dimmed.Render("  confirm the passkey matches on both devices:") + "\n\n")
+		b.WriteString(theme.Dimmed.Render("  approve pairing — code:") + "\n\n")
 		b.WriteString("  " + theme.Selected.Render(m.pairPrompt.text) + "\n\n")
-		b.WriteString("  " + theme.Selected.Render("y") + theme.Dimmed.Render(" matches   ") +
+		b.WriteString(theme.Dimmed.Render("  the keyboard confirms automatically.") + "\n")
+		b.WriteString("  " + theme.Selected.Render("y") + theme.Dimmed.Render(" approve   ") +
 			theme.Selected.Render("n") + theme.Dimmed.Render(" reject") + "\n")
 	} else if m.pairPrompt.kind == pairPromptAuthorize {
 		b.WriteString(theme.Dimmed.Render("  the device asks to authorize:") + "\n\n")
