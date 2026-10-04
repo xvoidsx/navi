@@ -243,3 +243,31 @@ func TestDisplayNameNeverBareMAC(t *testing.T) {
 		t.Errorf("DisplayName = %q, want %q", got, "Magic Keyboard")
 	}
 }
+
+func TestIsMACLike(t *testing.T) {
+	cases := []struct {
+		s    string
+		want bool
+	}{
+		{"04:69:F8:DA:18:E4", true},
+		{"04-69-F8-DA-18-E4", true},
+		{"0469F8DA18E4", true},
+		{"Keyboard", false},
+		{"Magic Keyboard", false},
+		{"", false},
+		{"not-a-mac", false},
+	}
+	for _, c := range cases {
+		if got := isMACLike(c.s); got != c.want {
+			t.Errorf("isMACLike(%q) = %v, want %v", c.s, got, c.want)
+		}
+	}
+}
+
+func TestDisplayNameRejectsMACAlias(t *testing.T) {
+	// BlueZ sets Alias to dashed MAC when there's no name.
+	d := BlueZDevice{Address: "25:55:FB:00:19:D5", Name: "25-55-FB-00-19-D5", Kind: DeviceUnknown}
+	if got := d.DisplayName(); isMACLike(got) {
+		t.Errorf("DisplayName returned MAC-like %q", got)
+	}
+}

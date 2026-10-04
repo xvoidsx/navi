@@ -89,10 +89,27 @@ type BlueZDevice struct {
 	Connected bool
 }
 
+// isMACLike reports whether s looks like a Bluetooth MAC address
+// (colons or dashes). BlueZ sets Alias to the dashed MAC when a device
+// has no real name — we must not show that to users.
+func isMACLike(s string) bool {
+	// Strip separators and check for 12 hex digits.
+	stripped := strings.ReplaceAll(strings.ReplaceAll(s, ":", ""), "-", "")
+	if len(stripped) != 12 {
+		return false
+	}
+	for _, r := range stripped {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
 // DisplayName returns Name, falling back to a kind label + short address.
 // It never returns a bare MAC — normies shouldn't have to read those.
 func (d BlueZDevice) DisplayName() string {
-	if d.Name != "" {
+	if d.Name != "" && !isMACLike(d.Name) {
 		return d.Name
 	}
 	// Last 5 chars of MAC as a distinguisher, e.g. "Keyboard · 18:E4"
@@ -221,7 +238,7 @@ func deviceFromProps(path dbus.ObjectPath, props map[string]dbus.Variant) BlueZD
 	}
 	if d.Name == "" {
 		if v, ok := props["Alias"]; ok {
-			if s, ok := v.Value().(string); ok {
+			if s, ok := v.Value().(string); ok && !isMACLike(s) {
 				d.Name = s
 			}
 		}
