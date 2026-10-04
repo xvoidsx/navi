@@ -113,6 +113,7 @@ window#waybar > box { background: transparent; }
 #custom-volume,
 #network,
 #bluetooth,
+#custom-bluetooth,
 #battery,
 #backlight,
 #idle_inhibitor,
@@ -232,17 +233,20 @@ window#waybar.empty #window {
 #battery.warning { color: #ff5cf5; }
 
 /* Bluetooth: rune plus a link glyph. Never a dot — that is the bell's. */
-#bluetooth.off {
+#bluetooth.off,
+#custom-bluetooth.off {
     color: rgba(255, 255, 255, 0.38);
     text-shadow: 0 0 5px rgba(255, 255, 255, 0.25);
 }
 
-#bluetooth.connected {
+#bluetooth.connected,
+#custom-bluetooth.connected {
     color: #4dffff;
     text-shadow: 0 0 8px rgba(0, 255, 255, 0.85), 0 0 20px rgba(0, 255, 255, 0.45);
 }
 
-#bluetooth.connecting {
+#bluetooth.connecting,
+#custom-bluetooth.connecting {
     color: #ff5cf5;
     text-shadow: 0 0 8px rgba(255, 16, 240, 0.85);
 }
@@ -310,7 +314,8 @@ window#waybar.empty #window {
 #custom-bell:hover,
 #custom-nowplaying:hover,
 #custom-agent:hover,
-#bluetooth:hover {
+#bluetooth:hover,
+#custom-bluetooth:hover {
     color: @nw;
     text-shadow: 0 0 9px rgba(255, 255, 255, 0.95), 0 0 24px rgba(255, 16, 240, 0.65);
     transition: text-shadow 300ms ease-out;

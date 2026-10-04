@@ -26,6 +26,7 @@
 	"custom/weather",
 	"custom/update",
 	"custom/volume",
+	"custom/bluetooth",
         "network",
         "battery",
         "backlight",
@@ -86,6 +87,43 @@
         "on-scroll-down": "pamixer -d 5",
         "on-click-right": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-audio\" navi-audio",
         "on-click-middle": "/usr/share/navi/wired/waybar/audio-switch.sh",
+        "tooltip": true
+    },
+
+    // Bluetooth — the bar's Bluetooth indicator, replacing blueman-applet.
+    //
+    // blueman-tray was a legacy X11 XEmbed tray host. On this pure-Wayland
+    // session it has no X display to reparent icons onto, so it never mapped
+    // a window and held ~77 MB while showing nothing.
+    //
+    // This is custom/bluetooth (a script), NOT waybar's built-in
+    // `bluetooth` module. The built-in renders NOTHING on waybar 0.12.0 here:
+    // it instantiates (the debug log shows label#bluetooth.module) but emits
+    // an empty label for every format tried — a literal string, {status},
+    // {icon} — with or without controller-alias. That is what "on-click never
+    // worked" meant on 2026-10-02: there was nothing on screen to click.
+    // Do not switch back without proving it renders.
+    //
+    // Click goes through mod-open.sh (floating, logged to mod-open.log);
+    // right-click is the power menu; scroll is power. All the mod conventions.
+    //
+    // The glyph is ᛒ (U+16D2, runic) — the bind-rune the Bluetooth logo is
+    // literally derived from, and it fits navi's rune theme. Only Noto Sans
+    // Runic carries it; fontconfig falls back to it, so there is no tofu.
+    // It stands alone: an earlier version trailed a Nerd Font state glyph,
+    // but 󰃧 reads as a bus, so state is carried by colour and tooltip
+    // instead. Colours live in style.css (#custom-bluetooth .off /
+    // .connected), mirroring the #bluetooth rules already in every theme.
+    "custom/bluetooth": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 5,
+        "exec": "/usr/share/navi/wired/waybar/bluetooth-mod.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi bluetooth\" navi-bluetooth",
+        "on-click-right": "/usr/share/navi/wired/waybar/bluetooth-menu.sh",
+        "on-scroll-up": "bluetoothctl power on",
+        "on-scroll-down": "bluetoothctl power off",
         "tooltip": true
     },
     // - - - XXX testing section XXX - - -
