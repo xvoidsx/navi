@@ -33,15 +33,31 @@ if [ -z "$status" ]; then
   exit 0
 fi
 
-backend="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("BackendState",""))' <<<"$status" 2>/dev/null)"
-tailnet="$(python3 -c 'import json,sys; d=json.load(sys.stdin).get("CurrentTailnet") or {}; print(d.get("Name",""))' <<<"$status" 2>/dev/null)"
+info="$(python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+backend = d.get("BackendState", "")
+tailnet = (d.get("CurrentTailnet") or {}).get("Name", "")
+self = d.get("Self") or {}
+ips = self.get("TailscaleIPs", [])
+ip = ips[0] if ips else ""
+peers = d.get("Peer", {})
+online = sum(1 for p in peers.values() if p and p.get("Online"))
+print(f"{backend}|{tailnet}|{ip}|{len(peers)}|{online}")
+' <<<"$status" 2>/dev/null)"
+
+backend="${info%%|*}"; rest="${info#*|}"
+tailnet="${rest%%|*}"; rest="${rest#*|}"
+ip="${rest%%|*}"; rest="${rest#*|}"
+total="${rest%%|*}"; online="${rest##*|}"
 
 if [ "$backend" = "Running" ]; then
-  if [ -n "$tailnet" ]; then
-    emit "󰖂" "tailscale connected — $tailnet (click to manage)" "connected"
-  else
-    emit "󰖂" "tailscale connected (click to manage)" "connected"
-  fi
+  tip="tailscale connected"
+  [ -n "$tailnet" ] && tip="$tip — $tailnet"
+  [ -n "$ip" ] && tip="$tip"$'\n'"this device: $ip"
+  tip="$tip"$'\n'"peers: $online/$total online"
+  tip="$tip"$'\n'"click to manage"
+  emit "󰖂" "$tip" "connected"
 else
   emit "󰖂" "tailscale down — click to open" "off"
 fi
