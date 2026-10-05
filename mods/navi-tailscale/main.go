@@ -293,47 +293,63 @@ func currentExitNode() string {
 	return ""
 }
 
-// listSendableFiles finds files in common locations for taildrop.
-func listSendableFiles() []string {
-	var files []string
-	seen := map[string]bool{}
-	dirs := []string{}
-	if h, err := os.UserHomeDir(); err == nil {
-		dirs = append(dirs,
-			filepath.Join(h, "Downloads"),
-			filepath.Join(h, "Documents"),
-			filepath.Join(h, "Pictures"),
-			h,
-		)
+// tdEntry is one row in the taildrop file browser.
+type tdEntry struct {
+	path  string
+	name  string
+	isDir bool
+}
+
+// listDir reads a directory for the taildrop browser: directories first,
+// then files, each sorted by name. Hidden entries are skipped.
+func listDir(dir string) []tdEntry {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
 	}
-	for _, dir := range dirs {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
+	var dirs, files []tdEntry
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		for _, e := range entries {
-			if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
-				continue
-			}
-			p := filepath.Join(dir, e.Name())
-			if !seen[p] {
-				seen[p] = true
-				files = append(files, p)
-			}
-			if len(files) >= 50 {
-				break
-			}
+		te := tdEntry{
+			path:  filepath.Join(dir, e.Name()),
+			name:  e.Name(),
+			isDir: e.IsDir(),
+		}
+		if te.isDir {
+			dirs = append(dirs, te)
+		} else {
+			files = append(files, te)
 		}
 	}
-	sort.Slice(files, func(i, j int) bool {
-		ai, _ := os.Stat(files[i])
-		aj, _ := os.Stat(files[j])
-		if ai == nil || aj == nil {
-			return files[i] < files[j]
+	sort.Slice(dirs, func(i, j int) bool { return dirs[i].name < dirs[j].name })
+	sort.Slice(files, func(i, j int) bool { return files[i].name < files[j].name })
+	return append(dirs, files...)
+}
+
+// tdFiltered returns the browser entries matching the live filter.
+func (m model) tdFiltered() []tdEntry {
+	if m.tdFilter == "" {
+		return m.tdEntries
+	}
+	var out []tdEntry
+	q := strings.ToLower(m.tdFilter)
+	for _, e := range m.tdEntries {
+		if strings.Contains(strings.ToLower(e.name), q) {
+			out = append(out, e)
 		}
-		return ai.ModTime().After(aj.ModTime())
-	})
-	return files
+	}
+	return out
+}
+
+// tdChdir moves the browser into dir and resets cursor/filter.
+func (m *model) tdChdir(dir string) {
+	m.tdDir = dir
+	m.tdEntries = listDir(dir)
+	m.tdCursor = 0
+	m.tdFilter = ""
+	m.tdFiltering = false
 }
 
 // taildropSend sends a file to a peer via `tailscale file cp`.
@@ -427,11 +443,14 @@ type model struct {
 	// exit node picker
 	exitCursor int
 	// taildrop
-	tdFiles    []string
-	tdCursor   int
-	tdPeer     int // selected peer index for sending
-	tdStep     int // 0=pick file, 1=pick peer, 2=confirm
-	tdFile     string
+	tdDir       string    // current browser directory
+	tdEntries   []tdEntry // entries in tdDir (dirs first, then files)
+	tdCursor    int
+	tdPeer      int  // selected peer index for sending
+	tdStep      int  // 0=pick file, 1=pick peer, 2=confirm
+	tdFile      string
+	tdFilter    string // live filename filter
+	tdFiltering bool   // typing a filter
 	// exit node
 	exitNode string
 }
@@ -931,8 +950,11 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setMsg("connect to tailnet first")
 			return m, nil
 		}
-		m.tdFiles = listSendableFiles()
-		m.tdCursor = 0
+		home, _ := os.UserHomeDir()
+		if home == "" {
+			home = "/"
+		}
+		m.tdChdir(home)
 		m.tdStep = 0
 		m.screen = screenTaildrop
 		return m, nil
@@ -957,7 +979,31 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m model) handleTaildropKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	k := msg.String()
 	switch m.tdStep {
-	case 0: // pick file
+	case 0: // pick file — a real file browser
+		entries := m.tdFiltered()
+		if m.tdFiltering {
+			switch k {
+			case "esc":
+				m.tdFiltering = false
+				m.tdFilter = ""
+				m.tdCursor = 0
+			case "backspace":
+				if len(m.tdFilter) > 0 {
+					m.tdFilter = m.tdFilter[:len(m.tdFilter)-1]
+					m.tdCursor = 0
+				} else {
+					m.tdFiltering = false
+				}
+			case "enter":
+				m.tdFiltering = false
+			default:
+				if len(k) == 1 {
+					m.tdFilter += k
+					m.tdCursor = 0
+				}
+			}
+			return m, nil
+		}
 		switch k {
 		case "esc", "q":
 			m.screen = screenMain
@@ -967,14 +1013,31 @@ func (m model) handleTaildropKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.tdCursor--
 			}
 		case "down", "j":
-			if m.tdCursor < len(m.tdFiles)-1 {
+			if m.tdCursor < len(entries)-1 {
 				m.tdCursor++
 			}
-		case "enter":
-			if len(m.tdFiles) > 0 {
-				m.tdFile = m.tdFiles[m.tdCursor]
-				m.tdStep = 1
-				m.tdPeer = m.cursor // default to currently selected peer
+		case "enter", "l":
+			if len(entries) > 0 && m.tdCursor < len(entries) {
+				e := entries[m.tdCursor]
+				if e.isDir {
+					m.tdChdir(e.path)
+				} else {
+					m.tdFile = e.path
+					m.tdStep = 1
+					m.tdPeer = m.cursor // default to currently selected peer
+				}
+			}
+		case "h", "backspace":
+			parent := filepath.Dir(m.tdDir)
+			if parent != m.tdDir {
+				m.tdChdir(parent)
+			}
+		case "/":
+			m.tdFiltering = true
+			m.tdFilter = ""
+		case "~":
+			if home, err := os.UserHomeDir(); err == nil {
+				m.tdChdir(home)
 			}
 		}
 	case 1: // pick peer
@@ -1276,20 +1339,36 @@ func (m model) renderTaildrop() string {
 	b.WriteString("  " + theme.Header.Render("TAILDROP — SEND FILE") + "\n\n")
 
 	if m.tdStep == 0 {
-		b.WriteString("  " + theme.Dimmed.Render("select a file:") + "\n")
-		if len(m.tdFiles) == 0 {
-			b.WriteString("  " + theme.Dimmed.Render("no files found in ~/Downloads, ~/Documents") + "\n")
-			return b.String()
+		entries := m.tdFiltered()
+		// breadcrumb — home collapses to ~
+		dir := m.tdDir
+		if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(dir, home) {
+			dir = "~" + dir[len(home):]
 		}
-		for i, f := range m.tdFiles {
+		b.WriteString("  " + theme.Dimmed.Render("browse: ") + theme.Selected.Render(dir) + "\n")
+		if m.tdFiltering || m.tdFilter != "" {
+			b.WriteString("  " + theme.Dimmed.Render("filter: /" + m.tdFilter + "_") + "\n")
+		}
+		b.WriteString("\n")
+		if len(entries) == 0 {
+			b.WriteString("  " + theme.Dimmed.Render("empty directory") + "\n")
+		}
+		dirStyle := lipgloss.NewStyle().Foreground(theme.Cyan)
+		for i, e := range entries {
 			cursor := "  "
+			name := e.name
 			nameStyle := lipgloss.NewStyle().Foreground(theme.White)
+			if e.isDir {
+				name += "/"
+				nameStyle = dirStyle
+			}
 			if i == m.tdCursor {
 				cursor = theme.Selected.Render("▸ ")
 				nameStyle = nameStyle.Bold(true)
 			}
-			b.WriteString(fmt.Sprintf("%s%s\n", cursor, nameStyle.Render(filepath.Base(f))))
+			b.WriteString(fmt.Sprintf("%s%s\n", cursor, nameStyle.Render(name)))
 		}
+		b.WriteString("\n  " + theme.Dimmed.Render("enter/l open · h/backspace up · / filter · ~ home") + "\n")
 	} else if m.tdStep == 1 {
 		b.WriteString("  " + theme.Dimmed.Render("file: "+filepath.Base(m.tdFile)) + "\n\n")
 		b.WriteString("  " + theme.Dimmed.Render("send to:") + "\n")
