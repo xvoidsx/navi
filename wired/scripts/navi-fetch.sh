@@ -8,6 +8,11 @@
 set -u
 
 if [ ! -t 1 ]; then
+  # no terminal (dmenu_run, etc.) — open the floating version instead of
+  # dumping fastfetch output nowhere.
+  if [ -x /usr/share/navi/wired/waybar/mod-open.sh ]; then
+    exec /usr/share/navi/wired/waybar/mod-open.sh "navi-fetch" navi-fetch
+  fi
   exec fastfetch "$@"
 fi
 command -v fastfetch >/dev/null 2>&1 || { echo "navi-fetch: fastfetch not installed" >&2; exit 1; }
