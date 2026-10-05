@@ -121,6 +121,77 @@ func tailscaleUp() error {
 	return cmd.Run()
 }
 
+// tailscaleInstalled reports whether the tailscale binary is on PATH.
+func tailscaleInstalled() bool {
+	_, err := exec.LookPath("tailscale")
+	return err == nil
+}
+
+// tailscaledRunning reports whether the tailscaled daemon is reachable.
+// We run a cheap status call and look for the daemon-connection failure.
+func tailscaledRunning() bool {
+	cmd := exec.Command("tailscale", "status")
+	// capture stderr: "failed to connect to local tailscaled" means down
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	cmd.Stdout = nil
+	_ = cmd.Run()
+	errText := strings.ToLower(stderr.String())
+	return !strings.Contains(errText, "tailscaled") ||
+		!strings.Contains(errText, "failed to connect")
+}
+
+// startTailscaled brings the daemon up via systemd.
+func startTailscaled() tea.Msg {
+	cmd := exec.Command("doas", "systemctl", "start", "tailscaled")
+	if err := cmd.Run(); err != nil {
+		// fall back to plain systemctl (may work for user units or with sudo config)
+		if err2 := exec.Command("systemctl", "start", "tailscaled").Run(); err2 != nil {
+			return daemonMsg{fmt.Errorf("could not start tailscaled: %w", err)}
+		}
+	}
+	// give the daemon a moment to come up
+	time.Sleep(1500 * time.Millisecond)
+	return daemonMsg{nil}
+}
+
+// installTailscale runs the navi tailscale installer.
+func installTailscale() tea.Msg {
+	// prefer the shipped installer script, fall back to navi-extras
+	installer := "/usr/share/navi/installers/tailscale-installer.sh"
+	if _, err := os.Stat(installer); err != nil {
+		installer = ""
+	}
+	var cmd *exec.Cmd
+	if installer != "" {
+		cmd = exec.Command("doas", "bash", installer)
+	} else {
+		cmd = exec.Command("doas", "navi-extras", "--install", "tailscale")
+	}
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return installMsg{fmt.Errorf("install failed: %s", strings.TrimSpace(string(out)))}
+	}
+	return installMsg{nil}
+}
+
+// pollAuth checks whether the device has joined the tailnet yet.
+func pollAuth() tea.Msg {
+	st, _ := tailscaleStatus()
+	return authPollMsg{st.LoggedIn && st.Up}
+}
+
+// openAuthURL opens the tailscale login URL in the default browser.
+func openAuthURL(url string) tea.Msg {
+	_ = exec.Command("xdg-open", url).Start()
+	return nil
+}
+
+// spinnerTick advances the busy spinner.
+func spinnerTick() tea.Msg {
+	time.Sleep(120 * time.Millisecond)
+	return spinnerTickMsg{}
+}
+
 // tailscaleUpCapture runs `tailscale up` and returns combined output so we
 // can extract the login URL for the QR code.
 func tailscaleUpCapture() (string, error) {
@@ -285,6 +356,8 @@ const (
 	screenAuth
 	screenTaildrop
 	screenTaildropInbox
+	screenNotInstalled
+	screenDaemonDown
 )
 
 type model struct {
@@ -300,6 +373,10 @@ type model struct {
 	// auth flow
 	authURL string
 	authQR  string
+	// setup flow
+	busy        bool   // async operation in progress (spinner)
+	busyMsg     string // what the spinner is doing
+	spinnerTick int
 	// taildrop
 	tdFiles    []string
 	tdCursor   int
@@ -337,6 +414,20 @@ type taildropMsg struct {
 	err error
 }
 
+type installMsg struct {
+	err error
+}
+
+type daemonMsg struct {
+	err error
+}
+
+type authPollMsg struct {
+	loggedIn bool
+}
+
+type spinnerTickMsg struct{}
+
 func fetchStatus() tea.Msg {
 	st, err := tailscaleStatus()
 	return statusMsg{st, err}
@@ -347,7 +438,16 @@ func initialModel() model {
 }
 
 func (m model) Init() tea.Cmd {
-	return fetchStatus
+	// setup chain: installed? -> daemon? -> status
+	return func() tea.Msg {
+		if !tailscaleInstalled() {
+			return installMsg{fmt.Errorf("not installed")}
+		}
+		if !tailscaledRunning() {
+			return daemonMsg{fmt.Errorf("daemon down")}
+		}
+		return fetchStatus()
+	}
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -387,6 +487,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, fetchStatus
 
 	case authMsg:
+		m.busy = false
 		if msg.err != nil {
 			m.setMsg("auth failed: " + msg.err.Error())
 			m.screen = screenMain
@@ -394,6 +495,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.authURL = msg.url
 			m.authQR = msg.qr
 			m.screen = screenAuth
+			// start polling for completion
+			return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+				return pollAuth()
+			})
 		} else {
 			// already authenticated or no URL needed
 			m.setMsg("connected to tailnet")
@@ -409,6 +514,71 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.screen = screenMain
 		return m, nil
+
+	case installMsg:
+		m.busy = false
+		if msg.err != nil && msg.err.Error() == "not installed" {
+			// initial check: tailscale isn't here
+			m.screen = screenNotInstalled
+			return m, nil
+		}
+		if msg.err != nil {
+			m.setMsg(msg.err.Error())
+			m.screen = screenNotInstalled
+			return m, nil
+		}
+		// install succeeded — check the daemon next
+		m.screen = screenMain
+		return m, func() tea.Msg {
+			if !tailscaledRunning() {
+				return daemonMsg{fmt.Errorf("daemon down")}
+			}
+			return fetchStatus()
+		}
+
+	case daemonMsg:
+		m.busy = false
+		if msg.err != nil && msg.err.Error() == "daemon down" {
+			// initial check or post-install: daemon isn't running.
+			// auto-start it — the user installed tailscale to use it.
+			m.screen = screenDaemonDown
+			m.busy = true
+			m.busyMsg = "starting tailscaled..."
+			return m, tea.Batch(startTailscaled, spinnerTick)
+		}
+		if msg.err != nil {
+			m.setMsg(msg.err.Error())
+			m.screen = screenDaemonDown
+			m.busy = false
+			return m, nil
+		}
+		// daemon is up — fetch status
+		m.screen = screenMain
+		return m, fetchStatus
+
+	case authPollMsg:
+		if msg.loggedIn {
+			// auth completed — clear the sensitive URL and go to main
+			m.authURL = ""
+			m.authQR = ""
+			m.screen = screenMain
+			m.setMsg("connected to tailnet")
+			return m, fetchStatus
+		}
+		// not yet — keep polling while on the auth screen
+		if m.screen == screenAuth {
+			return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+				return pollAuth()
+			})
+		}
+		return m, nil
+
+	case spinnerTickMsg:
+		if m.busy {
+			m.spinnerTick++
+			return m, spinnerTick
+		}
+		return m, nil
 	}
 	return m, nil
 }
@@ -419,7 +589,35 @@ func (m *model) setMsg(s string) {
 }
 
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// busy operations swallow keys (except ctrl+c)
+	if m.busy && msg.String() != "ctrl+c" {
+		return m, nil
+	}
 	switch m.screen {
+	case screenNotInstalled:
+		switch msg.String() {
+		case "i", "I":
+			// install tailscale
+			m.busy = true
+			m.busyMsg = "installing tailscale..."
+			return m, tea.Batch(installTailscale, spinnerTick)
+		case "q", "esc":
+			m.quitting = true
+			return m, tea.Quit
+		}
+		return m, nil
+	case screenDaemonDown:
+		switch msg.String() {
+		case "s", "S", "enter":
+			// retry starting the daemon
+			m.busy = true
+			m.busyMsg = "starting tailscaled..."
+			return m, tea.Batch(startTailscaled, spinnerTick)
+		case "q", "esc":
+			m.quitting = true
+			return m, tea.Quit
+		}
+		return m, nil
 	case screenConfirmDown:
 		switch msg.String() {
 		case "y", "Y":
@@ -437,11 +635,38 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case screenAuth:
-		// any key returns to main (auth happens in browser/phone)
-		m.screen = screenMain
-		m.authURL = ""
-		m.authQR = ""
-		return m, fetchStatus
+		switch msg.String() {
+		case "o", "O":
+			// open the auth URL in the default browser
+			if m.authURL != "" {
+				return m, func() tea.Msg { return openAuthURL(m.authURL) }
+			}
+			return m, nil
+		case "u", "U":
+			// regenerate the auth URL (old one may have expired)
+			m.busy = true
+			m.busyMsg = "requesting login link..."
+			return m, tea.Batch(
+				func() tea.Msg {
+					out, err := tailscaleUpCapture()
+					if err != nil {
+						return authMsg{"", "", err}
+					}
+					url := extractLoginURL(out)
+					if url == "" {
+						return authMsg{"", "", nil}
+					}
+					return authMsg{url, renderQR(url), nil}
+				},
+				spinnerTick,
+			)
+		default:
+			// any other key returns to main (auth happens in browser/phone)
+			m.screen = screenMain
+			m.authURL = ""
+			m.authQR = ""
+			return m, fetchStatus
+		}
 
 	case screenTaildrop:
 		return m.handleTaildropKey(msg)
@@ -475,18 +700,23 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "u":
 		// tailscale up with QR code auth flow
-		return m, func() tea.Msg {
-			out, err := tailscaleUpCapture()
-			if err != nil {
-				return authMsg{"", "", err}
-			}
-			url := extractLoginURL(out)
-			if url == "" {
-				// no URL = already authenticated
-				return authMsg{"", "", nil}
-			}
-			return authMsg{url, renderQR(url), nil}
-		}
+		m.busy = true
+		m.busyMsg = "requesting login link..."
+		return m, tea.Batch(
+			func() tea.Msg {
+				out, err := tailscaleUpCapture()
+				if err != nil {
+					return authMsg{"", "", err}
+				}
+				url := extractLoginURL(out)
+				if url == "" {
+					// no URL = already authenticated
+					return authMsg{"", "", nil}
+				}
+				return authMsg{url, renderQR(url), nil}
+			},
+			spinnerTick,
+			)
 
 	case "d":
 		// confirm before disconnecting
@@ -660,6 +890,10 @@ func (m model) View() string {
 	b.WriteString(header + "\n")
 	b.WriteString(theme.Divider(frameWidth) + "\n")
 
+	// busy spinner overlays the content area
+	if m.busy {
+		b.WriteString("\n\n  " + m.spinner() + "  " + theme.Dimmed.Render(m.busyMsg) + "\n")
+	} else {
 	switch m.screen {
 	case screenMain, screenConfirmDown:
 		if !m.status.LoggedIn {
@@ -675,6 +909,11 @@ func (m model) View() string {
 		b.WriteString(m.renderTaildrop())
 	case screenTaildropInbox:
 		b.WriteString(m.renderInbox())
+	case screenNotInstalled:
+		b.WriteString(m.renderNotInstalled())
+	case screenDaemonDown:
+		b.WriteString(m.renderDaemonDown())
+	}
 	}
 
 	// message line (fixed slot so footer never shifts)
@@ -696,9 +935,15 @@ func (m model) View() string {
 }
 
 func (m model) footer() string {
+	if m.busy {
+		return theme.Footer(false, [2]string{"please wait", ""})
+	}
 	switch m.screen {
 	case screenAuth:
-		return theme.Footer(true, [2]string{"any key", "done"})
+		return theme.Footer(true,
+			[2]string{"o", "open in browser"},
+			[2]string{"u", "new link"},
+			[2]string{"esc", "back"})
 	case screenTaildrop:
 		if m.tdStep == 0 {
 			return theme.Footer(true,
@@ -716,6 +961,14 @@ func (m model) footer() string {
 			[2]string{"n", "cancel"})
 	case screenTaildropInbox:
 		return theme.Footer(true, [2]string{"esc", "back"})
+	case screenNotInstalled:
+		return theme.Footer(true,
+			[2]string{"i", "install tailscale"},
+		[2]string{"q", "quit"})
+	case screenDaemonDown:
+		return theme.Footer(true,
+			[2]string{"s", "retry start"},
+			[2]string{"q", "quit"})
 	default:
 		// Grouped footer: navigate | connection | peer actions | system.
 		// Width-aware: single line when wide enough, two lines when narrow
@@ -842,7 +1095,10 @@ func (m model) renderAuth() string {
 	b.WriteString("\n")
 	b.WriteString("  " + theme.Dimmed.Render("or visit:") + "\n")
 	cyan := lipgloss.NewStyle().Foreground(theme.Cyan)
-	b.WriteString("  " + cyan.Render(m.authURL) + "\n")
+	b.WriteString("  " + cyan.Render(m.authURL) + "\n\n")
+	b.WriteString("  " + theme.Dimmed.Render("press ") + theme.Selected.Render("o") +
+		theme.Dimmed.Render(" to open in browser") + "\n")
+	b.WriteString("  " + theme.Dimmed.Render("waiting for authentication — this screen updates automatically") + "\n")
 	return b.String()
 }
 
@@ -898,14 +1154,42 @@ func (m model) renderInbox() string {
 	return b.String()
 }
 
+// spinner returns the current spinner frame.
+func (m model) spinner() string {
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	cyan := lipgloss.NewStyle().Foreground(theme.Cyan)
+	return cyan.Render(frames[m.spinnerTick%len(frames)])
+}
+
+func (m model) renderNotInstalled() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("TAILSCALE NOT INSTALLED") + "\n\n")
+	b.WriteString("  " + theme.Dimmed.Render("navi-tailscale needs the tailscale client to") + "\n")
+	b.WriteString("  " + theme.Dimmed.Render("manage your tailnet.") + "\n\n")
+	b.WriteString("  press " + theme.Selected.Render("i") + " to install it now,\n")
+	b.WriteString("  or run " + theme.Dimmed.Render("navi-extras --install tailscale") + "\n")
+	b.WriteString("  in a terminal.\n")
+	return b.String()
+}
+
+func (m model) renderDaemonDown() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("TAILSCALED NOT RUNNING") + "\n\n")
+	if m.err != "" {
+		b.WriteString("  " + theme.Error.Render(m.err) + "\n\n")
+	}
+	b.WriteString("  " + theme.Dimmed.Render("the tailscale daemon isn't running.") + "\n\n")
+	b.WriteString("  press " + theme.Selected.Render("s") + " to start it.\n")
+	return b.String()
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────
 
 func main() {
-	// needs tailscale on PATH
-	if _, err := exec.LookPath("tailscale"); err != nil {
-		fmt.Fprintln(os.Stderr, "tailscale not found — install it with: navi-extras --install tailscale")
-		os.Exit(1)
-	}
+	// no hard exit if tailscale is missing — the TUI handles it with
+	// an install screen instead (stderr goes nowhere from a panel launcher)
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
