@@ -247,6 +247,34 @@ func setExitNode(peer string) error {
 	return cmd.Run()
 }
 
+// selectedPeer returns the peer under the cursor in the filtered list,
+// or nil if none.
+func (m model) selectedPeer() *Peer {
+	peers := m.filteredPeers()
+	if m.cursor >= 0 && m.cursor < len(peers) {
+		return &peers[m.cursor]
+	}
+	return nil
+}
+
+// filteredPeers returns peers matching the current filter (case-insensitive
+// substring on name, IP, or OS). Empty filter returns all peers.
+func (m model) filteredPeers() []Peer {
+	if m.filter == "" {
+		return m.status.Peers
+	}
+	f := strings.ToLower(m.filter)
+	var out []Peer
+	for _, p := range m.status.Peers {
+		if strings.Contains(strings.ToLower(p.Name), f) ||
+			strings.Contains(strings.ToLower(p.IP), f) ||
+			strings.Contains(strings.ToLower(p.OS), f) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // currentExitNode parses `tailscale status --json` for the active exit node.
 func currentExitNode() string {
 	out, err := exec.Command("tailscale", "status", "--json").Output()
@@ -372,6 +400,8 @@ const (
 	screenTaildropInbox
 	screenNotInstalled
 	screenDaemonDown
+	screenExitNode
+	screenPeerDetail
 )
 
 type model struct {
@@ -391,6 +421,11 @@ type model struct {
 	busy        bool   // async operation in progress (spinner)
 	busyMsg     string // what the spinner is doing
 	spinnerTick int
+	// peer filter
+	filtering bool
+	filter    string
+	// exit node picker
+	exitCursor int
 	// taildrop
 	tdFiles    []string
 	tdCursor   int
@@ -407,7 +442,7 @@ type statusMsg struct {
 }
 
 type pingMsg struct {
-	idx     int
+	name    string
 	latency string
 	err     error
 }
@@ -484,9 +519,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case pingMsg:
-		if msg.err == nil && msg.idx < len(m.status.Peers) {
-			m.status.Peers[msg.idx].Latency = msg.latency
-			m.setMsg(fmt.Sprintf("ping %s: %s", m.status.Peers[msg.idx].Name, msg.latency))
+		if msg.err == nil {
+			for i := range m.status.Peers {
+				if m.status.Peers[i].Name == msg.name {
+					m.status.Peers[i].Latency = msg.latency
+					break
+				}
+			}
+			m.setMsg(fmt.Sprintf("ping %s: %s", msg.name, msg.latency))
 		} else {
 			m.setMsg("ping failed")
 		}
@@ -615,10 +655,87 @@ func (m *model) setMsg(s string) {
 	m.msgAt = time.Now()
 }
 
+// exitNodeChoices returns exit-capable peers plus a "none" option.
+func (m model) exitNodeChoices() []Peer {
+	var out []Peer
+	for _, p := range m.status.Peers {
+		if p.IsExit {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func (m model) handleExitNodeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	choices := m.exitNodeChoices()
+	// +1 for the "none" option
+	total := len(choices) + 1
+	switch msg.String() {
+	case "esc", "q":
+		m.screen = screenMain
+		return m, nil
+	case "up", "k":
+		if m.exitCursor > 0 {
+			m.exitCursor--
+		}
+		return m, nil
+	case "down", "j":
+		if m.exitCursor < total-1 {
+			m.exitCursor++
+		}
+		return m, nil
+	case "enter":
+		m.screen = screenMain
+		if m.exitCursor == len(choices) {
+			// "none" selected — clear exit node
+			return m, func() tea.Msg {
+				if err := setExitNode(""); err != nil {
+					return actionDoneMsg{"", err}
+				}
+				return actionDoneMsg{"exit node cleared", nil}
+			}
+		}
+		peerName := choices[m.exitCursor].Name
+		return m, func() tea.Msg {
+			if err := setExitNode(peerName); err != nil {
+				return actionDoneMsg{"", err}
+			}
+			return actionDoneMsg{"exit node: " + peerName, nil}
+		}
+	}
+	return m, nil
+}
+
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// busy operations swallow keys (except ctrl+c)
 	if m.busy && msg.String() != "ctrl+c" {
 		return m, nil
+	}
+	// filter input mode swallows all keys
+	if m.filtering {
+		switch msg.String() {
+		case "esc":
+			m.filtering = false
+			m.filter = ""
+			m.cursor = 0
+			return m, nil
+		case "enter":
+			m.filtering = false
+			m.cursor = 0
+			return m, nil
+		case "backspace":
+			if len(m.filter) > 0 {
+				m.filter = m.filter[:len(m.filter)-1]
+				m.cursor = 0
+			}
+			return m, nil
+		default:
+			if len(msg.String()) == 1 {
+				m.filter += msg.String()
+				m.cursor = 0
+			}
+			return m, nil
+		}
 	}
 	switch m.screen {
 	case screenNotInstalled:
@@ -643,6 +760,14 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "q", "esc":
 			m.quitting = true
 			return m, tea.Quit
+		}
+		return m, nil
+	case screenExitNode:
+		return m.handleExitNodeKey(msg)
+	case screenPeerDetail:
+		if msg.String() == "esc" || msg.String() == "q" || msg.String() == "enter" {
+			m.screen = screenMain
+			return m, nil
 		}
 		return m, nil
 	case screenConfirmDown:
@@ -707,7 +832,8 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// main screen
-	n := len(m.status.Peers)
+	peers := m.filteredPeers()
+	n := len(peers)
 	switch msg.String() {
 	case "ctrl+c", "q", "esc":
 		m.quitting = true
@@ -721,6 +847,19 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor < n-1 {
 			m.cursor++
 		}
+
+	case "/":
+		// peer filter
+		m.filtering = true
+		m.filter = ""
+		return m, nil
+
+	case "enter":
+		// peer details
+		if m.cursor < n {
+			m.screen = screenPeerDetail
+		}
+		return m, nil
 
 	case "r":
 		return m, fetchStatus
@@ -755,19 +894,17 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "p":
 		// ping selected peer
-		if m.cursor < n {
-			idx := m.cursor
-			ip := m.status.Peers[idx].IP
+		if peer := m.selectedPeer(); peer != nil {
+			name, ip := peer.Name, peer.IP
 			return m, func() tea.Msg {
 				lat, err := tailscalePing(ip)
-				return pingMsg{idx, lat, err}
+				return pingMsg{name, lat, err}
 			}
 		}
 
 	case "s":
 		// ssh to selected peer (exits the TUI into ssh)
-		if m.cursor < n {
-			peer := m.status.Peers[m.cursor]
+		if peer := m.selectedPeer(); peer != nil {
 			if !peer.Online {
 				m.setMsg(peer.Name + " is offline")
 				return m, nil
@@ -777,39 +914,16 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "c", "y":
 		// copy IP — print to stdout for terminal copy
-		if m.cursor < n {
-			ip := m.status.Peers[m.cursor].IP
-			fmt.Printf("\n%s\n", ip)
+		if peer := m.selectedPeer(); peer != nil {
+			fmt.Printf("\n%s\n", peer.IP)
 			m.setMsg("IP printed below (select + copy)")
 		}
 
 	case "e":
-		// toggle exit node for selected peer
-		if m.cursor < n {
-			peer := m.status.Peers[m.cursor]
-			if !peer.IsExit {
-				m.setMsg(peer.Name + " is not an exit node")
-				return m, nil
-			}
-			peerName := peer.Name
-			return m, func() tea.Msg {
-				// toggle: if already using this exit node, clear it
-				// (we track locally; tailscale doesn't expose it cleanly)
-				if err := setExitNode(peerName); err != nil {
-					return actionDoneMsg{"", err}
-				}
-				return actionDoneMsg{"exit node: " + peerName, nil}
-			}
-		}
-
-	case "E":
-		// clear exit node
-		return m, func() tea.Msg {
-			if err := setExitNode(""); err != nil {
-				return actionDoneMsg{"", err}
-			}
-			return actionDoneMsg{"exit node cleared", nil}
-		}
+		// exit node picker
+		m.exitCursor = 0
+		m.screen = screenExitNode
+		return m, nil
 
 	case "t":
 		// taildrop: send a file
@@ -940,6 +1054,10 @@ func (m model) View() string {
 		b.WriteString(m.renderNotInstalled())
 	case screenDaemonDown:
 		b.WriteString(m.renderDaemonDown())
+	case screenExitNode:
+		b.WriteString(m.renderExitNodePicker())
+	case screenPeerDetail:
+		b.WriteString(m.renderPeerDetail())
 	}
 	}
 
@@ -996,6 +1114,13 @@ func (m model) footer() string {
 		return theme.Footer(true,
 			[2]string{"s", "retry start"},
 			[2]string{"q", "quit"})
+	case screenExitNode:
+		return theme.Footer(true,
+			[2]string{"↑↓", "select"},
+			[2]string{"enter", "use exit node"},
+			[2]string{"esc", "cancel"})
+	case screenPeerDetail:
+		return theme.Footer(true, [2]string{"esc", "back"})
 	default:
 		// Grouped footer: navigate | connection | peer actions | system.
 		// Width-aware: single line when wide enough, two lines when narrow
@@ -1012,6 +1137,8 @@ func (m model) footer() string {
 			[2]string{"i", "inbox"},
 			[2]string{"c", "copy IP"})
 		sys := theme.Footer(true,
+			[2]string{"/", "filter"},
+			[2]string{"enter", "details"},
 			[2]string{"r", "refresh"},
 			[2]string{"q", "quit"})
 		sep := theme.Dimmed.Render(" │ ")
@@ -1068,17 +1195,31 @@ func (m model) renderSelf() string {
 
 func (m model) renderPeers() string {
 	var b strings.Builder
-	n := len(m.status.Peers)
-	b.WriteString(fmt.Sprintf("  %s (%d)\n", theme.Dimmed.Render("peers"), n))
+	peers := m.filteredPeers()
+	n := len(peers)
+	total := len(m.status.Peers)
+	header := fmt.Sprintf("  %s (%d)", theme.Dimmed.Render("peers"), n)
+	if m.filter != "" {
+		header += "  " + theme.Selected.Render("filter: "+m.filter+" ▊")
+	} else if m.filtering {
+		header += "  " + theme.Selected.Render("filter: ▊")
+	} else if total > 5 {
+		header += "  " + theme.Dimmed.Render("(/ to filter)")
+	}
+	b.WriteString(header + "\n")
 	if n == 0 {
-		b.WriteString("  " + theme.Dimmed.Render("no other devices on this tailnet yet.") + "\n")
+		if m.filter != "" {
+			b.WriteString("  " + theme.Dimmed.Render("no peers match filter.") + "\n")
+		} else {
+			b.WriteString("  " + theme.Dimmed.Render("no other devices on this tailnet yet.") + "\n")
+		}
 		return b.String()
 	}
 	green := lipgloss.NewStyle().Foreground(theme.Green)
 	dimDot := lipgloss.NewStyle().Foreground(theme.Dim)
 	dim := theme.Dimmed
 	cyan := lipgloss.NewStyle().Foreground(theme.Cyan)
-	for i, p := range m.status.Peers {
+	for i, p := range peers {
 		cursor := "  "
 		nameStyle := lipgloss.NewStyle().Foreground(theme.White)
 		if i == m.cursor {
@@ -1178,6 +1319,88 @@ func (m model) renderInbox() string {
 	b.WriteString("\n")
 	b.WriteString("  " + theme.Header.Render("TAILDROP INBOX") + "\n\n")
 	b.WriteString("  " + theme.Dimmed.Render("pulling waiting files into ~/Downloads…") + "\n")
+	return b.String()
+}
+
+func (m model) renderExitNodePicker() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("EXIT NODE") + "\n\n")
+	b.WriteString("  " + theme.Dimmed.Render("route all traffic through:") + "\n\n")
+
+	choices := m.exitNodeChoices()
+	current := currentExitNode()
+
+	for i, p := range choices {
+		cursor := "  "
+		if i == m.exitCursor {
+			cursor = theme.Selected.Render("▸ ")
+		}
+		dot := theme.Dimmed.Render("○")
+		if p.Online {
+			dot = lipgloss.NewStyle().Foreground(theme.Green).Render("●")
+		}
+		line := fmt.Sprintf("%s%s %s  %s", cursor, dot, p.Name, theme.Dimmed.Render(p.IP))
+		if current == p.Name || current == p.IP {
+			line += "  " + lipgloss.NewStyle().Foreground(theme.Cyan).Render("(active)")
+		}
+		if !p.Online {
+			line += "  " + theme.Dimmed.Render("(offline)")
+		}
+		b.WriteString("  " + line + "\n")
+	}
+
+	// "none" option
+	cursor := "  "
+	if m.exitCursor == len(choices) {
+		cursor = theme.Selected.Render("▸ ")
+	}
+	noneLine := cursor + theme.Dimmed.Render("none (direct connection)")
+	if current == "" {
+		noneLine += "  " + lipgloss.NewStyle().Foreground(theme.Cyan).Render("(active)")
+	}
+	b.WriteString("  " + noneLine + "\n")
+
+	if len(choices) == 0 {
+		b.WriteString("\n  " + theme.Dimmed.Render("no exit nodes on this tailnet.") + "\n")
+	}
+	return b.String()
+}
+
+func (m model) renderPeerDetail() string {
+	var b strings.Builder
+	peer := m.selectedPeer()
+	if peer == nil {
+		return b.String()
+	}
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render(strings.ToUpper(peer.Name)) + "\n\n")
+
+	green := lipgloss.NewStyle().Foreground(theme.Green)
+	dimDot := lipgloss.NewStyle().Foreground(theme.Dim)
+	dot := dimDot.Render("○ offline")
+	if peer.Online {
+		dot = green.Render("● online")
+	}
+	b.WriteString("  " + dot + "\n\n")
+
+	row := func(label, val string) {
+		b.WriteString(fmt.Sprintf("  %-12s %s\n",
+			theme.Dimmed.Render(label), val))
+	}
+	row("IP", peer.IP)
+	if peer.OS != "" {
+		row("OS", peer.OS)
+	}
+	if peer.IsExit {
+		row("exit node", "yes")
+	}
+	if peer.Latency != "" {
+		row("latency", peer.Latency)
+	}
+	if peer.IsSelf {
+		row("this device", "yes")
+	}
 	return b.String()
 }
 
