@@ -861,6 +861,20 @@
     "icon": "📝"
   },
   {
+    "id": "web-linear",
+    "name": "Linear",
+    "summary": "Issue tracking and project planning, built for speed.",
+    "category": "Productivity",
+    "source": "webapp",
+    "package": "linear",
+    "url": "https://linear.app",
+    "install": "navi-webapp install linear",
+    "downloadUrl": "webapps/linear.desktop",
+    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Linear\nExec=navi-browser-run --force-dark-mode --app=https://linear.app\nComment=Issue tracking and project planning, built for speed.\nTerminal=false\nType=Application\nIcon=navi-linear\nStartupNotify=true\nCategories=Office;",
+    "homepage": "https://linear.app",
+    "icon": "📈"
+  },
+  {
     "id": "web-airtable",
     "name": "Airtable",
     "summary": "Spreadsheet-database hybrid for organizing anything.",
