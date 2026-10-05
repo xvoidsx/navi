@@ -53,6 +53,7 @@ navi-networking) DIMS="69x38" ;;
 navi-notifs) DIMS="68x29" ;;
 navi-power) DIMS="67x26" ;;
 navi-tailscale) DIMS="78x24" ;;  # estimate, tune as needed
+navi-imprint) DIMS="72x28" ;;  # estimate, tune as needed
 navi-reminders) DIMS="69x24" ;;
 navi-weather) DIMS="68x24" ;;
 wiredrop) DIMS="66x23" ;;
