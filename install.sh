@@ -1833,6 +1833,10 @@ setup_sddm() {
     /usr/share/wayland-sessions/navi.desktop
   $DOAS sed -i -e "s/^Name=.*/Name=navi $sver \"$sname\" (X11)/" \
     /usr/share/xsessions/navi.desktop
+  # stamp the theme footer too — Main.qml hardcodes a release string and
+  # would otherwise show a stale version on the login screen itself.
+  $DOAS sed -i -e "s/text: \"navi .*/text: \"navi $sver \\\\\"$sname\\\\\"\"/" \
+    /usr/share/sddm/themes/navi/Main.qml
   # auto-unlock the login keyring on SDDM login so Element, Signal,
   # Chromium etc. get encryption without a separate keyring password.
   # libpam-gnome-keyring must be installed (see PKGS above).
