@@ -138,47 +138,80 @@ func listDevices() ([]Device, error) {
 }
 
 // listISOs finds .iso files under common locations.
-func listISOs() []string {
-	var isos []string
-	seen := map[string]bool{}
-	dirs := []string{}
-	if h, err := os.UserHomeDir(); err == nil {
-		dirs = append(dirs,
-			filepath.Join(h, "Downloads"),
-			filepath.Join(h, "ISOs"),
-			filepath.Join(h, "iso"),
-			h,
-		)
+// listIsoDir reads a directory for the ISO browser: subdirectories first,
+// then .iso files, each sorted by name. Hidden entries are skipped.
+func listIsoDir(dir string) []isoEntry {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
 	}
-	dirs = append(dirs, "/tmp", "/opt/navi-iso")
-	for _, dir := range dirs {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
+	var dirs, isos []isoEntry
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			if !strings.HasSuffix(strings.ToLower(e.Name()), ".iso") {
-				continue
-			}
-			p := filepath.Join(dir, e.Name())
-			if !seen[p] {
-				seen[p] = true
-				isos = append(isos, p)
+		if e.IsDir() {
+			dirs = append(dirs, isoEntry{
+				path:  filepath.Join(dir, e.Name()),
+				name:  e.Name(),
+				isDir: true,
+			})
+			continue
+		}
+		if !strings.HasSuffix(strings.ToLower(e.Name()), ".iso") {
+			continue
+		}
+		isos = append(isos, isoEntry{
+			path: filepath.Join(dir, e.Name()),
+			name: e.Name(),
+		})
+	}
+	sort.Slice(dirs, func(i, j int) bool { return dirs[i].name < dirs[j].name })
+	sort.Slice(isos, func(i, j int) bool { return isos[i].name < isos[j].name })
+	return append(dirs, isos...)
+}
+
+// isoFiltered returns browser entries matching the live filter.
+func (m model) isoFiltered() []isoEntry {
+	if m.isoFilter == "" {
+		return m.isoEntries
+	}
+	var out []isoEntry
+	q := strings.ToLower(m.isoFilter)
+	for _, e := range m.isoEntries {
+		if strings.Contains(strings.ToLower(e.name), q) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// isoChdir moves the browser into dir and resets cursor/filter.
+func (m *model) isoChdir(dir string) {
+	m.isoDir = dir
+	m.isoEntries = listIsoDir(dir)
+	m.isoCursor = 0
+	m.isoFilter = ""
+	m.isoFiltering = false
+}
+
+// safeEject unmounts all partitions on the device and powers it off via
+// udisksctl, falling back to plain umount when udisksctl is unavailable.
+func safeEject(devPath string) error {
+	if out, err := exec.Command("lsblk", "-rn", "-o", "MOUNTPOINT", devPath).Output(); err == nil {
+		for _, mp := range strings.Fields(string(out)) {
+			if mp != "" {
+				exec.Command("umount", mp).Run()
 			}
 		}
 	}
-	sort.Slice(isos, func(i, j int) bool {
-		ai, _ := os.Stat(isos[i])
-		aj, _ := os.Stat(isos[j])
-		if ai == nil || aj == nil {
-			return isos[i] < isos[j]
+	if _, err := exec.LookPath("udisksctl"); err == nil {
+		if out, err := exec.Command("udisksctl", "power-off", "-b", devPath).CombinedOutput(); err != nil {
+			return fmt.Errorf("power-off failed: %s", strings.TrimSpace(string(out)))
 		}
-		return ai.ModTime().After(aj.ModTime())
-	})
-	return isos
+		return nil
+	}
+	return nil // umount above is the best we can do without udisksctl
 }
 
 // ── Flashing ─────────────────────────────────────────────────────────────
@@ -257,10 +290,19 @@ func flashISO(src, dst string, total int64, prog chan<- flashProgressMsg) error 
 
 // ── Model ────────────────────────────────────────────────────────────────
 
+type isoEntry struct {
+	path  string
+	name  string
+	isDir bool
+}
+
 type model struct {
 	screen   screen
-	isos     []string
-	isoCursor int
+	isoDir      string
+	isoEntries  []isoEntry
+	isoCursor   int
+	isoFilter   string
+	isoFiltering bool
 	devices  []Device
 	devCursor int
 	isoPath  string
@@ -279,18 +321,41 @@ type devicesMsg struct {
 	err  error
 }
 
+type ejectMsg struct {
+	err string
+}
+
 func initialModel() model {
-	return model{
-		screen: screenPickISO,
-		isos:   listISOs(),
+	m := model{screen: screenPickISO}
+	home, _ := os.UserHomeDir()
+	start := filepath.Join(home, "Downloads")
+	if _, err := os.Stat(start); err != nil {
+		start = home
 	}
+	if start == "" {
+		start = "/"
+	}
+	m.isoChdir(start)
+	return m
+}
+
+// tickMsg drives hotplug polling: the device list refreshes every few
+// seconds while the picker is open, so newly plugged drives appear
+// without a manual rescan.
+type tickMsg struct{}
+
+func tickCmd() tea.Cmd {
+	return tea.Tick(3*time.Second, func(time.Time) tea.Msg { return tickMsg{} })
 }
 
 func (m model) Init() tea.Cmd {
-	return func() tea.Msg {
-		devs, err := listDevices()
-		return devicesMsg{devs, err}
-	}
+	return tea.Batch(
+		func() tea.Msg {
+			devs, err := listDevices()
+			return devicesMsg{devs, err}
+		},
+		tickCmd(),
+	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -303,8 +368,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err.Error()
 		} else {
 			m.devices = msg.devs
+			// keep cursor in range if the list shrank
+			if m.devCursor >= len(m.devices) && len(m.devices) > 0 {
+				m.devCursor = len(m.devices) - 1
+			}
 		}
 		return m, nil
+
+	case ejectMsg:
+		if msg.err != "" {
+			m.err = "eject: " + msg.err
+		} else {
+			m.doneErr = ""
+			m.err = ""
+		}
+		m.quitting = true
+		return m, tea.Quit
+
+	case tickMsg:
+		// hotplug poll: refresh devices in the background, keep ticking
+		if m.screen == screenPickDevice {
+			return m, tea.Batch(
+				tickCmd(),
+				func() tea.Msg {
+					devs, err := listDevices()
+					return devicesMsg{devs, err}
+				},
+			)
+		}
+		return m, tickCmd()
 
 	case flashProgressMsg:
 		if msg.total > 0 {
@@ -348,6 +440,30 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch m.screen {
 	case screenPickISO:
+		entries := m.isoFiltered()
+		if m.isoFiltering {
+			switch k {
+			case "esc":
+				m.isoFiltering = false
+				m.isoFilter = ""
+				m.isoCursor = 0
+			case "backspace":
+				if len(m.isoFilter) > 0 {
+					m.isoFilter = m.isoFilter[:len(m.isoFilter)-1]
+					m.isoCursor = 0
+				} else {
+					m.isoFiltering = false
+				}
+			case "enter":
+				m.isoFiltering = false
+			default:
+				if len(k) == 1 {
+					m.isoFilter += k
+					m.isoCursor = 0
+				}
+			}
+			return m, nil
+		}
 		switch k {
 		case "q", "esc":
 			m.quitting = true
@@ -357,18 +473,34 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.isoCursor--
 			}
 		case "down", "j":
-			if m.isoCursor < len(m.isos)-1 {
+			if m.isoCursor < len(entries)-1 {
 				m.isoCursor++
 			}
-		case "enter":
-			if len(m.isos) == 0 {
-				return m, nil
+		case "enter", "l":
+			if len(entries) > 0 && m.isoCursor < len(entries) {
+				e := entries[m.isoCursor]
+				if e.isDir {
+					m.isoChdir(e.path)
+				} else {
+					m.isoPath = e.path
+					if fi, err := os.Stat(m.isoPath); err == nil {
+						m.isoSize = fi.Size()
+					}
+					m.screen = screenPickDevice
+				}
 			}
-			m.isoPath = m.isos[m.isoCursor]
-			if fi, err := os.Stat(m.isoPath); err == nil {
-				m.isoSize = fi.Size()
+		case "h", "backspace":
+			parent := filepath.Dir(m.isoDir)
+			if parent != m.isoDir {
+				m.isoChdir(parent)
 			}
-			m.screen = screenPickDevice
+		case "/":
+			m.isoFiltering = true
+			m.isoFilter = ""
+		case "~":
+			if home, err := os.UserHomeDir(); err == nil {
+				m.isoChdir(home)
+			}
 		}
 
 	case screenPickDevice:
@@ -423,9 +555,19 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case screenDone:
-		if k == "q" || k == "esc" || k == "enter" {
+		switch k {
+		case "q", "esc", "enter":
 			m.quitting = true
 			return m, tea.Quit
+		case "e":
+			// safe eject, then quit
+			dev := m.device.Path
+			return m, func() tea.Msg {
+				if err := safeEject(dev); err != nil {
+					return ejectMsg{err.Error()}
+				}
+				return ejectMsg{""}
+			}
 		}
 	}
 	return m, nil
@@ -493,7 +635,8 @@ func (m model) footer() string {
 	case screenPickISO:
 		return theme.Footer(true,
 			[2]string{"↑↓", "select"},
-			[2]string{"enter", "choose"},
+			[2]string{"enter/l", "open"},
+			[2]string{"/", "filter"},
 			[2]string{"q", "quit"})
 	case screenPickDevice:
 		return theme.Footer(true,
@@ -508,7 +651,9 @@ func (m model) footer() string {
 	case screenFlashing:
 		return theme.Footer(false, [2]string{"", "writing — do not remove the device…"})
 	case screenDone:
-		return theme.Footer(true, [2]string{"enter", "done"})
+		return theme.Footer(true,
+			[2]string{"e", "eject & done"},
+			[2]string{"enter", "done"})
 	}
 	return ""
 }
@@ -516,25 +661,40 @@ func (m model) footer() string {
 func (m model) viewPickISO() string {
 	var b strings.Builder
 	b.WriteString("  " + theme.Header.Render("SELECT IMAGE") + "\n")
-	if len(m.isos) == 0 {
-		b.WriteString("  " + theme.Dimmed.Render("no .iso files found in ~/Downloads, ~/ISOs, /tmp") + "\n")
+	entries := m.isoFiltered()
+	dir := m.isoDir
+	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(dir, home) {
+		dir = "~" + dir[len(home):]
+	}
+	b.WriteString("  " + theme.Dimmed.Render("browse: ") + theme.Selected.Render(dir) + "\n")
+	if m.isoFiltering || m.isoFilter != "" {
+		b.WriteString("  " + theme.Dimmed.Render("filter: /" + m.isoFilter + "_") + "\n")
+	}
+	if len(entries) == 0 {
+		b.WriteString("  " + theme.Dimmed.Render("no .iso files here") + "\n")
 		return b.String()
 	}
-	for i, p := range m.isos {
+	dirStyle := lipgloss.NewStyle().Foreground(theme.Cyan)
+	for i, e := range entries {
 		cursor := "  "
+		name := e.name
 		nameStyle := lipgloss.NewStyle().Foreground(theme.White)
+		if e.isDir {
+			name += "/"
+			nameStyle = dirStyle
+		}
 		if i == m.isoCursor {
 			cursor = theme.Selected.Render("▸ ")
 			nameStyle = nameStyle.Bold(true)
 		}
-		base := filepath.Base(p)
 		var size string
-		if fi, err := os.Stat(p); err == nil {
-			size = "  " + theme.Dimmed.Render(formatBytes(fi.Size()))
+		if !e.isDir {
+			if fi, err := os.Stat(e.path); err == nil {
+				size = "  " + theme.Dimmed.Render(formatBytes(fi.Size()))
+			}
 		}
 		b.WriteString(fmt.Sprintf("%s%s%s\n", cursor,
-			nameStyle.Render(base), size))
-		b.WriteString("    " + theme.Dimmed.Render(p) + "\n")
+			nameStyle.Render(name), size))
 	}
 	return b.String()
 }
@@ -549,7 +709,7 @@ func (m model) viewPickDevice() string {
 	}
 	if len(m.devices) == 0 {
 		b.WriteString("  " + theme.Dimmed.Render("no removable USB/SD devices found.") + "\n")
-		b.WriteString("  " + theme.Dimmed.Render("plug one in and press r to rescan.") + "\n")
+		b.WriteString("  " + theme.Dimmed.Render("plug one in — the list refreshes automatically.") + "\n")
 		return b.String()
 	}
 	green := lipgloss.NewStyle().Foreground(theme.Green)
@@ -619,7 +779,7 @@ func (m model) viewDone() string {
 		green := lipgloss.NewStyle().Foreground(theme.Green).Bold(true)
 		b.WriteString("  " + green.Render("✓ "+m.device.Path+" is ready") + "\n\n")
 		b.WriteString("  " + theme.Dimmed.Render(
-			"safe to remove — the image was synced to the device.") + "\n")
+			"press e to safely eject, or enter to finish.") + "\n")
 	}
 	b.WriteString("\n")
 	return b.String()
