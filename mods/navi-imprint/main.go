@@ -161,9 +161,15 @@ func listIsoDir(dir string) []isoEntry {
 		if !strings.HasSuffix(strings.ToLower(e.Name()), ".iso") {
 			continue
 		}
+		p := filepath.Join(dir, e.Name())
+		var sz int64 = -1
+		if fi, err := e.Info(); err == nil {
+			sz = fi.Size()
+		}
 		isos = append(isos, isoEntry{
-			path: filepath.Join(dir, e.Name()),
+			path: p,
 			name: e.Name(),
+			size: sz,
 		})
 	}
 	sort.Slice(dirs, func(i, j int) bool { return dirs[i].name < dirs[j].name })
@@ -294,6 +300,7 @@ type isoEntry struct {
 	path  string
 	name  string
 	isDir bool
+	size  int64 // cached at list time; -1 = unknown
 }
 
 type model struct {
@@ -328,14 +335,10 @@ type ejectMsg struct {
 func initialModel() model {
 	m := model{screen: screenPickISO}
 	home, _ := os.UserHomeDir()
-	start := filepath.Join(home, "Downloads")
-	if _, err := os.Stat(start); err != nil {
-		start = home
+	if home == "" {
+		home = "/"
 	}
-	if start == "" {
-		start = "/"
-	}
-	m.isoChdir(start)
+	m.isoChdir(home)
 	return m
 }
 
@@ -688,10 +691,8 @@ func (m model) viewPickISO() string {
 			nameStyle = nameStyle.Bold(true)
 		}
 		var size string
-		if !e.isDir {
-			if fi, err := os.Stat(e.path); err == nil {
-				size = "  " + theme.Dimmed.Render(formatBytes(fi.Size()))
-			}
+		if !e.isDir && e.size >= 0 {
+			size = "  " + theme.Dimmed.Render(formatBytes(e.size))
 		}
 		b.WriteString(fmt.Sprintf("%s%s%s\n", cursor,
 			nameStyle.Render(name), size))
