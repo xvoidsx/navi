@@ -356,7 +356,7 @@ type harness struct {
 
 var knownHarnesses = []struct{ bin, hint string }{
 	{"opencode", "ships with navi"},
-	{"wisp", "ships with navi — xvoidsx's opencode fork"},
+	{"wisp", "ships with navi"},
 	{"omp", "ships with navi"},
 	{"goose", "ships with navi"},
 	{"hermes", "ships with navi — default agent (Lain)"},
@@ -402,9 +402,17 @@ func writeDefaultAgent(bin string) error {
 
 func pollHarnesses() []harness {
 	var out []harness
+	home, _ := os.UserHomeDir()
 	for _, h := range knownHarnesses {
 		_, err := exec.LookPath(h.bin)
-		out = append(out, harness{Bin: h.bin, Installed: err == nil, Hint: h.hint})
+		installed := err == nil
+		// wisp installs to ~/.wisp/bin which may not be in PATH for GUI launches
+		if !installed && h.bin == "wisp" {
+			if _, serr := os.Stat(filepath.Join(home, ".wisp", "bin", "wisp")); serr == nil {
+				installed = true
+			}
+		}
+		out = append(out, harness{Bin: h.bin, Installed: installed, Hint: h.hint})
 	}
 	return out
 }
