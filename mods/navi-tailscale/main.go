@@ -194,23 +194,25 @@ func spinnerTick() tea.Msg {
 
 // tailscaleUpCapture runs `tailscale up` and returns combined output so we
 // can extract the login URL for the QR code.
+//
+// Note: we deliberately do NOT retry with doas here. doas needs an interactive
+// password prompt, which cannot work from inside the alt-screen TUI (stdin is
+// detached, the prompt never renders). If `tailscale up` needs elevation, we
+// surface that clearly and let the user run it in a real terminal.
 func tailscaleUpCapture() (string, error) {
 	cmd := exec.Command("tailscale", "up")
 	cmd.Stdin = nil
 	out, err := cmd.CombinedOutput()
-	if err == nil {
-		return string(out), nil
-	}
-	lower := strings.ToLower(string(out))
-	if strings.Contains(lower, "permission") ||
+	return string(out), err
+}
+
+// needsElevation reports whether tailscale up output looks like a privilege issue.
+func needsElevation(output string) bool {
+	lower := strings.ToLower(output)
+	return strings.Contains(lower, "permission") ||
 		strings.Contains(lower, "access denied") ||
 		strings.Contains(lower, "must be root") ||
-		strings.Contains(lower, "operation not permitted") {
-		cmd = exec.Command("doas", "tailscale", "up")
-		cmd.Stdin = nil
-		out, err = cmd.CombinedOutput()
-	}
-	return string(out), err
+		strings.Contains(lower, "operation not permitted")
 }
 
 // extractLoginURL finds the tailscale login URL in `tailscale up` output.
@@ -502,15 +504,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case authMsg:
 		m.busy = false
 		if msg.err != nil {
-			errText := msg.err.Error()
-			if strings.TrimSpace(msg.output) != "" {
-				lines := strings.Split(strings.TrimSpace(msg.output), "\n")
-				errText = lines[0]
-				if len(errText) > 80 {
-					errText = errText[:80] + "..."
+			if needsElevation(msg.output) {
+				m.setMsg("tailscale up needs root - run `doas tailscale up` in a terminal, then press r")
+			} else {
+				errText := msg.err.Error()
+				if strings.TrimSpace(msg.output) != "" {
+					lines := strings.Split(strings.TrimSpace(msg.output), "\n")
+					errText = lines[0]
+					if len(errText) > 80 {
+						errText = errText[:80] + "..."
+					}
 				}
+				m.setMsg("auth failed: " + errText)
 			}
-			m.setMsg("auth failed: " + errText)
 			m.screen = screenMain
 		} else if msg.url != "" {
 			m.authURL = msg.url
