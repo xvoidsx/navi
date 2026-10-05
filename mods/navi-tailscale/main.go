@@ -505,7 +505,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.busy = false
 		if msg.err != nil {
 			if needsElevation(msg.output) {
-				m.setMsg("tailscale up needs root - run `doas tailscale up` in a terminal, then press r")
+				m.setMsg("need operator rights - run `doas tailscale set --operator=$USER` once, then press r")
 			} else {
 				errText := msg.err.Error()
 				if strings.TrimSpace(msg.output) != "" {
