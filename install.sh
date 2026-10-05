@@ -391,17 +391,27 @@ setup_agents() {
   # wisp (xvoidsx/wisp — navi's own coding agent, opencode fork with
   # nightshadeNeon theme, Ollama-first, herdr integration). Installs from
   # the GitHub releases via the install.sh script.
-  if [ -x /usr/bin/wisp ]; then
-    ok "wisp already in /usr/bin"
-  elif ! host_up https://raw.githubusercontent.com/xvoidsx/wisp/dev/install.sh; then
-    warn "wisp installer unreachable — skipping wisp (re-run install.sh --yes later)"
+  # wisp lives in ~/.wisp/bin (user install) or /usr/bin (system install).
+  # Check both, and always try to update — the installer is idempotent and
+  # fetches the latest release. The old "[ -x /usr/bin/wisp ] → skip" logic
+  # meant navi-update never picked up new wisp releases.
+  local wisp_bin=""
+  for cand in "$HOME/.wisp/bin/wisp" /usr/bin/wisp; do
+    if [ -x "$cand" ]; then wisp_bin="$cand"; break; fi
+  done
+  if ! host_up https://raw.githubusercontent.com/xvoidsx/wisp/dev/install.sh; then
+    if [ -n "$wisp_bin" ]; then
+      ok "wisp already installed ($wisp_bin) — installer unreachable, keeping current"
+    else
+      warn "wisp installer unreachable — skipping wisp (re-run install.sh --yes later)"
+    fi
   else
-    info "installing wisp..."
+    info "installing/updating wisp..."
     local wisptmp
     wisptmp="$(mktemp)"
     if fetch https://raw.githubusercontent.com/xvoidsx/wisp/dev/install.sh -o "$wisptmp" \
         && $DOAS setsid timeout -k 30 300 bash "$wisptmp" </dev/null; then
-      ok "wisp -> /usr/bin/wisp"
+      ok "wisp installed/updated"
     else
       warn "wisp install failed — skipping (re-run install.sh --yes later)"
     fi
