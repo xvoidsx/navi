@@ -47,3 +47,7 @@ fastfetch "${LOGO_ARGS[@]}" --logo "$SETTLE" "$@"
 
 printf '\e[?25h'  # cursor back on
 trap - EXIT INT TERM
+
+# stay open until a keypress — this is a display, not a one-shot
+printf '\n  %s\n' "$(tput dim 2>/dev/null)press any key to close$(tput sgr0 2>/dev/null)"
+read -rsn1
