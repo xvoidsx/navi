@@ -38,8 +38,8 @@ var frameWidth = 62
 type screen int
 
 const (
-	screenPickISO screen = iota
-	screenPickDevice
+	screenPickDevice screen = iota
+	screenPickISO
 	screenConfirm
 	screenFlashing
 	screenDone
@@ -333,7 +333,7 @@ type ejectMsg struct {
 }
 
 func initialModel() model {
-	m := model{screen: screenPickISO}
+	m := model{screen: screenPickDevice}
 	home, _ := os.UserHomeDir()
 	if home == "" {
 		home = "/"
@@ -444,6 +444,10 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case screenPickISO:
 		entries := m.isoFiltered()
+		if k == "q" {
+			m.quitting = true
+			return m, tea.Quit
+		}
 		if m.isoFiltering {
 			switch k {
 			case "esc":
@@ -468,9 +472,9 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		switch k {
-		case "q", "esc":
-			m.quitting = true
-			return m, tea.Quit
+		case "esc":
+			m.screen = screenPickDevice
+			return m, nil
 		case "up", "k":
 			if m.isoCursor > 0 {
 				m.isoCursor--
@@ -486,9 +490,7 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.isoChdir(e.path)
 				} else {
 					m.isoPath = e.path
-					if fi, err := os.Stat(m.isoPath); err == nil {
-						m.isoSize = fi.Size()
-					}
+					m.isoSize = e.size
 					m.screen = screenPickDevice
 				}
 			}
@@ -508,7 +510,10 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case screenPickDevice:
 		switch k {
-		case "q", "esc", "backspace":
+		case "q", "esc":
+			m.quitting = true
+			return m, tea.Quit
+		case "o":
 			m.screen = screenPickISO
 			return m, nil
 		case "up", "k":
@@ -530,7 +535,12 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.device = m.devices[m.devCursor]
 			m.confirmInput = ""
-			m.screen = screenConfirm
+			if m.isoPath == "" {
+				// no image yet — pick one first
+				m.screen = screenPickISO
+			} else {
+				m.screen = screenConfirm
+			}
 		}
 
 	case screenConfirm:
@@ -640,13 +650,13 @@ func (m model) footer() string {
 			[2]string{"↑↓", "select"},
 			[2]string{"enter/l", "open"},
 			[2]string{"/", "filter"},
-			[2]string{"q", "quit"})
+			[2]string{"esc", "back"})
 	case screenPickDevice:
 		return theme.Footer(true,
 			[2]string{"↑↓", "select"},
-			[2]string{"enter", "choose"},
-			[2]string{"r", "rescan"},
-			[2]string{"esc", "back"})
+			[2]string{"enter", "select disk"},
+			[2]string{"o", "select image"},
+			[2]string{"q", "quit"})
 	case screenConfirm:
 		return theme.Footer(true,
 			[2]string{"type device name", "confirm"},
@@ -702,8 +712,14 @@ func (m model) viewPickISO() string {
 
 func (m model) viewPickDevice() string {
 	var b strings.Builder
-	b.WriteString("  " + theme.Header.Render("SELECT TARGET DEVICE") + "\n")
-	b.WriteString("  " + theme.Dimmed.Render("image: "+filepath.Base(m.isoPath)) + "\n\n")
+	b.WriteString("  " + theme.Header.Render("∅ navi-imprint") + "\n")
+	b.WriteString("  " + theme.Dimmed.Render("Disks:") + "\n")
+	if m.isoPath != "" {
+		b.WriteString("  " + theme.Dimmed.Render("image: ") +
+			theme.Selected.Render(filepath.Base(m.isoPath)) + "\n\n")
+	} else {
+		b.WriteString("  " + theme.Dimmed.Render("image: (press o to select)") + "\n\n")
+	}
 	if m.err != "" {
 		b.WriteString("  " + theme.Error.Render(m.err) + "\n")
 		return b.String()
