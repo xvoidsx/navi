@@ -62,8 +62,7 @@
     // modules-right off the right edge of the screen. 50 chars keeps the
     // left section bounded no matter what's focused.
     "sway/window": {
-        "max-length": 50,
-        "tooltip": false
+        "max-length": 50
     },
 
     "clock#1": {
