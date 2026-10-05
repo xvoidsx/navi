@@ -31,7 +31,7 @@
         "battery",
         "backlight",
         "idle_inhibitor",
-        "power-profiles-daemon",
+        "custom/tailscale",
 	"custom/agent",
 	"custom/bell",
 	"tray",
@@ -134,6 +134,18 @@
         "on-scroll-down": "bluetoothctl power off",
         "tooltip": true
     },
+
+    // Tailscale — mesh VPN status. Script module: emits nothing when the
+    // tailscale binary is missing, so the pill hides itself on machines
+    // without it. Click opens navi-tailscale, right-click toggles up/down.
+    "custom/tailscale": {
+        "format": "{}",
+        "return-type": "json",
+        "interval": 10,
+        "exec": "/usr/share/navi/wired/waybar/tailscale-mod.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi tailscale\" navi-tailscale",
+        "on-click-right": "tailscale up || tailscale down"
+    },
     // - - - XXX testing section XXX - - -
     // this is a 'testing' network module. if it doesn't work out right, we'll remove it
     "network": {
@@ -209,17 +221,6 @@
 		"tooltip": true,
 		"tooltip-format": "Brightness control",
         "format-icons": ["", "", "", "", "", "", "", "", ""]
-    },
-    "power-profiles-daemon": {
-        "format": "{icon}",
-        "tooltip-format": "Power profile: {profile}\nDriver: {driver}",
-        "tooltip": true,
-        "format-icons": {
-            "default": "",
-            "performance": "",
-            "balanced": "",
-            "power-saver": ""
-        }
     },
     "custom/update": {
         "format": "{}",
