@@ -432,6 +432,19 @@ func disconnectNetwork(ctx context.Context, info ConnectionInfo) error {
 	return err
 }
 
+// terseValue extracts the value from an nmcli -t "FIELD:value" line,
+// handling indexed multi-value fields like "IP4.DNS[1]:1.1.1.1".
+// IPv6 addresses contain colons, so only the field prefix is stripped.
+func terseValue(line string) string {
+	if idx := strings.Index(line, "]:"); idx >= 0 {
+		return strings.TrimSpace(line[idx+2:])
+	}
+	if idx := strings.Index(line, ":"); idx >= 0 {
+		return strings.TrimSpace(line[idx+1:])
+	}
+	return strings.TrimSpace(line)
+}
+
 func activeConnection(ctx context.Context) (ConnectionInfo, error) {
 	out, err := runNmcli(ctx, "-t", "-f", "ACTIVE,SSID,DEVICE,SIGNAL,SECURITY,BSSID", "device", "wifi")
 	if err != nil {
@@ -467,19 +480,27 @@ func activeConnection(ctx context.Context) (ConnectionInfo, error) {
 
 		details, e := runNmcli(ctx, "-t", "-f", "IP4.ADDRESS,IP4.GATEWAY,IP4.DNS,IP6.DNS", "device", "show", info.Device)
 		if e == nil {
-			vals := strings.Split(strings.TrimSpace(string(details)), "\n")
-			if len(vals) > 0 {
-				info.IPv4 = vals[0]
+			// Terse output is one FIELD:value per line, but multi-value
+			// fields repeat: IP4.DNS[1]:1.1.1.1, IP4.DNS[2]:1.0.0.1.
+			// Parse by field prefix so extra servers don't shift the
+			// positions of the fields after them.
+			var dns4, dns6 []string
+			for _, line := range strings.Split(strings.TrimSpace(string(details)), "\n") {
+				switch {
+				case strings.HasPrefix(line, "IP4.ADDRESS"):
+					if info.IPv4 == "" {
+						info.IPv4 = terseValue(line)
+					}
+				case strings.HasPrefix(line, "IP4.GATEWAY:"):
+					info.Gateway = terseValue(line)
+				case strings.HasPrefix(line, "IP4.DNS["):
+					dns4 = append(dns4, terseValue(line))
+				case strings.HasPrefix(line, "IP6.DNS["):
+					dns6 = append(dns6, terseValue(line))
+				}
 			}
-			if len(vals) > 1 {
-				info.Gateway = vals[1]
-			}
-			if len(vals) > 2 {
-				info.DNSv4 = vals[2]
-			}
-			if len(vals) > 3 {
-				info.DNSv6 = vals[3]
-			}
+			info.DNSv4 = strings.Join(dns4, ", ")
+			info.DNSv6 = strings.Join(dns6, ", ")
 		}
 		return info, nil
 	}
