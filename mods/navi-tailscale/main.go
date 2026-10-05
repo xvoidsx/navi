@@ -198,6 +198,18 @@ func tailscaleUpCapture() (string, error) {
 	cmd := exec.Command("tailscale", "up")
 	cmd.Stdin = nil
 	out, err := cmd.CombinedOutput()
+	if err == nil {
+		return string(out), nil
+	}
+	lower := strings.ToLower(string(out))
+	if strings.Contains(lower, "permission") ||
+		strings.Contains(lower, "access denied") ||
+		strings.Contains(lower, "must be root") ||
+		strings.Contains(lower, "operation not permitted") {
+		cmd = exec.Command("doas", "tailscale", "up")
+		cmd.Stdin = nil
+		out, err = cmd.CombinedOutput()
+	}
 	return string(out), err
 }
 
@@ -404,9 +416,10 @@ type actionDoneMsg struct {
 }
 
 type authMsg struct {
-	url string
-	qr  string
-	err error
+	url    string
+	qr     string
+	err    error
+	output string
 }
 
 type taildropMsg struct {
@@ -489,7 +502,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case authMsg:
 		m.busy = false
 		if msg.err != nil {
-			m.setMsg("auth failed: " + msg.err.Error())
+			errText := msg.err.Error()
+			if strings.TrimSpace(msg.output) != "" {
+				lines := strings.Split(strings.TrimSpace(msg.output), "\n")
+				errText = lines[0]
+				if len(errText) > 80 {
+					errText = errText[:80] + "..."
+				}
+			}
+			m.setMsg("auth failed: " + errText)
 			m.screen = screenMain
 		} else if msg.url != "" {
 			m.authURL = msg.url
@@ -650,13 +671,13 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				func() tea.Msg {
 					out, err := tailscaleUpCapture()
 					if err != nil {
-						return authMsg{"", "", err}
+						return authMsg{"", "", err, out}
 					}
 					url := extractLoginURL(out)
 					if url == "" {
-						return authMsg{"", "", nil}
+						return authMsg{"", "", nil, ""}
 					}
-					return authMsg{url, renderQR(url), nil}
+					return authMsg{url, renderQR(url), nil, ""}
 				},
 				spinnerTick,
 			)
@@ -706,14 +727,14 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			func() tea.Msg {
 				out, err := tailscaleUpCapture()
 				if err != nil {
-					return authMsg{"", "", err}
+					return authMsg{"", "", err, out}
 				}
 				url := extractLoginURL(out)
 				if url == "" {
 					// no URL = already authenticated
-					return authMsg{"", "", nil}
+					return authMsg{"", "", nil, ""}
 				}
-				return authMsg{url, renderQR(url), nil}
+				return authMsg{url, renderQR(url), nil, ""}
 			},
 			spinnerTick,
 			)
