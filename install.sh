@@ -1735,19 +1735,29 @@ setup_element() {
 setup_tailscale() {
   step "tailscale (mesh VPN)"
   if command -v tailscale >/dev/null 2>&1; then
-    ok "tailscale already installed — skipping"
-    return 0
-  fi
-  local installer="$REPO_DIR/scripts/installers/tailscale-installer.sh"
-  [ -x "$installer" ] || installer="/usr/share/navi/installers/tailscale-installer.sh"
-  if [ ! -x "$installer" ]; then
-    warn "tailscale installer not found — skipping (later: navi-extras --install tailscale)"
-    return 0
-  fi
-  if bash "$installer"; then
-    ok "tailscale installed — run 'tailscale up' to join your tailnet"
+    ok "tailscale already installed"
   else
-    warn "tailscale installer failed — retry later with: navi-extras --install tailscale"
+    local installer="$REPO_DIR/scripts/installers/tailscale-installer.sh"
+    [ -x "$installer" ] || installer="/usr/share/navi/installers/tailscale-installer.sh"
+    if [ ! -x "$installer" ]; then
+      warn "tailscale installer not found — skipping (later: navi-extras --install tailscale)"
+      return 0
+    fi
+    if bash "$installer"; then
+      ok "tailscale installed — run 'tailscale up' to join your tailnet"
+    else
+      warn "tailscale installer failed — retry later with: navi-extras --install tailscale"
+      return 0
+    fi
+  fi
+  # let the user run tailscale commands without root: one-time operator grant
+  # so navi-tailscale (and `tailscale file get` for taildrop) just works.
+  # doas is used because `tailscale set` needs root; $USER is the real user
+  # here since install.sh doesn't run as root itself.
+  if doas tailscale set --operator="$USER" 2>/dev/null; then
+    ok "tailscale operator set to $USER — no root needed for tailscale commands"
+  else
+    warn "could not set tailscale operator — run: doas tailscale set --operator=\$USER"
   fi
 }
 
