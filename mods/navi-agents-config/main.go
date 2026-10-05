@@ -356,6 +356,7 @@ type harness struct {
 
 var knownHarnesses = []struct{ bin, hint string }{
 	{"opencode", "ships with navi"},
+	{"wisp", "ships with navi — xvoidsx's opencode fork"},
 	{"omp", "ships with navi"},
 	{"goose", "ships with navi"},
 	{"hermes", "ships with navi — default agent (Lain)"},
