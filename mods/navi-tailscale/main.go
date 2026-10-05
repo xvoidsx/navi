@@ -354,7 +354,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		return m, nil
+		return m, tea.ClearScreen
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -717,19 +717,28 @@ func (m model) footer() string {
 	case screenTaildropInbox:
 		return theme.Footer(true, [2]string{"esc", "back"})
 	default:
-		return theme.Footer(true,
-			[2]string{"↑↓", "navigate"},
+		// Grouped footer: navigate | connection | peer actions | system.
+		// Width-aware: single line when wide enough, two lines when narrow
+		// (instead of letting the terminal wrap it and ghost on resize).
+		nav := theme.Footer(true, [2]string{"↑↓", "navigate"})
+		conn := theme.Footer(true,
 			[2]string{"u", "up"},
-			[2]string{"d", "down"},
+			[2]string{"d", "down"})
+		actions := theme.Footer(true,
 			[2]string{"p", "ping"},
 			[2]string{"s", "ssh"},
 			[2]string{"e", "exit node"},
 			[2]string{"t", "taildrop"},
 			[2]string{"i", "inbox"},
-			[2]string{"c", "copy IP"},
+			[2]string{"c", "copy IP"})
+		sys := theme.Footer(true,
 			[2]string{"r", "refresh"},
-			[2]string{"q", "quit"},
-		)
+			[2]string{"q", "quit"})
+		sep := theme.Dimmed.Render(" │ ")
+		if m.width >= 110 {
+			return nav + sep + conn + sep + actions + sep + sys
+		}
+		return nav + sep + conn + sep + sys + "\n" + actions
 	}
 }
 
