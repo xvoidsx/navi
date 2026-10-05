@@ -90,6 +90,44 @@ var dnsPresets = []DNSPreset{
 	{Name: "Custom"},
 }
 
+// detectDNSPreset names the DNS provider currently in use, by matching the
+// live servers against the known presets. Returns the preset name, the raw
+// server list when it's a custom setup, or "ISP / Automatic" when the
+// servers look DHCP-assigned / unset.
+func detectDNSPreset(info ConnectionInfo) string {
+	servers := map[string]bool{}
+	for _, field := range []string{info.DNSv4, info.DNSv6} {
+		for _, s := range strings.FieldsFunc(field, func(r rune) bool {
+			return r == ',' || r == ' ' || r == '\n'
+		}) {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				servers[s] = true
+			}
+		}
+	}
+	if len(servers) == 0 {
+		return "ISP / Automatic"
+	}
+	for _, p := range dnsPresets {
+		if p.Automatic || p.Name == "Custom" {
+			continue
+		}
+		// Any preset IP present means that provider is in use — the user
+		// may have set only the primary.
+		for _, ip := range append(p.IPv4, p.IPv6...) {
+			if servers[ip] {
+				return p.Name
+			}
+		}
+	}
+	// Unknown servers — show the first one so it's still informative.
+	for s := range servers {
+		return s
+	}
+	return "ISP / Automatic"
+}
+
 // speedEntry is one completed speed test, persisted to
 // ~/.local/share/navi/navi-networking/speed-history.json (cap 50).
 type speedEntry struct {
@@ -2044,6 +2082,7 @@ func (m model) dashboardView() string {
 		b.WriteString(theme.Normal.Render("  Security  ") + m.info.Security + "\n")
 		b.WriteString(theme.Normal.Render("  Device    ") + m.info.Device + "\n")
 		b.WriteString(theme.Normal.Render("  BSSID     ") + theme.Grayed.Render(m.info.BSSID) + "\n")
+		b.WriteString(theme.Normal.Render("  DNS       ") + okStyle.Render("current DNS: "+detectDNSPreset(m.info)) + "\n")
 	}
 	// Error slot: always one line.
 	if m.err != nil {
@@ -2060,12 +2099,28 @@ func (m model) dnsView() string {
 	b.WriteString(theme.Header.Render("DNS"))
 	b.WriteString("\n\n")
 	b.WriteString(theme.Normal.Render("  Connection  ") + theme.Selected.Render(m.info.SSID) + "\n\n")
+	active := detectDNSPreset(m.info)
+	// A raw IP means a custom setup — light up the Custom row instead.
+	isPreset := false
+	for _, p := range dnsPresets {
+		if p.Name == active {
+			isPreset = true
+			break
+		}
+	}
+	if !isPreset {
+		active = "Custom"
+	}
 	for i, p := range dnsPresets {
 		cursor := "  "
 		if i == m.dnsCursor {
 			cursor = theme.Selected.Render("› ")
 		}
-		b.WriteString(cursor + p.Name + "\n")
+		line := p.Name
+		if p.Name == active {
+			line += " " + lipgloss.NewStyle().Foreground(theme.Cyan).Render("(active)")
+		}
+		b.WriteString(cursor + line + "\n")
 	}
 	// Loading slot: always one line.
 	if m.loading {
