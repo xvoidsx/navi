@@ -57,6 +57,15 @@
 		}
     },
 
+    // Cap the window title length: without this, a long title (browser tab,
+    // terminal with a deep path) grows modules-left unbounded and pushes
+    // modules-right off the right edge of the screen. 50 chars keeps the
+    // left section bounded no matter what's focused.
+    "sway/window": {
+        "max-length": 50,
+        "tooltip": false
+    },
+
     "clock#1": {
         "format": "{:%A}",
         "tooltip": false,
