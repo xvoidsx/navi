@@ -132,7 +132,7 @@ bindsym $mod+g exec --no-startup-id "swaymsg 'gaps inner all set 6; gaps outer a
 bindsym $mod+Shift+g exec --no-startup-id "swaymsg 'gaps inner all set 0; gaps outer all set 0' && notify-send 'wired helper' 'Gaps disabled.'"
 
 # navi launchers
-bindsym $mod+d exec dmenu_run -fn "NotoSans-10" -nb black -nf pink -sb green -sf red -p "nightshade - run command: "
+bindsym $mod+d exec navi-dmenu-run
 bindsym $mod+Shift+a exec --no-startup-id i3-dmenu-desktop --dmenu='dmenu -fn "NotoSans-10" -i -nb black -nf pink -sb green -sf red -p "nightshade - Applications List: "'
 bindsym $mod+Tab exec --no-startup-id "rofi -show combi -combi-modi window,drun,run"
 # Alt+Tab: thumbnail window switcher (single-flight; repeat = next tile).
