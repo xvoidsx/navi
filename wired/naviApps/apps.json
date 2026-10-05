@@ -1109,6 +1109,17 @@
     "icon": "⌨️"
   },
   {
+    "id": "agent-wisp",
+    "name": "Wisp",
+    "summary": "xvoidsx's navi-native coding harness — fork of opencode with nightshadeNeon theme, Ollama local by default, reads navi's agents.env.",
+    "category": "agents",
+    "source": "agent",
+    "package": "wisp",
+    "install": "curl -fsSL https://raw.githubusercontent.com/xvoidsx/wisp/dev/install.sh | bash",
+    "homepage": "https://github.com/xvoidsx/wisp",
+    "icon": "✦"
+  },
+  {
     "id": "agent-omp",
     "name": "OMP",
     "summary": "Pre-installed. Can Bölük's maximalist fork of pi — batteries included: 60+ providers, LSP/DAP, subagents, Rust core.",
