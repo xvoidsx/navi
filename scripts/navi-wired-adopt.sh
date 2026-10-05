@@ -156,7 +156,13 @@ maybe_reload_wm() {
   # the bar reads its config at startup — restart it so the new
   # modules and styles take effect immediately.
   restart_bar() {
-    if pgrep -x waybar >/dev/null 2>&1; then
+    if systemctl --user is-active --quiet waybar.service 2>/dev/null; then
+      # systemd owns the bar — restart via the service. A manual pkill+spawn
+      # races the unit's Restart=on-failure and yields two waybars.
+      systemctl --user restart waybar.service >/dev/null 2>&1 \
+        && ok "waybar restarted (systemd)" \
+        || warn "waybar service restart failed"
+    elif pgrep -x waybar >/dev/null 2>&1; then
       pkill -x waybar
       (waybar >/dev/null 2>&1 &)
       ok "waybar restarted"
