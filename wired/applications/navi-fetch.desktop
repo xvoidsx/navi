@@ -2,7 +2,7 @@
 Type=Application
 Name=navi-fetch
 Comment=System info with navi's animated shimmer emblem
-Exec=navi-fetch
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-fetch" navi-fetch
 Icon=utilities-system-monitor
 Categories=System;Utility;
 Terminal=true
