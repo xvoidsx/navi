@@ -89,6 +89,11 @@ window#waybar > box { background: transparent; }
 /* ----------------------------------------------------------------------------
  * Readout. No boxes — a terminal has none. Separators do the work of module
  * chrome, and the glyphs themselves are the interface.
+ *
+ * SPACING CONTRACT: every module gets the same margin/padding and the same
+ * 1px right separator. No per-module border-right:none exceptions — the only
+ * opt-out is #tray, which is structurally last. If a new module looks
+ * "off", check it against this contract before adding an override.
  * -------------------------------------------------------------------------- */
 #workspaces,
 #window,
@@ -198,7 +203,6 @@ window#waybar > box { background: transparent; }
 #window {
     color: rgba(57, 255, 20, 0.42);
     text-shadow: none;
-    border-right: none;
 }
 
 window#waybar.empty #window {
@@ -211,7 +215,9 @@ window#waybar.empty #window {
 #custom-weather {
     color: @phos-dim;
     font-size: 8px;
-    border-right: none;
+    /* keeps the standard separator: at 8px the glyphs run light, so the
+       separator is what anchors this module to its neighbours. */
+    padding: 2px 8px;
     text-shadow: 0 0 5px rgba(57, 255, 20, 0.35);
 }
 

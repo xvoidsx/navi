@@ -1,0 +1,218 @@
+/* ============================================================================
+ * GHOST
+ * ----------------------------------------------------------------------------
+ * The bar that isn't there. No background, no boxes, no separators, no glow
+ * stacks — just type floating over the wallpaper in nightshadeNeon hues,
+ * spaced wide enough to breathe. The anti-theme: everything the other five
+ * themes do with chrome, this one does with whitespace.
+ *
+ * The only motion is none. Zero animations, zero transitions beyond a soft
+ * hover fade. This is the cheapest theme in the set by construction — there
+ * is almost nothing to repaint.
+ *
+ * Workspaces are bare numerals. The active one goes pink; urgent goes red.
+ * Everything else sits in a quiet warm gray until it has something to say —
+ * volume, network, and battery speak in cyan, updates and the agent speak in
+ * pink, warnings speak in red. Silence is the default; color is the signal.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ * ========================================================================== */
+
+@define-color np #ff10f0;
+@define-color nc #00ffff;
+@define-color nr #ff3131;
+@define-color nw #f2f0ea;
+@define-color dim rgba(242, 240, 234, 0.45);
+@define-color faint rgba(242, 240, 234, 0.25);
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", monospace;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* Nothing. The wallpaper is the background. */
+window#waybar {
+    color: @nw;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Modules are type, not widgets. Wide padding is the only chrome.
+ *
+ * SPACING CONTRACT: every module gets the same padding and no separators,
+ * no backgrounds, no borders. If a new module looks "off", check it against
+ * this contract before adding an override.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#power-profiles-daemon,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 4px 2px;
+    padding: 2px 10px;
+    color: @dim;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+    transition: color 200ms ease-out;
+}
+
+/* Signature voices. The launcher and power key go pink; the clock stays
+   quiet white — time doesn't need to shout. */
+#custom-wired-launcher,
+#custom-power { color: @np; font-size: 12px; }
+
+#clock { color: @nw; }
+
+/* The working voices: volume and network in cyan. */
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth { color: @nc; }
+
+/* Battery at rest is quiet; it only raises its voice when worried. */
+#battery { color: @dim; }
+
+/* Workspaces: bare numerals, no boxes. */
+#workspaces button {
+    min-width: 18px;
+    margin: 0 2px;
+    padding: 1px 4px;
+    color: @faint;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.empty { color: @faint; }
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @np;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.6);
+}
+
+#workspaces button.urgent {
+    color: @nr;
+    background: transparent;
+    text-shadow: 0 0 8px rgba(255, 49, 49, 0.7);
+}
+
+#window { color: @faint; }
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+#custom-weather { font-size: 9px; }
+
+/* ----------------------------------------------------------------------------
+ * State. Color is the signal — nothing else moves.
+ * -------------------------------------------------------------------------- */
+#network.disconnected,
+#battery.critical,
+#custom-volume.muted {
+    color: @nr;
+}
+
+#battery.warning { color: @np; }
+
+#battery.charging { color: @nc; }
+
+#bluetooth.off,
+#custom-bluetooth.off,
+#custom-tailscale.off,
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep,
+#custom-nowplaying.idle {
+    color: @faint;
+}
+
+#bluetooth.connected,
+#custom-bluetooth.connected,
+#custom-tailscale.connected { color: @nc; }
+
+#custom-update.updates-available,
+#custom-bell.has-notifs,
+#custom-agent.agent-ready,
+#custom-agent.agent-working,
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked,
+#custom-nowplaying.playing { color: @np; }
+
+#custom-nowplaying.paused { color: @nc; }
+
+#idle_inhibitor.activated { color: @nw; }
+
+#tray > .passive { opacity: 0.4; }
+#tray > .needs-attention { color: @nr; }
+
+/* Hover: the cell under the pointer brightens. That's all. */
+#workspaces button:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover {
+    color: @nw;
+    background: transparent;
+}
+
+tooltip {
+    color: @nw;
+    background-color: rgba(10, 8, 12, 0.95);
+    border: 1px solid rgba(242, 240, 234, 0.2);
+    border-radius: 2px;
+}
+
+tooltip label { color: @nw; }

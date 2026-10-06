@@ -1,0 +1,295 @@
+/* ============================================================================
+ * AFTERGLOW
+ * ----------------------------------------------------------------------------
+ * The bar as the last light after sunset. Deep violet-black glass with a
+ * faint pink-to-violet wash, and neon pink finally getting top billing —
+ * the signature hue of nightshadeNeon, leading instead of accenting.
+ *
+ * Restrained synthwave: pink where it matters (clock, active workspace, the
+ * voices that want attention), darkness everywhere else. Cyan is the second
+ * voice. Green appears only where a real machine would put it.
+ *
+ * Motion budget: one slow pink breathing on the bar's glow (~1 change per
+ * 8s) and nothing else. ~15ms per repaint means motion is priced per visible
+ * change, and dusk does not hurry.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ * ========================================================================== */
+
+@define-color np #ff10f0;
+@define-color np-dim rgba(255, 16, 240, 0.55);
+@define-color np-faint rgba(255, 16, 240, 0.28);
+@define-color nc #00ffff;
+@define-color nc-dim rgba(0, 255, 255, 0.55);
+@define-color ng #39ff14;
+@define-color nr #ff3131;
+@define-color nw #ffe6fb;
+@define-color dusk #0d0714;
+@define-color dusk-2 #140a1e;
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", monospace;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* Dusk glass: violet-black with a pink horizon wash along the top edge. */
+window#waybar {
+    color: @nw;
+    background-color: @dusk;
+    background-image:
+        linear-gradient(to bottom,
+            rgba(255, 16, 240, 0.10) 0%,
+            rgba(255, 16, 240, 0.02) 30%,
+            rgba(0, 0, 0, 0) 60%),
+        linear-gradient(to right,
+            rgba(20, 10, 30, 0) 0%,
+            rgba(40, 12, 52, 0.35) 50%,
+            rgba(20, 10, 30, 0) 100%);
+    border: 1px solid rgba(255, 16, 240, 0.25);
+    border-radius: 6px;
+    box-shadow:
+        0 0 18px rgba(255, 16, 240, 0.16),
+        inset 0 1px 0 rgba(255, 230, 251, 0.08);
+    animation: afterglow-breathe 8s ease-in-out infinite;
+}
+
+@keyframes afterglow-breathe {
+    0%   { box-shadow: 0 0 18px rgba(255, 16, 240, 0.16), inset 0 1px 0 rgba(255, 230, 251, 0.08); }
+    50%  { box-shadow: 0 0 26px rgba(255, 16, 240, 0.24), inset 0 1px 0 rgba(255, 230, 251, 0.08); }
+    100% { box-shadow: 0 0 18px rgba(255, 16, 240, 0.16), inset 0 1px 0 rgba(255, 230, 251, 0.08); }
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Modules sit on the glass as soft pills. Pink-tinted separators keep the
+ * rhythm; the wash behind them stays dark.
+ *
+ * SPACING CONTRACT: every module gets the same margin/padding and the same
+ * separator. No per-module exceptions — only #tray opts out, structurally last.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#power-profiles-daemon,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 3px 3px;
+    padding: 2px 8px;
+    color: rgba(255, 230, 251, 0.72);
+    background-color: rgba(255, 16, 240, 0.05);
+    border: 1px solid rgba(255, 16, 240, 0.12);
+    border-radius: 4px;
+    box-shadow: none;
+    text-shadow: 0 0 6px rgba(255, 16, 240, 0.35);
+    transition: color 200ms ease-out, background-color 200ms ease-out;
+}
+
+/* The clock leads in full pink — time is the hero here. */
+#clock {
+    color: @np;
+    background-color: rgba(255, 16, 240, 0.12);
+    border-color: rgba(255, 16, 240, 0.35);
+    text-shadow: 0 0 10px rgba(255, 16, 240, 0.8);
+}
+
+#custom-wired-launcher,
+#custom-power {
+    color: @np;
+    font-size: 12px;
+    text-shadow: 0 0 10px rgba(255, 16, 240, 0.8);
+}
+
+/* Second voice: cyan for the working modules. */
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#custom-tailscale,
+#memory,
+#cpu {
+    color: @nc-dim;
+    text-shadow: 0 0 6px rgba(0, 255, 255, 0.4);
+}
+
+#battery { color: rgba(255, 230, 251, 0.72); }
+
+/* Workspaces: dim pills; the active one fills pink. */
+#workspaces button {
+    min-width: 20px;
+    margin: 0 1px;
+    padding: 1px 7px;
+    color: rgba(255, 230, 251, 0.4);
+    background-color: rgba(255, 16, 240, 0.04);
+    border: 1px solid rgba(255, 16, 240, 0.14);
+    border-radius: 3px;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.empty {
+    color: rgba(255, 230, 251, 0.22);
+    border-color: rgba(255, 16, 240, 0.08);
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @dusk;
+    background-color: @np;
+    border-color: @np;
+    box-shadow: 0 0 14px rgba(255, 16, 240, 0.7);
+    text-shadow: none;
+}
+
+#workspaces button.urgent {
+    color: @nr;
+    background-color: rgba(255, 49, 49, 0.14);
+    border-color: @nr;
+    box-shadow: 0 0 12px rgba(255, 49, 49, 0.5);
+}
+
+#window {
+    color: rgba(255, 230, 251, 0.4);
+    text-shadow: none;
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+#custom-weather {
+    font-size: 9px;
+    color: rgba(255, 230, 251, 0.5);
+}
+
+/* ----------------------------------------------------------------------------
+ * State. Pink shouts, cyan works, red warns — green only where a machine
+ * would put it (charging, connected).
+ * -------------------------------------------------------------------------- */
+#network.disconnected,
+#battery.critical {
+    color: @nr;
+    border-color: @nr;
+    text-shadow: 0 0 10px rgba(255, 49, 49, 0.8);
+}
+
+#battery.warning {
+    color: @np;
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.7);
+}
+
+#battery.charging { color: @ng; text-shadow: 0 0 8px rgba(57, 255, 20, 0.7); }
+
+#bluetooth.off,
+#custom-bluetooth.off,
+#custom-tailscale.off {
+    color: rgba(255, 230, 251, 0.3);
+    text-shadow: none;
+}
+
+#bluetooth.connected,
+#custom-bluetooth.connected,
+#custom-tailscale.connected { color: @ng; text-shadow: 0 0 8px rgba(57, 255, 20, 0.7); }
+
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep,
+#custom-nowplaying.idle {
+    color: rgba(255, 230, 251, 0.32);
+    text-shadow: none;
+}
+
+#custom-update.updates-available,
+#custom-bell.has-notifs,
+#custom-agent.agent-ready,
+#custom-agent.agent-working,
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked,
+#custom-nowplaying.playing {
+    color: @np;
+    border-color: rgba(255, 16, 240, 0.4);
+    text-shadow: 0 0 10px rgba(255, 16, 240, 0.85);
+}
+
+#custom-nowplaying.paused { color: @nc-dim; }
+
+#custom-volume.muted {
+    color: rgba(255, 230, 251, 0.32);
+    text-shadow: none;
+}
+
+#idle_inhibitor.activated {
+    color: @np;
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.7);
+}
+
+#tray > .passive { opacity: 0.45; }
+#tray > .needs-attention {
+    background-color: rgba(255, 49, 49, 0.16);
+    border-radius: 3px;
+}
+
+/* Hover: the pill warms up. */
+#workspaces button:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover {
+    color: @nw;
+    background-color: rgba(255, 16, 240, 0.16);
+    text-shadow: 0 0 10px rgba(255, 16, 240, 0.9);
+}
+
+#custom-power:hover {
+    color: @nr;
+    background-color: rgba(255, 49, 49, 0.14);
+    text-shadow: 0 0 10px rgba(255, 49, 49, 0.9);
+}
+
+tooltip {
+    color: @nw;
+    background-color: rgba(13, 7, 20, 0.97);
+    border: 1px solid rgba(255, 16, 240, 0.4);
+    border-radius: 4px;
+    box-shadow: 0 0 16px rgba(255, 16, 240, 0.3);
+    text-shadow: 0 0 6px rgba(255, 16, 240, 0.5);
+}
+
+tooltip label { color: @nw; }
