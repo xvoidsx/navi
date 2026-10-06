@@ -263,7 +263,8 @@
     "custom/power": {
         "format" : "⏻ ",
         "tooltip": false,
-        "menu": "on-click",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-power\" navi-power",
+        "menu": "on-click-right",
         "menu-file": "/usr/share/waybar/custom_modules/power_menu.xml",
         "menu-actions": {
             "shutdown": "sh -c 'systemctl poweroff'",

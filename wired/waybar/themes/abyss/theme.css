@@ -1,0 +1,292 @@
+/* ============================================================================
+ * ABYSS
+ * ----------------------------------------------------------------------------
+ * The bar as deep water. Dark ocean blues — not black, blue — with
+ * bioluminescent cyan and teal for anything alive, and a slow drift like a
+ * current moving through it. The only blue-dominant theme in the set; every
+ * other theme lives in green, pink, or neutral territory.
+ *
+ * The signature is the current: a slow background drift (~1 change per 12s)
+ * that moves a faint teal wash across the bar. Everything else holds still
+ * so the drift reads as depth, not motion.
+ *
+ * Motion budget: the drift only. ~15ms per repaint means motion is priced
+ * per visible change, and deep water moves slowly.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ * ========================================================================== */
+
+@define-color np #ff10f0;
+@define-color nc #00ffff;
+@define-color teal #2de1c2;
+@define-color teal-dim rgba(45, 225, 194, 0.5);
+@define-color deep #020d1a;
+@define-color deep-2 #041525;
+@define-color foam rgba(220, 245, 255, 0.85);
+@define-color foam-dim rgba(220, 245, 255, 0.5);
+@define-color foam-faint rgba(220, 245, 255, 0.28);
+@define-color nr #ff3131;
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", monospace;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* Deep water with a slow current. */
+window#waybar {
+    color: @foam;
+    background-color: @deep;
+    background-image:
+        linear-gradient(to right,
+            rgba(45, 225, 194, 0.0) 0%,
+            rgba(45, 225, 194, 0.06) 50%,
+            rgba(45, 225, 194, 0.0) 100%);
+    background-size: 200% 100%;
+    border: 1px solid rgba(45, 225, 194, 0.22);
+    border-radius: 8px;
+    box-shadow:
+        0 0 20px rgba(0, 120, 140, 0.25),
+        inset 0 0 30px rgba(0, 60, 90, 0.35);
+    animation: current 12s ease-in-out infinite alternate;
+}
+
+@keyframes current {
+    from { background-position: 0% 0; }
+    to   { background-position: 100% 0; }
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Modules float like organisms — soft rounded cells with a teal membrane.
+ *
+ * SPACING CONTRACT: every module gets the same margin/padding and the same
+ * treatment. No per-module exceptions — only #tray opts out of nothing here;
+ * it keeps the same cell like everything else (no trailing rule to worry
+ * about, cells don't use separators).
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#power-profiles-daemon,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 3px 3px;
+    padding: 2px 9px;
+    color: @foam-dim;
+    background-color: rgba(45, 225, 194, 0.06);
+    border: 1px solid rgba(45, 225, 194, 0.16);
+    border-radius: 12px;
+    box-shadow: none;
+    text-shadow: 0 0 7px rgba(45, 225, 194, 0.4);
+    transition: color 200ms ease-out, background-color 200ms ease-out;
+}
+
+/* The clock glows like something alive down there. */
+#clock {
+    color: @nc;
+    background-color: rgba(0, 255, 255, 0.10);
+    border-color: rgba(0, 255, 255, 0.35);
+    text-shadow: 0 0 12px rgba(0, 255, 255, 0.8);
+}
+
+#custom-wired-launcher,
+#custom-power {
+    color: @teal;
+    font-size: 12px;
+    text-shadow: 0 0 10px rgba(45, 225, 194, 0.8);
+}
+
+/* Working voices in teal. */
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#custom-tailscale,
+#memory,
+#cpu {
+    color: @teal-dim;
+}
+
+#battery { color: @foam-dim; }
+
+/* Workspaces: dim cells; the active one lights up cyan. */
+#workspaces button {
+    min-width: 20px;
+    margin: 0 1px;
+    padding: 1px 7px;
+    color: @foam-faint;
+    background-color: rgba(45, 225, 194, 0.04);
+    border: 1px solid rgba(45, 225, 194, 0.12);
+    border-radius: 9px;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.empty {
+    color: @foam-faint;
+    border-color: rgba(45, 225, 194, 0.08);
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @deep;
+    background-color: @nc;
+    border-color: @nc;
+    box-shadow: 0 0 16px rgba(0, 255, 255, 0.65);
+    text-shadow: none;
+}
+
+#workspaces button.urgent {
+    color: @nr;
+    background-color: rgba(255, 49, 49, 0.14);
+    border-color: @nr;
+    box-shadow: 0 0 12px rgba(255, 49, 49, 0.5);
+}
+
+#window {
+    color: @foam-faint;
+    text-shadow: none;
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+#custom-weather {
+    font-size: 9px;
+    color: @foam-faint;
+}
+
+/* ----------------------------------------------------------------------------
+ * State. Cyan is alive, pink is rare (only the agent's urgent states),
+ * red is wrong.
+ * -------------------------------------------------------------------------- */
+#network.disconnected,
+#battery.critical {
+    color: @nr;
+    border-color: @nr;
+    text-shadow: 0 0 10px rgba(255, 49, 49, 0.8);
+}
+
+#battery.warning { color: @np; text-shadow: 0 0 8px rgba(255, 16, 240, 0.7); }
+#battery.charging { color: @nc; text-shadow: 0 0 10px rgba(0, 255, 255, 0.8); }
+
+#bluetooth.off,
+#custom-bluetooth.off,
+#custom-tailscale.off {
+    color: @foam-faint;
+    text-shadow: none;
+}
+
+#bluetooth.connected,
+#custom-bluetooth.connected,
+#custom-tailscale.connected {
+    color: @nc;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+}
+
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep,
+#custom-nowplaying.idle {
+    color: @foam-faint;
+    text-shadow: none;
+}
+
+#custom-update.updates-available,
+#custom-bell.has-notifs,
+#custom-agent.agent-ready,
+#custom-agent.agent-working {
+    color: @nc;
+    border-color: rgba(0, 255, 255, 0.4);
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.85);
+}
+
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: @np;
+    border-color: rgba(255, 16, 240, 0.4);
+    text-shadow: 0 0 10px rgba(255, 16, 240, 0.85);
+}
+
+#custom-nowplaying.playing { color: @teal; }
+#custom-nowplaying.paused { color: @foam-dim; }
+
+#custom-volume.muted {
+    color: @foam-faint;
+    text-shadow: none;
+}
+
+#idle_inhibitor.activated { color: @nc; }
+
+#tray > .passive { opacity: 0.45; }
+#tray > .needs-attention {
+    background-color: rgba(255, 49, 49, 0.16);
+    border-radius: 9px;
+}
+
+/* Hover: the organism brightens. */
+#workspaces button:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover {
+    color: @foam;
+    background-color: rgba(45, 225, 194, 0.16);
+    text-shadow: 0 0 12px rgba(45, 225, 194, 0.9);
+}
+
+#custom-power:hover {
+    color: @nr;
+    background-color: rgba(255, 49, 49, 0.14);
+    text-shadow: 0 0 10px rgba(255, 49, 49, 0.9);
+}
+
+tooltip {
+    color: @foam;
+    background-color: rgba(2, 13, 26, 0.97);
+    border: 1px solid rgba(45, 225, 194, 0.35);
+    border-radius: 8px;
+    box-shadow: 0 0 18px rgba(0, 120, 140, 0.35);
+    text-shadow: 0 0 6px rgba(45, 225, 194, 0.5);
+}
+
+tooltip label { color: @foam; }

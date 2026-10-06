@@ -1,0 +1,213 @@
+/* ============================================================================
+ * MONOLITH
+ * ----------------------------------------------------------------------------
+ * The bar as poured concrete. No border-radius anywhere, no gradients, no
+ * glow, no shadows — just flat black, 1px lines, and type set like it was
+ * stamped. The opposite of ghost's softness: where ghost dissolves, monolith
+ * declares.
+ *
+ * Everything is uppercase-adjacent in spirit (the modules speak for
+ * themselves). Pink appears exactly twice: the active workspace and urgent
+ * states. Everything else is white, gray, or the red of a real warning.
+ *
+ * Motion budget: zero. No animations, no transitions. Concrete does not
+ * breathe. This ties ghost as the cheapest theme in the set.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ * ========================================================================== */
+
+@define-color np #ff10f0;
+@define-color nr #ff3131;
+@define-color nw #ffffff;
+@define-color gray #9a9a9a;
+@define-color faint rgba(255, 255, 255, 0.30);
+@define-color line rgba(255, 255, 255, 0.22);
+@define-color slab #0a0a0a;
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", monospace;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* Poured flat. No radius, no glow, no gradient. */
+window#waybar {
+    color: @nw;
+    background-color: @slab;
+    border: 1px solid @line;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Modules are cells in the slab, divided by 1px rules. Uniform and absolute.
+ *
+ * SPACING CONTRACT: every module gets the same margin/padding and the same
+ * 1px right rule. No per-module exceptions — only #tray opts out,
+ * structurally last.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#power-profiles-daemon,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 0;
+    padding: 4px 10px;
+    color: @gray;
+    background: transparent;
+    border: none;
+    border-right: 1px solid @line;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#tray { border-right: none; }
+
+#custom-wired-launcher,
+#custom-power {
+    color: @nw;
+    font-size: 12px;
+}
+
+#clock { color: @nw; }
+
+/* Workspaces: stamped cells. Active is the only pink on the bar. */
+#workspaces button {
+    min-width: 22px;
+    margin: 0;
+    padding: 4px 6px;
+    color: @faint;
+    background: transparent;
+    border: none;
+    border-right: 1px solid @line;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.empty { color: @faint; }
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @slab;
+    background-color: @np;
+    border-right: 1px solid @np;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.urgent {
+    color: @nw;
+    background-color: @nr;
+    border-right: 1px solid @nr;
+}
+
+#window { color: @faint; }
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+#custom-weather { font-size: 9px; }
+
+/* ----------------------------------------------------------------------------
+ * State. White is normal, red is wrong. Nothing else speaks.
+ * -------------------------------------------------------------------------- */
+#network.disconnected,
+#battery.critical,
+#custom-volume.muted {
+    color: @nr;
+}
+
+#battery.warning { color: @nr; }
+#battery.charging { color: @nw; }
+
+#bluetooth.off,
+#custom-bluetooth.off,
+#custom-tailscale.off,
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep,
+#custom-nowplaying.idle {
+    color: @faint;
+}
+
+#bluetooth.connected,
+#custom-bluetooth.connected,
+#custom-tailscale.connected,
+#custom-update.updates-available,
+#custom-bell.has-notifs,
+#custom-agent.agent-ready,
+#custom-agent.agent-working,
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked,
+#custom-nowplaying.playing {
+    color: @nw;
+}
+
+#custom-nowplaying.paused { color: @gray; }
+
+#idle_inhibitor.activated { color: @nw; }
+
+#tray > .passive { opacity: 0.4; }
+#tray > .needs-attention { background-color: @nr; }
+
+/* Hover: invert the cell. */
+#workspaces button:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover {
+    color: @slab;
+    background-color: @nw;
+}
+
+tooltip {
+    color: @nw;
+    background-color: @slab;
+    border: 1px solid @line;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+tooltip label { color: @nw; }
