@@ -464,6 +464,7 @@ window#waybar.empty #window {
 #custom-bell:hover,
 #custom-nowplaying:hover,
 #custom-agent:hover,
+#custom-tailscale:hover,
 #bluetooth:hover,
 #custom-bluetooth:hover {
     background-color: rgba(39, 5, 35, 0.72);
