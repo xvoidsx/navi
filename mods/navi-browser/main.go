@@ -43,9 +43,9 @@ import (
 
 const frameWidth = 68
 
-// Fixed-frame geometry: 25 body lines. The 7 browsers render 2 lines
-// each. Frame is 29 rows total.
-const nbBodyRows = 25
+// Fixed-frame geometry: 27 body lines. The 8 browsers render 2 lines
+// each. Frame is 31 rows total.
+const nbBodyRows = 27
 
 // ---------------------------------------------------------------------------
 // browser table
@@ -65,7 +65,15 @@ var browserTable = []browserDef{
 	{
 		ID: "brave", Name: "Brave",
 		Blurb:      "navi's default — Shields, Leo AI, sync; private out of the box.",
-		Binaries:   []string{"brave-browser", "brave-browser-beta", "brave-browser-nightly"},
+		Binaries:   []string{"brave-browser", "brave-browser-beta"},
+		PolicyDir:  "/etc/brave/policies/managed",
+		ExtrasID:   "",
+		SkipPolicy: true,
+	},
+	{
+		ID: "brave-nightly", Name: "Brave Nightly",
+		Blurb:      "Bleeding-edge Brave — nightly builds, for life on the cutting edge.",
+		Binaries:   []string{"brave-browser-nightly"},
 		PolicyDir:  "/etc/brave/policies/managed",
 		ExtrasID:   "brave-nightly",
 		SkipPolicy: true,

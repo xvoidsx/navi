@@ -81,7 +81,7 @@ func TestResolveFallbackChain(t *testing.T) {
 	bindir := t.TempDir()
 	home := t.TempDir()
 	withEnv(t, home, bindir) // empty PATH dir: nothing installed
-	for _, name := range []string{"chromium", "brave-browser-nightly", "google-chrome-unstable"} {
+	for _, name := range []string{"chromium", "brave-browser", "brave-browser-nightly", "google-chrome-unstable"} {
 		p := filepath.Join(bindir, name)
 		os.WriteFile(p, []byte("#!/bin/sh\n"), 0o755)
 	}
@@ -91,12 +91,22 @@ func TestResolveFallbackChain(t *testing.T) {
 		t.Fatal(err)
 	}
 	id, bin := resolveBinary()
-	if id != "brave" || !strings.HasSuffix(bin, "brave-browser-nightly") {
-		t.Fatalf("resolve = %q %q, want brave .../brave-browser-nightly", id, bin)
+	if id != "brave" || !strings.HasSuffix(bin, "brave-browser") {
+		t.Fatalf("resolve = %q %q, want brave .../brave-browser", id, bin)
+	}
+
+	// brave-nightly is its own entry now
+	if err := writeDefault("brave-nightly"); err != nil {
+		t.Fatal(err)
+	}
+	id, bin = resolveBinary()
+	if id != "brave-nightly" || !strings.HasSuffix(bin, "brave-browser-nightly") {
+		t.Fatalf("resolve = %q %q, want brave-nightly .../brave-browser-nightly", id, bin)
 	}
 
 	// configured browser missing -> chromium fallback
 	os.WriteFile(configPath(), []byte("brave\n"), 0o600)
+	os.Remove(filepath.Join(bindir, "brave-browser"))
 	os.Remove(filepath.Join(bindir, "brave-browser-nightly"))
 	id, bin = resolveBinary()
 	if id != "chromium" || !strings.HasSuffix(bin, "chromium") {
