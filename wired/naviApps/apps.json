@@ -431,7 +431,7 @@
   "downloadUrl": "webapps/googledocs.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Google Docs\nExec=navi-browser-run --force-dark-mode --app=https://docs.google.com\nComment=Google Docs as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-googledocs\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://docs.google.com",
-  "logo": "icons/googledocs.svg",
+  "logo": "icons/googledocs.png",
   "icon": "📄"
  },
  {
@@ -446,7 +446,7 @@
   "downloadUrl": "webapps/googlesheets.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Google Sheets\nExec=navi-browser-run --force-dark-mode --app=https://sheets.google.com\nComment=Google Sheets as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-googlesheets\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://sheets.google.com",
-  "logo": "icons/googlesheets.svg",
+  "logo": "icons/googlesheets.png",
   "icon": "📊"
  },
  {
@@ -461,7 +461,7 @@
   "downloadUrl": "webapps/googleslides.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Google Slides\nExec=navi-browser-run --force-dark-mode --app=https://slides.google.com\nComment=Google Slides as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-googleslides\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://slides.google.com",
-  "logo": "icons/googleslides.svg",
+  "logo": "icons/googleslides.png",
   "icon": "📽️"
  },
  {
@@ -476,7 +476,7 @@
   "downloadUrl": "webapps/googlecalendar.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Google Calendar\nExec=navi-browser-run --force-dark-mode --app=https://calendar.google.com\nComment=Google Calendar as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-googlecalendar\nStartupNotify=true\nCategories=Office;Calendar;",
   "homepage": "https://calendar.google.com",
-  "logo": "icons/googlecalendar.svg",
+  "logo": "icons/googlecalendar.png",
   "icon": "📅"
  },
  {
@@ -491,7 +491,7 @@
   "downloadUrl": "webapps/googlemeet.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Google Meet\nExec=navi-browser-run --force-dark-mode --app=https://meet.google.com\nComment=Google Meet as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-googlemeet\nStartupNotify=true\nCategories=Network;VideoConference;",
   "homepage": "https://meet.google.com",
-  "logo": "icons/googlemeet.svg",
+  "logo": "icons/googlemeet.png",
   "icon": "📹"
  },
  {
@@ -506,7 +506,7 @@
   "downloadUrl": "webapps/googlekeep.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Google Keep\nExec=navi-browser-run --force-dark-mode --app=https://keep.google.com\nComment=Google Keep as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-googlekeep\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://keep.google.com",
-  "logo": "icons/googlekeep.svg",
+  "logo": "icons/googlekeep.png",
   "icon": "📝"
  },
  {
