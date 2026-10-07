@@ -122,6 +122,8 @@ PKGS=(
   gnome-keyring libpam-gnome-keyring
   # wlsunset: night light for Wayland (used by navi-displays)
   wlsunset
+  # libfuse2: AppImages mount via FUSE 2 — without it they refuse to run.
+  libfuse2
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
