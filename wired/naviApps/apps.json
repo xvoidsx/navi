@@ -848,6 +848,21 @@
   "logo": "icons/excalidraw.png"
  },
  {
+  "id": "web-artcraft",
+  "name": "ArtCraft",
+  "summary": "Browser-based Adobe suite alternative — design, photo, and vector tools.",
+  "category": "Graphics",
+  "source": "webapp",
+  "package": "artcraft",
+  "url": "https://app.getartcraft.com",
+  "install": "navi-webapp install artcraft",
+  "downloadUrl": "webapps/artcraft.desktop",
+  "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=ArtCraft\nExec=navi-browser-run --force-dark-mode --app=https://app.getartcraft.com\nComment=ArtCraft as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-artcraft\nStartupNotify=true\nCategories=Graphics;",
+  "homepage": "https://app.getartcraft.com",
+  "logo": "icons/artcraft.png",
+  "icon": "🎨"
+ },
+ {
   "id": "web-jitsi",
   "name": "Jitsi Meet",
   "summary": "FOSS video conferencing, no account needed.",
