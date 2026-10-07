@@ -641,7 +641,8 @@
   "downloadUrl": "webapps/bandcamp.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Bandcamp\nExec=navi-browser-run --force-dark-mode --app=https://bandcamp.com\nComment=Music directly from the artists. The fair-trade music store.\nTerminal=false\nType=Application\nIcon=navi-bandcamp\nStartupNotify=true\nCategories=AudioVideo;Audio;",
   "homepage": "https://bandcamp.com",
-  "icon": "🎸"
+  "icon": "🎸",
+  "logo": "icons/bandcamp.png"
  },
  {
   "id": "web-writefreely",
@@ -655,7 +656,8 @@
   "downloadUrl": "webapps/writefreely.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=WriteFreely\nExec=navi-browser-run --force-dark-mode --app=https://write.as\nComment=Minimalist, private publishing.\nTerminal=false\nType=Application\nIcon=navi-writefreely\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://write.as",
-  "icon": "✍️"
+  "icon": "✍️",
+  "logo": "icons/writefreely.png"
  },
  {
   "id": "web-cryptpad",
@@ -669,7 +671,8 @@
   "downloadUrl": "webapps/cryptpad.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=CryptPad\nExec=navi-browser-run --force-dark-mode --app=https://cryptpad.fr\nComment=Encrypted docs, sheets and whiteboards.\nTerminal=false\nType=Application\nIcon=navi-cryptpad\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://cryptpad.fr",
-  "icon": "🔐"
+  "icon": "🔐",
+  "logo": "icons/cryptpad.png"
  },
  {
   "id": "web-photopea",
@@ -683,7 +686,8 @@
   "downloadUrl": "webapps/photopea.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Photopea\nExec=navi-browser-run --force-dark-mode --app=https://www.photopea.com\nComment=A Photoshop-class editor in a browser tab.\nTerminal=false\nType=Application\nIcon=navi-photopea\nStartupNotify=true\nCategories=Graphics;",
   "homepage": "https://www.photopea.com",
-  "icon": "🎨"
+  "icon": "🎨",
+  "logo": "icons/photopea.png"
  },
  {
   "id": "native-element",
@@ -735,7 +739,8 @@
   "downloadUrl": "webapps/stoat.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Stoat\nExec=navi-browser-run --force-dark-mode --app=https://stoat.chat\nComment=FOSS Discord-style chat, community-run. (formerly Revolt)\nTerminal=false\nType=Application\nIcon=navi-stoat\nStartupNotify=true\nCategories=Network;",
   "homepage": "https://stoat.chat",
-  "icon": "🐾"
+  "icon": "🐾",
+  "logo": "icons/stoat.png"
  },
  {
   "id": "web-penpot",
@@ -749,7 +754,8 @@
   "downloadUrl": "webapps/penpot.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Penpot\nExec=navi-browser-run --force-dark-mode --app=https://penpot.app\nComment=FOSS design tool for interfaces and prototypes.\nTerminal=false\nType=Application\nIcon=navi-penpot\nStartupNotify=true\nCategories=Graphics;",
   "homepage": "https://penpot.app",
-  "icon": "🎨"
+  "icon": "🎨",
+  "logo": "icons/penpot.png"
  },
  {
   "id": "web-excalidraw",
@@ -763,7 +769,8 @@
   "downloadUrl": "webapps/excalidraw.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Excalidraw\nExec=navi-browser-run --force-dark-mode --app=https://excalidraw.com\nComment=Sketch-style whiteboard for diagrams and ideas.\nTerminal=false\nType=Application\nIcon=navi-excalidraw\nStartupNotify=true\nCategories=Graphics;",
   "homepage": "https://excalidraw.com",
-  "icon": "✏️"
+  "icon": "✏️",
+  "logo": "icons/excalidraw.png"
  },
  {
   "id": "web-jitsi",
@@ -777,7 +784,8 @@
   "downloadUrl": "webapps/jitsi.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Jitsi Meet\nExec=navi-browser-run --force-dark-mode --app=https://meet.jit.si\nComment=FOSS video conferencing, no account needed.\nTerminal=false\nType=Application\nIcon=navi-jitsi\nStartupNotify=true\nCategories=Network;",
   "homepage": "https://meet.jit.si",
-  "icon": "📹"
+  "icon": "📹",
+  "logo": "icons/jitsi.png"
  },
  {
   "id": "web-lichess",
@@ -791,7 +799,8 @@
   "downloadUrl": "webapps/lichess.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Lichess\nExec=navi-browser-run --force-dark-mode --app=https://lichess.org\nComment=Free FOSS chess for everyone.\nTerminal=false\nType=Application\nIcon=navi-lichess\nStartupNotify=true\nCategories=Game;",
   "homepage": "https://lichess.org",
-  "icon": "♞"
+  "icon": "♞",
+  "logo": "icons/lichess.png"
  },
  {
   "id": "web-marginalia",
@@ -805,7 +814,8 @@
   "downloadUrl": "webapps/marginalia.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Marginalia\nExec=navi-browser-run --force-dark-mode --app=https://search.marginalia.nu\nComment=Smallweb search engine for the indie web.\nTerminal=false\nType=Application\nIcon=navi-marginalia\nStartupNotify=true\nCategories=Network;",
   "homepage": "https://search.marginalia.nu",
-  "icon": "🔍"
+  "icon": "🔍",
+  "logo": "icons/marginalia.png"
  },
  {
   "id": "web-archive",
@@ -819,7 +829,8 @@
   "downloadUrl": "webapps/archive.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Internet Archive\nExec=navi-browser-run --force-dark-mode --app=https://archive.org\nComment=The web's memory: books, media, and the Wayback Machine.\nTerminal=false\nType=Application\nIcon=navi-archive\nStartupNotify=true\nCategories=Network;",
   "homepage": "https://archive.org",
-  "icon": "🏛️"
+  "icon": "🏛️",
+  "logo": "icons/archive.png"
  },
  {
   "id": "web-upd",
@@ -833,7 +844,8 @@
   "downloadUrl": "webapps/upd.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=upd.dev\nExec=navi-browser-run --force-dark-mode --app=https://upd.dev\nComment=Independent code forge. A forge, not a factory.\nTerminal=false\nType=Application\nIcon=navi-upd\nStartupNotify=true\nCategories=Development;",
   "homepage": "https://upd.dev",
-  "icon": "⚒️"
+  "icon": "⚒️",
+  "logo": "icons/upd.png"
  },
  {
   "id": "native-telegram",
@@ -860,7 +872,8 @@
   "downloadUrl": "webapps/wikipedia.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Wikipedia\nExec=navi-browser-run --force-dark-mode --app=https://en.wikipedia.org\nComment=The free encyclopedia.\nTerminal=false\nType=Application\nIcon=navi-wikipedia\nStartupNotify=true\nCategories=Network;",
   "homepage": "https://en.wikipedia.org",
-  "icon": "📚"
+  "icon": "📚",
+  "logo": "icons/wikipedia.png"
  },
  {
   "id": "web-bitwarden",
@@ -874,7 +887,8 @@
   "downloadUrl": "webapps/bitwarden.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Bitwarden\nExec=navi-browser-run --force-dark-mode --app=https://vault.bitwarden.com\nComment=FOSS password manager vault.\nTerminal=false\nType=Application\nIcon=navi-bitwarden\nStartupNotify=true\nCategories=Utility;",
   "homepage": "https://vault.bitwarden.com",
-  "icon": "🔐"
+  "icon": "🔐",
+  "logo": "icons/bitwarden.png"
  },
  {
   "id": "web-notion",
@@ -888,7 +902,8 @@
   "downloadUrl": "webapps/notion.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Notion\nExec=navi-browser-run --force-dark-mode --app=https://www.notion.so\nComment=All-in-one workspace for notes and docs.\nTerminal=false\nType=Application\nIcon=navi-notion\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://www.notion.so",
-  "icon": "📝"
+  "icon": "📝",
+  "logo": "icons/notion.png"
  },
  {
   "id": "web-linear",
@@ -902,7 +917,8 @@
   "downloadUrl": "webapps/linear.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Linear\nExec=navi-browser-run --force-dark-mode --app=https://linear.app\nComment=Issue tracking and project planning, built for speed.\nTerminal=false\nType=Application\nIcon=navi-linear\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://linear.app",
-  "icon": "📈"
+  "icon": "📈",
+  "logo": "icons/linear.svg"
  },
  {
   "id": "web-airtable",
@@ -916,7 +932,8 @@
   "downloadUrl": "webapps/airtable.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Airtable\nExec=navi-browser-run --force-dark-mode --app=https://airtable.com\nComment=Spreadsheet-database hybrid for organizing anything.\nTerminal=false\nType=Application\nIcon=navi-airtable\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://airtable.com",
-  "icon": "🗂️"
+  "icon": "🗂️",
+  "logo": "icons/airtable.png"
  },
  {
   "id": "web-crunchyroll",
@@ -930,7 +947,8 @@
   "downloadUrl": "webapps/crunchyroll.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Crunchyroll\nExec=navi-browser-run --force-dark-mode --app=https://www.crunchyroll.com\nComment=Anime streaming.\nTerminal=false\nType=Application\nIcon=navi-crunchyroll\nStartupNotify=true\nCategories=AudioVideo;Video;",
   "homepage": "https://www.crunchyroll.com",
-  "icon": "🍙"
+  "icon": "🍙",
+  "logo": "icons/crunchyroll.png"
  },
  {
   "id": "web-yomi",
@@ -944,7 +962,8 @@
   "downloadUrl": "webapps/yomi.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Yomi\nExec=navi-browser-run --force-dark-mode --app=https://yomi.to\nComment=Free anime streaming.\nTerminal=false\nType=Application\nIcon=navi-yomi\nStartupNotify=true\nCategories=AudioVideo;Video;",
   "homepage": "https://yomi.to",
-  "icon": "📺"
+  "icon": "📺",
+  "logo": "icons/yomi.png"
  },
  {
   "id": "web-retroarch",
@@ -958,7 +977,8 @@
   "downloadUrl": "webapps/retroarch.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=RetroArch Web\nExec=navi-browser-run --force-dark-mode --app=https://web.libretro.com\nComment=Retro emulation right in the browser.\nTerminal=false\nType=Application\nIcon=navi-retroarch\nStartupNotify=true\nCategories=Game;",
   "homepage": "https://web.libretro.com",
-  "icon": "🕹️"
+  "icon": "🕹️",
+  "logo": "icons/retroarch.png"
  },
  {
   "id": "web-huggingface",
@@ -972,7 +992,8 @@
   "downloadUrl": "webapps/huggingface.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Hugging Face\nExec=navi-browser-run --force-dark-mode --app=https://huggingface.co\nComment=Models, datasets, and AI spaces.\nTerminal=false\nType=Application\nIcon=navi-huggingface\nStartupNotify=true\nCategories=Network;",
   "homepage": "https://huggingface.co",
-  "icon": "🤗"
+  "icon": "🤗",
+  "logo": "icons/huggingface.png"
  },
  {
   "id": "web-devdocs",
@@ -986,7 +1007,8 @@
   "downloadUrl": "webapps/devdocs.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=DevDocs\nExec=navi-browser-run --force-dark-mode --app=https://devdocs.io\nComment=Fast, offline-capable API documentation.\nTerminal=false\nType=Application\nIcon=navi-devdocs\nStartupNotify=true\nCategories=Documentation;",
   "homepage": "https://devdocs.io",
-  "icon": "📖"
+  "icon": "📖",
+  "logo": "icons/devdocs.png"
  },
  {
   "id": "web-tuta",
@@ -1000,7 +1022,8 @@
   "downloadUrl": "webapps/tuta.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Tuta\nExec=navi-browser-run --force-dark-mode --app=https://app.tuta.com\nComment=FOSS encrypted mail.\nTerminal=false\nType=Application\nIcon=navi-tuta\nStartupNotify=true\nCategories=Network;",
   "homepage": "https://app.tuta.com",
-  "icon": "✉️"
+  "icon": "✉️",
+  "logo": "icons/tuta.png"
  },
  {
   "id": "web-standardnotes",
@@ -1014,7 +1037,8 @@
   "downloadUrl": "webapps/standardnotes.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Standard Notes\nExec=navi-browser-run --force-dark-mode --app=https://app.standardnotes.com\nComment=FOSS end-to-end encrypted notes.\nTerminal=false\nType=Application\nIcon=navi-standardnotes\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://app.standardnotes.com",
-  "icon": "🗒️"
+  "icon": "🗒️",
+  "logo": "icons/standardnotes.png"
  },
  {
   "id": "web-ente",
@@ -1028,7 +1052,8 @@
   "downloadUrl": "webapps/ente.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Ente\nExec=navi-browser-run --force-dark-mode --app=https://ente.io\nComment=FOSS encrypted photos.\nTerminal=false\nType=Application\nIcon=navi-ente\nStartupNotify=true\nCategories=Graphics;",
   "homepage": "https://ente.io",
-  "icon": "🖼️"
+  "icon": "🖼️",
+  "logo": "icons/ente.png"
  },
  {
   "id": "web-fizzy",
@@ -1042,7 +1067,8 @@
   "downloadUrl": "webapps/fizzy.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Fizzy\nExec=navi-browser-run --force-dark-mode --app=https://app.fizzy.do\nComment=Boards and tasks for team projects.\nTerminal=false\nType=Application\nIcon=navi-fizzy\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://app.fizzy.do",
-  "icon": "🫧"
+  "icon": "🫧",
+  "logo": "icons/fizzy.png"
  },
  {
   "id": "web-weatherwise",
@@ -1056,7 +1082,8 @@
   "downloadUrl": "webapps/weatherwise.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=WeatherWise\nExec=navi-browser-run --force-dark-mode --app=https://web.weatherwise.app\nComment=Weather and radar, beautifully done.\nTerminal=false\nType=Application\nIcon=navi-weatherwise\nStartupNotify=true\nCategories=Utility;",
   "homepage": "https://web.weatherwise.app",
-  "icon": "🌦️"
+  "icon": "🌦️",
+  "logo": "icons/weatherwise.png"
  },
  {
   "id": "web-basecamp",
@@ -1070,7 +1097,8 @@
   "downloadUrl": "webapps/basecamp.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Basecamp\nExec=navi-browser-run --force-dark-mode --app=https://basecamp.com\nComment=37signals' calm project management.\nTerminal=false\nType=Application\nIcon=navi-basecamp\nStartupNotify=true\nCategories=Office;",
   "homepage": "https://basecamp.com",
-  "icon": "🏕️"
+  "icon": "🏕️",
+  "logo": "icons/basecamp.png"
  },
  {
   "id": "web-hey",
@@ -1084,7 +1112,8 @@
   "downloadUrl": "webapps/hey.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=HEY\nExec=navi-browser-run --force-dark-mode --app=https://hey.com\nComment=Email, reimagined by 37signals.\nTerminal=false\nType=Application\nIcon=navi-hey\nStartupNotify=true\nCategories=Network;",
   "homepage": "https://hey.com",
-  "icon": "💌"
+  "icon": "💌",
+  "logo": "icons/hey.png"
  },
  {
   "id": "web-perplexity",
@@ -1379,7 +1408,8 @@
   "downloadUrl": "webapps/cloudflare.desktop",
   "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Cloudflare\nExec=navi-browser-run --force-dark-mode --app=https://dash.cloudflare.com\nComment=Cloudflare as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-cloudflare\nStartupNotify=true\nCategories=Network;",
   "homepage": "https://cloudflare.com",
-  "icon": "☁️"
+  "icon": "☁️",
+  "logo": "icons/cloudflare.png"
  },
  {
   "id": "native-chrome",
