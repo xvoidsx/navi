@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Gab
+Exec=navi-browser-run --force-dark-mode --app=https://gab.com
+Comment=free speech social network
+Terminal=false
+Type=Application
+Icon=navi-gab
+StartupNotify=true
+Categories=Network;
