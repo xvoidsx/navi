@@ -5,14 +5,21 @@
 #   Select Area        - drag a region
 #   Select Window      - click a window (Wayland) / capture focused window (X11)
 #   Grab Entire Screen - all outputs
+#
+# navishot --area skips the menu and goes straight to area selection
+# (the quick-snag path, bound to Super+Shift+P).
 set -eu
 
 DIR="$HOME/Pictures/Screenshots"
 mkdir -p "$DIR"
 
-MODE=$(printf "Select Area\nSelect Window\nGrab Entire Screen" \
-    | dmenu -fn "NotoSans-10" -i -nb black -nf pink -sb green -sf red -p "navishot: ") || exit 0
-[ -z "$MODE" ] && exit 0
+if [ "${1:-}" = "--area" ]; then
+    MODE="Select Area"
+else
+    MODE=$(printf "Select Area\nSelect Window\nGrab Entire Screen" \
+        | dmenu -fn "NotoSans-10" -i -nb black -nf pink -sb green -sf red -p "navishot: ") || exit 0
+    [ -z "$MODE" ] && exit 0
+fi
 
 FILE="$DIR/$(date -Ins).png"
 

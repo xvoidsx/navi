@@ -146,6 +146,7 @@ bindsym Mod1+c exec --no-startup-id "alacritty -e calcurse"
 bindsym $mod+Shift+f exec --no-startup-id "nemo"
 bindsym Caps_Lock exec --no-startup-id "notify-send 'wired helper' 'Caps Lock pressed.'"
 bindsym $mod+p exec --no-startup-id "navishot"
+bindsym $mod+Shift+p exec --no-startup-id "navishot --area"
 # waybar theme picker: real screenshots, switch applied live via SIGUSR2.
 bindsym Mod1+t exec --no-startup-id "navi-theme"
 bindsym Mod1+h exec --no-startup-id "alacritty -e htop"
