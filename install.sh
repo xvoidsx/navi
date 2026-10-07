@@ -142,8 +142,10 @@ DEFAULT_WEBAPPS=(
   # Workspace Stack — installed out of the box on every fresh install
   # (Raven, 2026-09-30). Users can remove any of them from the naviApps store.
   gmail googledrive fizzy notion airtable linear
-  # Full Google suite curated in naviApps (Raven, 2026-09-30)
+  # Full Google suite curated in naviApps (Raven, 2026-09-30; Sheets/Slides/
+  # Calendar/Meet/Keep added 2026-10-07, install by default with the rest)
   googlechat googledocs googlemessages googlephotos
+  googlesheets googleslides googlecalendar googlemeet googlekeep
   # Full Proton suite (Raven, 2026-09-30)
   protonmail protoncalendar protondrive protonmeet protonpass
 )

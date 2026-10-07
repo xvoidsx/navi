@@ -240,6 +240,13 @@ install_one() {
   if [[ -n "$icon_info" ]]; then
     read -r src_path dest_path <<< "$icon_info"
     cp "$src_path" "$dest_path"
+    # drop the stale counterpart: if the shipped icon changed format
+    # (svg -> png or vice versa), the old one would otherwise linger in
+    # the theme and win the lookup (scalable svg beats 48x48 png).
+    case "$dest_path" in
+      *.svg) rm -f "${ICON_PNG_DIR}/navi-${name}.png" ;;
+      *.png) rm -f "${ICON_SVG_DIR}/navi-${name}.svg" ;;
+    esac
   fi
   # drop leftovers from the old pixmaps-based installs
   rm -f "${LEGACY_ICON_DIR}/navi-${name}.svg" "${LEGACY_ICON_DIR}/navi-${name}.png"
