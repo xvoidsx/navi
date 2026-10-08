@@ -1574,6 +1574,18 @@
   "icon": "🌐"
  },
  {
+  "id": "native-zen",
+  "name": "Zen Browser",
+  "summary": "The beautiful Firefox-based browser.",
+  "category": "Internet",
+  "source": "native",
+  "package": "zen",
+  "install": "navi-extras --install zen",
+  "remove": "flatpak uninstall -y io.github.zen_browser.zen",
+  "homepage": "https://zen-browser.app/",
+  "icon": "🌀"
+ },
+ {
   "id": "native-signal",
   "name": "Signal",
   "summary": "Private messaging — end-to-end encrypted texts, voice, and video calls. The native desktop app.",
