@@ -48,8 +48,10 @@ func TestTableValid(t *testing.T) {
 	if browserTable[0].ID != "brave" {
 		t.Errorf("browserTable[0] = %q, want brave first", browserTable[0].ID)
 	}
-	// Brave gets the light touch: no managed policy, ever.
-	for _, id := range []string{"brave", "brave-origin"} {
+	// Brave family, chromium and helium get the light touch: no managed
+	// policy, ever. (Chromium's extensions install per-user; helium shares
+	// chromium's policy dir, so policy there would pollute both.)
+	for _, id := range []string{"brave", "brave-nightly", "brave-origin", "brave-origin-nightly", "chromium", "helium"} {
 		if def := findDef(id); def == nil {
 			t.Errorf("table must contain a %q entry", id)
 		} else if !def.SkipPolicy {

@@ -114,6 +114,14 @@ var browserTable = []browserDef{
 		SkipPolicy: true,
 	},
 	{
+		ID: "brave-origin-nightly", Name: "Brave Origin Nightly",
+		Blurb:      "Brave Origin on the bleeding edge — nightly builds for origin enjoyers.",
+		Binaries:   []string{"brave-origin-nightly"},
+		PolicyDir:  "/etc/brave/policies/managed",
+		ExtrasID:   "brave-origin-nightly",
+		SkipPolicy: true,
+	},
+	{
 		ID: "chrome", Name: "Google Chrome",
 		Blurb:     "The reference build — stock Chromium plus Google's services.",
 		Binaries:  []string{"google-chrome-stable", "google-chrome"},
