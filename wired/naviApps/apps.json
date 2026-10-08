@@ -1586,6 +1586,18 @@
   "icon": "🌀"
  },
  {
+  "id": "native-vivaldi",
+  "name": "Vivaldi",
+  "summary": "The power-user's Chromium browser — nightshadeNeon theme in the Vivaldi store.",
+  "category": "Internet",
+  "source": "native",
+  "package": "vivaldi",
+  "install": "navi-extras --install vivaldi",
+  "remove": "doas apt remove -y vivaldi-stable",
+  "homepage": "https://vivaldi.com/",
+  "icon": "🎭"
+ },
+ {
   "id": "native-signal",
   "name": "Signal",
   "summary": "Private messaging — end-to-end encrypted texts, voice, and video calls. The native desktop app.",

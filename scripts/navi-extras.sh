@@ -29,6 +29,7 @@ EXTRAS=(
   "chrome-canary|Google Chrome Canary|Bleeding-edge Chrome, straight from Google's apt repo|command -v google-chrome-unstable >/dev/null 2>&1|chrome-canary-installer.sh|"
   "edge|Microsoft Edge|Microsoft's Chromium-based browser, from Microsoft's own apt repo|command -v microsoft-edge-stable >/dev/null 2>&1|msedge-installer.sh|"
   "zen|Zen Browser|The beautiful Firefox-based browser, via Flathub|flatpak list --user --app 2>/dev/null | grep -q io.github.zen_browser.zen|zen-installer.sh|"
+  "vivaldi|Vivaldi|The power-user's Chromium browser, from Vivaldi's own apt repo|command -v vivaldi-stable >/dev/null 2>&1|vivaldi-installer.sh|"
   "vscode|VS Code|Microsoft's code editor, from Microsoft's own apt repo|command -v code >/dev/null 2>&1|vscode-installer.sh|"
   "vscodium|VSCodium|The community VS Code build — no Microsoft telemetry, from VSCodium's own apt repo|command -v codium >/dev/null 2>&1|vscodium-installer.sh|"
   "sublime|Sublime Text|The fast, proprietary code editor, from Sublime's own apt repo|command -v subl >/dev/null 2>&1|sublime-installer.sh|"
