@@ -2008,7 +2008,8 @@ setup_brave() {
     seed_brave_profile "$HOME" "Brave-Browser-Nightly"
   fi
   if command -v brave-origin-stable >/dev/null 2>&1 \
-    || command -v brave-origin >/dev/null 2>&1; then
+    || command -v brave-origin >/dev/null 2>&1 \
+    || command -v brave-origin-nightly >/dev/null 2>&1; then
     seed_brave_profile /etc/skel "Brave-Origin" doas
     seed_brave_profile "$HOME" "Brave-Origin"
   fi
