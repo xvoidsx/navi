@@ -122,6 +122,14 @@ var browserTable = []browserDef{
 		SkipPolicy: true,
 	},
 	{
+		ID: "vivaldi", Name: "Vivaldi",
+		Blurb:      "The power-user's Chromium — deep customization, tab stacks, notes.",
+		Binaries:   []string{"vivaldi-stable", "vivaldi"},
+		PolicyDir:  "/etc/vivaldi/policies/managed",
+		ExtrasID:   "vivaldi",
+		SkipPolicy: true,
+	},
+	{
 		ID: "chrome", Name: "Google Chrome",
 		Blurb:     "The reference build — stock Chromium plus Google's services.",
 		Binaries:  []string{"google-chrome-stable", "google-chrome"},

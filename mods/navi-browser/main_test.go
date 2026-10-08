@@ -51,7 +51,7 @@ func TestTableValid(t *testing.T) {
 	// Brave family, chromium and helium get the light touch: no managed
 	// policy, ever. (Chromium's extensions install per-user; helium shares
 	// chromium's policy dir, so policy there would pollute both.)
-	for _, id := range []string{"brave", "brave-nightly", "brave-origin", "brave-origin-nightly", "chromium", "helium"} {
+	for _, id := range []string{"brave", "brave-nightly", "brave-origin", "brave-origin-nightly", "chromium", "helium", "vivaldi"} {
 		if def := findDef(id); def == nil {
 			t.Errorf("table must contain a %q entry", id)
 		} else if !def.SkipPolicy {
