@@ -1610,6 +1610,18 @@
   "icon": "🎭"
  },
  {
+  "id": "native-helium",
+  "name": "Helium",
+  "summary": "Minimal, ungoogled Chromium — fast, private, productized. The likely accela base.",
+  "category": "Internet",
+  "source": "native",
+  "package": "helium-bin",
+  "install": "navi-extras --install helium",
+  "remove": "doas apt remove -y helium-bin",
+  "homepage": "https://github.com/imputnet/helium-linux",
+  "icon": "🎈"
+ },
+ {
   "id": "native-nyxt",
   "name": "Nyxt",
   "summary": "The hacker's keyboard-driven browser, extensible in Lisp.",
