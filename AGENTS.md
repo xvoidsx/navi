@@ -118,17 +118,25 @@ Firefox ESR ships too. The OS suggests, the user decides.
   rewrites Preferences on exit).
 - **Brave gets the light touch, always:** no managed policy, no
   force-installed extensions. Shields covers ad/tracker blocking, so
-  **blackice stays Chromium-only**. The forcelist
-  (`wired/chromium/policies/managed/navi.json`) is just the nightshadeNeon
-  theme + blackice — **Proton Pass was removed 2026-09-29**; no password
-  manager is imposed anywhere, users bring their own (Proton Pass remains
-  a one-click webapp in naviApps).
+  **blackice stays Chromium-only**. **Proton Pass was removed 2026-09-29**;
+  no password manager is imposed anywhere, users bring their own (Proton
+  Pass remains a one-click webapp in naviApps).
+- **Chromium's extensions are per-user, not policy** (2026-10-08): the old
+  `ExtensionInstallForcelist` at `/etc/chromium/policies/managed/navi.json`
+  leaked into Helium (Chromium forks share that policy dir), so it was
+  retired — install.sh removes it on existing machines. The nightshadeNeon
+  theme + blackice now install via Chromium's External Extensions
+  mechanism, scoped to `~/.config/chromium` (`wired/chromium/
+  external-extensions/*.json`, deployed to `$HOME` and `/etc/skel`), so
+  forks never see them. Unlike force-install, the user can remove them.
 - The **navi-browser** picker (`mods/navi-browser`, prebuilt binary
   committed) is how users switch the default browser *and* the webapp
   runtime: it writes `~/.config/navi/default-browser`, offers the xdg
   system default, and deploys navi's managed policy to the chosen
-  browser — except Brave/brave-origin, which are `SkipPolicy` and never
-  get the policy offer. `navi-browser-run` (what webapp launchers Exec)
+  browser — except Brave/brave-origin/**chromium**/**helium**, which are
+  `SkipPolicy` and never get the policy offer (chromium's extensions are
+  handled per-user by install.sh; helium shares chromium's policy dir,
+  so policy there would pollute both). `navi-browser-run` (what webapp launchers Exec)
   resolves `navi-browser --print-binary`: configured default, then brave,
   then chromium, then first installed.
 - This arrangement is **experimental**: Raven is bench-testing it on new

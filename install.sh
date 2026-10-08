@@ -1874,22 +1874,49 @@ setup_sddm() {
 # ---------------------------------------------------------------- chromium
 
 # Chromium ships navi-flavored: the nightshadeNeon theme (by rav3ndust, on
-# the Chrome Web Store) installs itself via managed enterprise policy on
-# first launch — no clicks, no profile surgery. Force-install means the
-# theme stays put while the policy is in place; that's the price of a
-# curated default. Dark mode is forced explicitly too: Chromium's
-# system-theme auto-detection is unreliable on sway (it needs
+# the Chrome Web Store) plus blackice install on first launch — no clicks,
+# no profile surgery. They arrive per-user via Chromium's External
+# Extensions mechanism, scoped to Chromium's own config dir
+# (~/.config/chromium) — deliberately NOT via managed enterprise policy:
+# /etc/chromium/policies/managed is shared with Chromium forks (Helium
+# reads it too), so the old force-install policy leaked into Helium with
+# its "managed by your organization" banner, making Helium unusable as a
+# default. Per-user install also means the user can remove them — the OS
+# suggests, the user decides. Dark mode is forced explicitly too:
+# Chromium's system-theme auto-detection is unreliable on sway (it needs
 # xdg-desktop-portal's Settings portal to see the prefer-dark dconf key,
 # and silently falls back to light without it), so a tiny wrapper in
 # /usr/local/bin injects --force-dark-mode on every launch. That covers
 # the stock launcher, the webapp launchers, xdg-open, and the terminal —
 # and an explicit `chromium --force-light-mode` still wins.
 setup_chromium() {
-  step "chromium (nightshadeNeon theme via managed policy)"
-  $DOAS install -d -m 755 /etc/chromium/policies/managed
-  $DOAS install -m 644 "$WIRED_DIR/chromium/policies/managed/navi.json" \
-    /etc/chromium/policies/managed/navi.json
-  ok "nightshadeNeon theme installs on first Chromium launch"
+  step "chromium (nightshadeNeon theme + blackice, per-user)"
+  # Retire the managed policy (migration for existing installs): it was
+  # the thing leaking into Helium. rmdir only removes empty dirs, so
+  # anyone else's policies are left alone.
+  if [ -f /etc/chromium/policies/managed/navi.json ]; then
+    $DOAS rm -f /etc/chromium/policies/managed/navi.json
+    $DOAS rmdir /etc/chromium/policies/managed 2>/dev/null || true
+    $DOAS rmdir /etc/chromium/policies 2>/dev/null || true
+    ok "retired /etc/chromium managed policy (was leaking into Helium)"
+  fi
+  # nightshadeNeon theme + blackice as External Extensions: installed on
+  # first Chromium launch, scoped to Chromium's own config dir so forks
+  # (Helium) never see them. Deployed for this user (customized configs
+  # stay sacred via deploy_config) and /etc/skel (future users).
+  local ext skel_ext
+  for ext in lllmaajdpjgggpijpcaholegiejdoihk nncobpmjfngafidkngebojkabaabbkhm; do
+    deploy_config "chromium/external-extensions/$ext.json" \
+      "$HOME/.config/chromium/External Extensions/$ext.json"
+    skel_ext="/etc/skel/.config/chromium/External Extensions/$ext.json"
+    if [ ! -f "$skel_ext" ]; then
+      $DOAS install -d -m 755 "/etc/skel/.config/chromium/External Extensions"
+      $DOAS install -m 644 "$WIRED_DIR/chromium/external-extensions/$ext.json" "$skel_ext"
+      ok "skel: chromium external extension $ext"
+    else
+      info "skel: chromium external extension $ext already present"
+    fi
+  done
   if [[ -x /usr/bin/chromium ]]; then
     $DOAS install -m 755 "$WIRED_DIR/chromium/usr-local-bin/chromium" \
       /usr/local/bin/chromium

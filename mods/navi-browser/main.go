@@ -84,6 +84,9 @@ var browserTable = []browserDef{
 		Binaries:  []string{"chromium", "chromium-browser"},
 		PolicyDir: "/etc/chromium/policies/managed",
 		ExtrasID:  "",
+		// its extensions install per-user via External Extensions
+		// (setup_chromium); the managed dir is shared with forks.
+		SkipPolicy: true,
 	},
 	{
 		ID: "helium", Name: "Helium",
@@ -91,6 +94,9 @@ var browserTable = []browserDef{
 		Binaries:  []string{"helium", "helium-browser"},
 		PolicyDir: "/etc/chromium/policies/managed",
 		ExtrasID:  "helium",
+		// shares Chromium's managed-policy dir — the light touch keeps
+		// navi's policy out of it so Helium works clean as a default.
+		SkipPolicy: true,
 	},
 	{
 		ID: "edge", Name: "Microsoft Edge",
