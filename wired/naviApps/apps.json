@@ -1598,18 +1598,6 @@
   "icon": "🎭"
  },
  {
-  "id": "native-qutebrowser",
-  "name": "qutebrowser",
-  "summary": "The keyboard-driven Vim-like browser — never touch the mouse.",
-  "category": "Internet",
-  "source": "native",
-  "package": "qutebrowser",
-  "install": "navi-extras --install qutebrowser",
-  "remove": "doas apt remove -y qutebrowser",
-  "homepage": "https://qutebrowser.org/",
-  "icon": "⌨️"
- },
- {
   "id": "native-nyxt",
   "name": "Nyxt",
   "summary": "The hacker's keyboard-driven browser, extensible in Lisp.",

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>wired</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --pink: #ff2d95; --cyan: #00ffff; --purple: #b967ff;
+    --green: #39ff14; --bg: #0d0d14; --surface: #1a1a24;
+  }
+  body {
+    background: var(--bg); color: #e0e0e0;
+    font-family: 'Noto Sans', system-ui, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; overflow: hidden;
+    position: relative;
+  }
+  /* Animated grid */
+  .grid-bg {
+    position: absolute; inset: -40px; opacity: 0.12;
+    background-image:
+      linear-gradient(rgba(255,45,149,0.4) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,255,0.4) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridMove 15s linear infinite;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  }
+  @keyframes gridMove {
+    0% { transform: translate(0,0); } 100% { transform: translate(40px,40px); }
+  }
+  /* Floating orbs */
+  .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.25; animation: float 10s ease-in-out infinite; }
+  .orb1 { width: 350px; height: 350px; background: var(--pink); top: -80px; left: -80px; }
+  .orb2 { width: 280px; height: 280px; background: var(--cyan); bottom: -60px; right: -60px; animation-delay: -3s; }
+  .orb3 { width: 180px; height: 180px; background: var(--purple); top: 40%; left: 70%; animation-delay: -6s; opacity: 0.18; }
+  @keyframes float {
+    0%,100% { transform: translate(0,0) scale(1); }
+    33% { transform: translate(40px,-30px) scale(1.08); }
+    66% { transform: translate(-20px,20px) scale(0.95); }
+  }
+  /* Katakana rain (navi signature!) */
+  #rain {
+    position: absolute; inset: 0; opacity: 0.07; pointer-events: none;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--cyan);
+    overflow: hidden; white-space: pre; line-height: 1.4;
+  }
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 5;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px);
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 4;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%);
+  }
+  .content { position: relative; z-index: 10; text-align: center; animation: fadeUp 1s ease-out; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .logo {
+    font-size: 110px; line-height: 1; margin-bottom: 4px;
+    background: linear-gradient(135deg, var(--pink), var(--cyan), var(--purple), var(--pink));
+    background-size: 300% 300%;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 35px rgba(255,45,149,0.7));
+    animation: gradientShift 5s ease infinite, logoPulse 4s ease-in-out infinite;
+  }
+  @keyframes gradientShift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+  @keyframes logoPulse { 0%,100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.04) rotate(1deg); } }
+  h1 {
+    font-size: 34px; letter-spacing: 14px; color: var(--pink); font-weight: 200;
+    margin-bottom: 6px; text-shadow: 0 0 25px rgba(255,45,149,0.9), 0 0 60px rgba(255,45,149,0.4);
+    animation: flicker 6s linear infinite;
+  }
+  @keyframes flicker {
+    0%,100% { opacity: 1; } 91% { opacity: 1; } 92% { opacity: 0.7; }
+    93% { opacity: 1; } 95% { opacity: 0.85; } 96% { opacity: 1; }
+  }
+  .sub {
+    color: var(--cyan); font-size: 12px; letter-spacing: 8px; margin-bottom: 12px;
+    text-shadow: 0 0 12px rgba(0,255,255,0.7);
+  }
+  .typed-line {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--green);
+    height: 20px; margin-bottom: 28px; text-shadow: 0 0 8px rgba(57,255,20,0.5);
+  }
+  .typed-line::after { content: '▊'; animation: blink 1s step-end infinite; color: var(--pink); }
+  @keyframes blink { 50% { opacity: 0; } }
+  /* ── search: the startpage is a command line ── */
+  .search-wrap { position: relative; width: 480px; max-width: 80vw; margin: 0 auto 34px; }
+  #search {
+    width: 100%; background: rgba(26,26,36,0.75); border: 1px solid #2a2a35;
+    border-radius: 14px; padding: 14px 18px 14px 46px; color: #e0e0e0;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; outline: none;
+    backdrop-filter: blur(12px); transition: all 0.25s ease;
+  }
+  #search::placeholder { color: #555; }
+  #search:focus {
+    border-color: var(--pink);
+    box-shadow: 0 0 0 1px rgba(255,45,149,0.4), 0 8px 30px rgba(255,45,149,0.25);
+  }
+  .search-wrap::before {
+    content: '∅'; position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    color: var(--pink); font-size: 18px; text-shadow: 0 0 10px rgba(255,45,149,0.8);
+    pointer-events: none;
+  }
+  .search-wrap .slash {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    color: #555; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    border: 1px solid #2a2a35; border-radius: 6px; padding: 2px 8px; pointer-events: none;
+  }
+  #search:focus + .slash { display: none; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; max-width: 660px; }
+  a {
+    background: rgba(26,26,36,0.75); border: 1px solid #2a2a35;
+    border-radius: 18px; padding: 24px 16px; text-align: center;
+    text-decoration: none; color: #e0e0e0; transition: all 0.3s cubic-bezier(0.2,0.8,0.3,1.2);
+    backdrop-filter: blur(12px); position: relative; overflow: hidden;
+  }
+  a::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,45,149,0.25), rgba(0,255,255,0.12), rgba(185,103,255,0.15));
+    opacity: 0; transition: opacity 0.3s ease;
+  }
+  a::after {
+    content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    transition: left 0.5s ease;
+  }
+  a:hover::before { opacity: 1; }
+  a:hover::after { left: 100%; }
+  a:hover {
+    border-color: var(--pink); transform: translateY(-5px) scale(1.03);
+    box-shadow: 0 14px 36px rgba(255,45,149,0.45), 0 0 0 1px rgba(255,45,149,0.3);
+  }
+  a .icon { font-size: 34px; display: block; margin-bottom: 8px; position: relative; filter: drop-shadow(0 0 8px rgba(255,45,149,0.4)); }
+  a .label { font-size: 12px; color: #999; position: relative; letter-spacing: 2px; text-transform: uppercase; }
+  a:hover .label { color: var(--pink); }
+  .hint {
+    margin-top: 36px; color: #555; font-size: 12px;
+    font-family: 'JetBrains Mono', monospace; position: relative;
+  }
+  .hint b { color: var(--pink); text-shadow: 0 0 8px rgba(255,45,149,0.6); }
+  .hint span { color: var(--cyan); }
+  .clock {
+    position: absolute; top: 24px; right: 32px; z-index: 10;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--cyan);
+    text-shadow: 0 0 10px rgba(0,255,255,0.5); letter-spacing: 2px;
+  }
+  .date-line {
+    position: absolute; top: 24px; left: 32px; z-index: 10;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--pink);
+    text-shadow: 0 0 10px rgba(255,45,149,0.5); letter-spacing: 2px;
+  }
+</style></head>
+<body>
+  <div class="grid-bg"></div>
+  <div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div>
+  <div id="rain"></div>
+  <div class="vignette"></div><div class="scanlines"></div>
+  <div class="clock" id="clock">00:00</div>
+  <div class="date-line" id="dateline">---</div>
+  <div class="content">
+    <div class="logo">∅</div>
+    <h1>WIRED</h1>
+    <div class="sub">NAVIGATE WITH INTENT</div>
+    <div class="typed-line" id="typed"></div>
+    <div class="search-wrap">
+      <input id="search" type="text" placeholder="!yt query · !gh repo · !w article · plain text searches Brave" autocomplete="off" spellcheck="false">
+      <span class="slash">/</span>
+    </div>
+    <div class="grid">
+      <a href="https://neighborli.xyz"><span class="icon">🌐</span><span class="label">neighborli</span></a>
+      <a href="https://xvoidsx.github.io/navi-radio/"><span class="icon">🎵</span><span class="label">navi radio</span></a>
+      <a href="https://glyyph.app"><span class="icon">📡</span><span class="label">glyyph</span></a>
+      <a href="https://xvoidsx.org"><span class="icon">∅</span><span class="label">xvoidsx</span></a>
+      <a href="file:///usr/share/navi/wired/naviApps/index.html"><span class="icon">📦</span><span class="label">naviApps</span></a>
+      <a href="https://github.com/xvoidsx"><span class="icon">💻</span><span class="label">github</span></a>
+      <a href="file:///usr/share/navi/wired/manual/manual.html"><span class="icon">📖</span><span class="label">manual</span></a>
+      <a href="https://search.brave.com/"><span class="icon">🔍</span><span class="label">search</span></a>
+    </div>
+    <div class="hint"><b>/</b> search · <b>!yt</b> query · <b>!gh</b> repo · <b>,n</b> neighborli · <span>o</span> open · <span>T</span> tabs · <b>:help</b> keys</div>
+  </div>
+<script>
+  // Live clock
+  function tick() {
+    const n = new Date();
+    document.getElementById('clock').textContent =
+      String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+    document.getElementById('dateline').textContent =
+      n.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}).toUpperCase();
+  }
+  tick(); setInterval(tick, 10000);
+  // Typing effect
+  const lines = [
+    "> welcome to the wired, traveler...",
+    "> keyboard is faster than mouse. trust.",
+    "> press / to search. !bangs take you anywhere.",
+    "> o to open a url. T for tabs.",
+    "> the web, minus the cruft."
+  ];
+  let li = 0, ci = 0, del = false;
+  const el = document.getElementById('typed');
+  (function type() {
+    const line = lines[li];
+    el.textContent = line.slice(0, ci);
+    if (!del && ci < line.length) { ci++; setTimeout(type, 45); }
+    else if (!del) { del = true; setTimeout(type, 2200); }
+    else if (ci > 0) { ci--; setTimeout(type, 18); }
+    else { del = false; li = (li+1) % lines.length; setTimeout(type, 400); }
+  })();
+  // Bang-aware search — mirrors the bangs in config.py
+  const BANGS = {
+    "!yt": "https://www.youtube.com/results?search_query={}",
+    "!gh": "https://github.com/search?q={}",
+    "!w": "https://en.wikipedia.org/wiki/Special:Search?search={}",
+    "!so": "https://stackoverflow.com/search?q={}",
+    "!mdn": "https://developer.mozilla.org/en-US/search?q={}",
+    "!npm": "https://www.npmjs.com/search?q={}",
+    "!pypi": "https://pypi.org/search/?q={}",
+    "!arch": "https://wiki.archlinux.org/index.php?search={}",
+    "!g": "https://www.google.com/search?q={}",
+    "!ddg": "https://duckduckgo.com/?q={}",
+    "!sp": "https://startpage.com/sp/search?query={}",
+    "!r": "https://www.reddit.com/search/?q={}",
+    "!hn": "https://hn.algolia.com/?q={}",
+    "!radio": "https://xvoidsx.github.io/navi-radio/?q={}",
+    "!nl": "https://neighborli.xyz/search?q={}",
+    "!apps": "file:///usr/share/navi/wired/naviApps/index.html?q={}",
+    "!wired": "https://navi.xvoidsx.org/?q={}"
+  };
+  const DEFAULT_SEARCH = "https://search.brave.com/search?q={}";
+  const search = document.getElementById('search');
+  search.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const raw = search.value.trim();
+    if (!raw) return;
+    let url;
+    const m = raw.match(/^(![a-z]+)\s+(.*)$/);
+    if (m && BANGS[m[1]]) {
+      url = BANGS[m[1]].replace("{}", encodeURIComponent(m[2]));
+    } else {
+      url = DEFAULT_SEARCH.replace("{}", encodeURIComponent(raw));
+    }
+    window.location.href = url;
+  });
+  // "/" focuses search, vim-style (unless already typing)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement !== search &&
+        !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
+      e.preventDefault();
+      search.focus();
+    }
+  });
+  // Katakana rain
+  const kana = "アカサタナハマヤラワ0123456789∅";
+  const rain = document.getElementById('rain');
+  const cols = Math.floor(window.innerWidth / 18);
+  let drops = Array(cols).fill(0).map(() => Math.random() * -50);
+  function drawRain() {
+    let out = "";
+    const rows = Math.floor(window.innerHeight / 20);
+    let grid = Array(rows).fill().map(() => Array(cols).fill(" "));
+    drops.forEach((d, i) => {
+      const r = Math.floor(d);
+      if (r >= 0 && r < rows) grid[r][i] = kana[Math.floor(Math.random()*kana.length)];
+      drops[i] += 0.4 + Math.random() * 0.4;
+      if (drops[i] > rows + 5) drops[i] = Math.random() * -10;
+    });
+    rain.textContent = grid.map(r => r.join("")).join("\n");
+    requestAnimationFrame(drawRain);
+  }
+  drawRain();
+</script>
+</body></html>

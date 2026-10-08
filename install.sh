@@ -83,7 +83,7 @@ PKGS=(
   fonts-jetbrains-mono fonts-firacode fonts-noto fonts-cascadia-code wdisplays papirus-icon-theme moka-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak dconf-cli
-  chromium firefox-esr
+  chromium firefox-esr qutebrowser
   # zstd: the ollama installer needs it to unpack its payload.
   zstd
   # wifi firmware bundle: every common wireless chipset, so networking is
@@ -1345,6 +1345,11 @@ deploy_configs() {
   deploy_config "elinks/elinks.conf"          "$HOME/.config/elinks/elinks.conf"
   deploy_config "lynx/lynx.cfg"               "/etc/lynx.cfg"
   deploy_config "lynx/lynxrc"                 "$HOME/.lynxrc"
+  # qutebrowser: navi's keyboard-driven browser. the nightshadeNeon config
+  # and startpage ship together — config.py locates startpage.html beside
+  # itself, so both land in ~/.config/qutebrowser/.
+  deploy_config "qutebrowser/config.py"       "$HOME/.config/qutebrowser/config.py"
+  deploy_config "qutebrowser/startpage.html"  "$HOME/.config/qutebrowser/startpage.html"
   # best-effort agent configs; paths to be confirmed against the apps
   deploy_config "ai/opencode/tui.json"        "$HOME/.config/opencode/tui.json"
   deploy_config "ai/pi/agent/themes/nightshadeNeon.json" \
