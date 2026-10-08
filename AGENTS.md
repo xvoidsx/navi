@@ -8,8 +8,11 @@
 ## What navi is
 
 navi is xvoidsx's Linux distro: a complete, opinionated, **agent-native**
-desktop OS on a dependable **Debian (trixie) base**. Wayland-first
-(**sway**, our "wired" session), X11 fallback (**i3**). Deep blacks, neon
+desktop OS on a dependable **Debian (trixie) base**. **Wayland-only**
+(**sway**, our "wired" session) since 2026-10-08 — the X11 session (i3)
+was retired; even the 2008 ThinkPad x200 renders sway fine, so the
+compat argument was dead. XWayland covers X11 apps. The i3/picom/polybar
+configs stay in the repo as the port-back kit. Deep blacks, neon
 pink, phosphor green — the **nightshadeNeon** design language across the
 whole desktop.
 

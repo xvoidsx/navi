@@ -56,19 +56,20 @@ MANIFEST_TMP=""
 # Every apt package, audited against Debian 13 "trixie" (2026-09-10).
 # Corrections baked in: opendoas (doas is a transitional dummy), no slock
 # (virtual, provided by suckless-tools), imagemagick-7.q16 (imagemagick is
-# virtual). i3status + i3blocks were dropped: navi uses polybar, not i3bar,
-# on the X11 session.
+# virtual). Wayland-only since 2026-10-08: the X11 session (i3/picom/polybar)
+# is retired, so its packages are gone from this list. XWayland stays for
+# X11 apps (dmenu, lxpolkit) under sway.
 PKGS=(
   # sudo rides along for compatibility: third-party install scripts
   # (scripts/installers/*) and random upstream tooling expect it.
   # doas stays the navi-native way up; see setup_sudo.
-  i3 i3lock-fancy nitrogen pamixer wget curl git htop opendoas sudo lsd
-  nsxiv pulseaudio-utils xcompmgr picom waybar alacritty fonts-inter xterm
+  pamixer wget curl git htop opendoas sudo lsd
+  nsxiv pulseaudio-utils waybar alacritty fonts-inter
   # navi-bluetooth (eiri): BlueZ for bluetoothctl, upower for the headset
   # battery fallback when a device doesn't report Battery Percentage itself.
   bluez upower
-  arandr nemo rofi xss-lock feh pandoc volumeicon-alsa polybar dunst
-  flameshot meteo-qt pasystray ffmpeg mpv kitty stterm surf conky-all suckless-tools zathura zathura-pdf-poppler maim xdotool xclip
+  nemo rofi pandoc dunst
+  flameshot meteo-qt ffmpeg mpv kitty conky-all suckless-tools zathura zathura-pdf-poppler
   lxpolkit lxappearance vim nnn cmus cava amfora sway swaylock
   swayidle swaybg grimshot xdg-desktop-portal-wlr qt5ct tty-clock wf-recorder
   brightnessctl sakura foot gsimplecal calcurse pavucontrol playerctl yaru-theme-gtk yaru-theme-icon bibata-cursor-theme
@@ -1457,15 +1458,6 @@ install_commands() {
   install_bin "nslock.sh"           "nslock"
   install_bin "naviWalls.sh"        "naviWalls"
   install_bin "gifpaperslain.sh"    "gifpaperslain"
-  install_bin "navi-blur-toggle.sh" "navi-blur-toggle"
-
-  # xwinwrap (X11 animated wallpapers — not in Debian, vendored under wired/bin)
-  if [ -e "$WIRED_SHARE/bin/xwinwrap/xwinwrap" ]; then
-    $DOAS install -m 0755 "$WIRED_SHARE/bin/xwinwrap/xwinwrap" "/usr/bin/xwinwrap"
-    ok "xwinwrap"
-  else
-    warn "missing vendored binary: bin/xwinwrap/xwinwrap — skipping"
-  fi
   install_bin "navi-wallpaper.sh"   "navi-wallpaper"
   install_bin "navi-fetch.sh"      "navi-fetch"
   install_bin "navi-dmenu-run.sh"  "navi-dmenu-run"
@@ -1898,8 +1890,10 @@ setup_sddm() {
   done
   $DOAS install -m 644 "$WIRED_DIR/sessions/navi.desktop" \
     /usr/share/wayland-sessions/navi.desktop
-  $DOAS install -m 644 "$WIRED_DIR/sessions/navi-x11.desktop" \
-    /usr/share/xsessions/navi.desktop
+  # Wayland-only (2026-10-08): the X11 session is retired. Remove the
+  # session file on existing machines so SDDM stops offering it. The
+  # i3/picom/polybar configs stay in the repo as the port-back kit.
+  $DOAS rm -f /usr/share/xsessions/navi.desktop
   # stamp the session names from wired/VERSION (single source of truth) so
   # SDDM shows the channel — "navi 2.0 "eiri"" vs "navi 1.6 "mika"" — instead
   # of a stale hardcoded release. every deploy and every navi-update
@@ -1909,8 +1903,6 @@ setup_sddm() {
   sname="$(printf '%s' "$NAVI_VERSION" | awk '{print $2}' | tr -d '"')"
   $DOAS sed -i -e "s/^Name=.*/Name=navi $sver \"$sname\" (Wayland)/" \
     /usr/share/wayland-sessions/navi.desktop
-  $DOAS sed -i -e "s/^Name=.*/Name=navi $sver \"$sname\" (X11)/" \
-    /usr/share/xsessions/navi.desktop
   # stamp the theme footer too — Main.qml hardcodes a release string and
   # would otherwise show a stale version on the login screen itself.
   $DOAS sed -i -e "s/text: \"navi .*/text: \"navi $sver \\\\\"$sname\\\\\"\"/" \
