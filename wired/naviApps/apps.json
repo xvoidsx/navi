@@ -1562,6 +1562,18 @@
   "icon": "🦁"
  },
  {
+  "id": "native-brave-origin-nightly",
+  "name": "Brave Origin Nightly",
+  "summary": "Brave Origin on the bleeding edge — nightly builds for origin enjoyers.",
+  "category": "Internet",
+  "source": "native",
+  "package": "brave-origin-nightly",
+  "install": "navi-extras --install brave-origin-nightly",
+  "remove": "doas apt remove -y brave-origin-nightly",
+  "homepage": "https://brave.com/",
+  "icon": "🌅"
+ },
+ {
   "id": "native-edge",
   "name": "Microsoft Edge",
   "summary": "Microsoft's Chromium-based browser — from Microsoft's own apt repo.",

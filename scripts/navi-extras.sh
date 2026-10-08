@@ -25,6 +25,7 @@ EXTRAS=(
   "firefox-nightly|Firefox Nightly|Bleeding-edge Firefox, straight from Mozilla's apt repo|command -v firefox-nightly >/dev/null 2>&1|nightly-browsers.sh|firefox"
   "brave-nightly|Brave Nightly|Bleeding-edge Brave, for life on the edge|command -v brave-browser-nightly >/dev/null 2>&1|nightly-browsers.sh|brave"
   "brave-origin|Brave Origin|Brave stripped to its essentials — Shields and speed, minus the crypto, AI, and VPN extras. Free on Linux|command -v brave-origin-stable >/dev/null 2>&1|brave-origin-installer.sh|"
+  "brave-origin-nightly|Brave Origin Nightly|Brave Origin on the bleeding edge — nightly builds for origin enjoyers|command -v brave-origin-nightly >/dev/null 2>&1|brave-origin-nightly-installer.sh|"
   "chrome|Google Chrome|The browser half the planet uses, from Google's own apt repo|command -v google-chrome >/dev/null 2>&1|chrome-installer.sh|"
   "chrome-canary|Google Chrome Canary|Bleeding-edge Chrome, straight from Google's apt repo|command -v google-chrome-unstable >/dev/null 2>&1|chrome-canary-installer.sh|"
   "edge|Microsoft Edge|Microsoft's Chromium-based browser, from Microsoft's own apt repo|command -v microsoft-edge-stable >/dev/null 2>&1|msedge-installer.sh|"
