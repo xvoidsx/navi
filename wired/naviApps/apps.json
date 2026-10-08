@@ -951,6 +951,18 @@
   "icon": "✈️"
  },
  {
+  "id": "native-matui",
+  "name": "matui",
+  "summary": "Matrix chat in the terminal — a TUI client for your Matrix account.",
+  "category": "Internet",
+  "source": "native",
+  "package": "matui",
+  "install": "navi-extras --install matui",
+  "remove": "doas rm -f /usr/local/bin/matui",
+  "homepage": "https://github.com/pkulak/matui",
+  "icon": "💬"
+ },
+ {
   "id": "web-wikipedia",
   "name": "Wikipedia",
   "summary": "The free encyclopedia.",
@@ -1726,6 +1738,18 @@
   "install": "navi-extras --install cliamp",
   "homepage": "https://github.com/bjarneo/cliamp",
   "icon": "🎵"
+ },
+ {
+  "id": "native-songsnatch",
+  "name": "SongSnatch",
+  "summary": "Snag audio from YouTube via yt-dlp — saves to ~/Music. By xvoidsx.",
+  "category": "Multimedia",
+  "source": "native",
+  "package": "songsnatch",
+  "install": "navi-extras --install songsnatch",
+  "remove": "",
+  "homepage": "https://github.com/xvoidsx/songsnatch",
+  "icon": "🎶"
  },
  {
   "id": "native-navivim",
