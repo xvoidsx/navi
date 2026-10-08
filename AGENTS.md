@@ -115,7 +115,12 @@ Firefox ESR ships too. The OS suggests, the user decides.
   Preferences silently does nothing. Both files land in `/etc/skel`
   (future users) and the invoking user's `$HOME`; existing files are
   never overwritten, and seeding is skipped while Brave is running (it
-  rewrites Preferences on exit).
+  rewrites Preferences on exit). **Every installed Brave variant gets
+  the same vision** (2026-10-08): release, nightly
+  (`Brave-Browser-Nightly`), origin (`Brave-Origin` — verified from the
+  binary; origin nightly shares it). install.sh seeds installed variants;
+  the variant installers (`nightly-browsers.sh`, `brave-origin*.sh`)
+  seed via `scripts/installers/brave-seed-lib.sh` right after install.
 - **Brave gets the light touch, always:** no managed policy, no
   force-installed extensions. Shields covers ad/tracker blocking, so
   **blackice stays Chromium-only**. **Proton Pass was removed 2026-09-29**;

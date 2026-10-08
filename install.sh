@@ -1966,7 +1966,10 @@ setup_chromium() {
 #     silently does nothing)
 # Both land in /etc/skel (future users) and the invoking user's $HOME
 # (this install). Existing files are never overwritten, and Brave must
-# not be running while seeding — it rewrites Preferences on exit.
+# not be running while seeding — it rewrites Preferences on exit. Every
+# installed Brave variant (release, nightly, origin, origin-nightly —
+# origin nightly shares origin's profile dir) gets the same treatment:
+# the navi vision follows the browser that is installed.
 setup_brave() {
   step "brave (navi's default browser)"
   # Brave's official apt repo — same keyring/sources pattern as
@@ -1988,8 +1991,20 @@ setup_brave() {
     info "brave-browser already installed"
   fi
 
-  seed_brave_profile /etc/skel doas
-  seed_brave_profile "$HOME"
+  seed_brave_profile /etc/skel "Brave-Browser" doas
+  seed_brave_profile "$HOME" "Brave-Browser"
+  # The navi vision follows every installed Brave variant — not just
+  # release. Origin nightly shares release Origin's profile dir
+  # (Brave-Origin), so it needs no separate seed.
+  if command -v brave-browser-nightly >/dev/null 2>&1; then
+    seed_brave_profile /etc/skel "Brave-Browser-Nightly" doas
+    seed_brave_profile "$HOME" "Brave-Browser-Nightly"
+  fi
+  if command -v brave-origin-stable >/dev/null 2>&1 \
+    || command -v brave-origin >/dev/null 2>&1; then
+    seed_brave_profile /etc/skel "Brave-Origin" doas
+    seed_brave_profile "$HOME" "Brave-Origin"
+  fi
 
   # navi's browser runtime defaults to Brave: ~/.config/navi/default-browser
   # drives navi-browser-run (webapps). Only write when absent or still
@@ -2013,12 +2028,12 @@ setup_brave() {
   fi
 }
 
-# seed_brave_profile <base> [doas] — write Brave's navi defaults under
-# <base>/.config/BraveSoftware/Brave-Browser/. Existing files are left
-# alone. Pass "doas" to elevate (for /etc/skel).
+# seed_brave_profile <base> <BraveSoftware-subdir> [doas] — write navi's
+# Brave defaults under <base>/.config/BraveSoftware/<subdir>/. Existing
+# files are left alone. Pass "doas" to elevate (for /etc/skel).
 seed_brave_profile() {
-  local base="$1" priv="${2:-}"
-  local dir="$base/.config/BraveSoftware/Brave-Browser"
+  local base="$1" subdir="$2" priv="${3:-}"
+  local dir="$base/.config/BraveSoftware/$subdir"
   if pgrep -x brave >/dev/null 2>&1 || pgrep -x brave-browser >/dev/null 2>&1; then
     warn "Brave is running — skipping config seed (it rewrites Preferences on exit)"
     return 0

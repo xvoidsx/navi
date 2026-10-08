@@ -12,6 +12,9 @@ install_brave_origin () {
   doas curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources https://brave-browser-apt-release.s3.brave.com/brave-browser.sources
   # install brave origin
   doas apt update && doas apt install -y "$pkg"
+  # navi vision for origin (ultradark, compact tabs, ...)
+  source "$(dirname "${BASH_SOURCE[0]}")/brave-seed-lib.sh"
+  seed_brave_variant "Brave-Origin"
 }
 
 main () {

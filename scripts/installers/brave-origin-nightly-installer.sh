@@ -14,6 +14,9 @@ install_brave_origin_nightly() {
     https://brave-browser-apt-nightly.s3.brave.com/brave-browser.sources
   # install brave origin nightly
   doas apt update && doas apt install -y "$pkg"
+  # navi vision for origin nightly — shares release origin's profile dir
+  source "$(dirname "${BASH_SOURCE[0]}")/brave-seed-lib.sh"
+  seed_brave_variant "Brave-Origin"
 }
 
 main() {

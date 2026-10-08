@@ -26,6 +26,9 @@ EOF
 }
 brave_nightly_install () {
   curl -fsS https://dl.brave.com/install.sh | CHANNEL=nightly sh
+  # navi vision for the nightly variant (ultradark, compact tabs, ...)
+  source "$(dirname "${BASH_SOURCE[0]}")/brave-seed-lib.sh"
+  seed_brave_variant "Brave-Browser-Nightly"
 }
 main () {
   # target: firefox | brave | all (default all). lets navi-extras offer each
