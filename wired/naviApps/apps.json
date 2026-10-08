@@ -1598,6 +1598,78 @@
   "icon": "🎭"
  },
  {
+  "id": "native-qutebrowser",
+  "name": "qutebrowser",
+  "summary": "The keyboard-driven Vim-like browser — never touch the mouse.",
+  "category": "Internet",
+  "source": "native",
+  "package": "qutebrowser",
+  "install": "navi-extras --install qutebrowser",
+  "remove": "doas apt remove -y qutebrowser",
+  "homepage": "https://qutebrowser.org/",
+  "icon": "⌨️"
+ },
+ {
+  "id": "native-nyxt",
+  "name": "Nyxt",
+  "summary": "The hacker's keyboard-driven browser, extensible in Lisp.",
+  "category": "Internet",
+  "source": "native",
+  "package": "nyxt",
+  "install": "navi-extras --install nyxt",
+  "remove": "doas apt remove -y nyxt",
+  "homepage": "https://nyxt.atlas.engineer/",
+  "icon": "🧠"
+ },
+ {
+  "id": "native-lynx",
+  "name": "Lynx",
+  "summary": "The classic terminal web browser — the web at the speed of text.",
+  "category": "Internet",
+  "source": "native",
+  "package": "lynx",
+  "install": "navi-extras --install lynx",
+  "remove": "doas apt remove -y lynx",
+  "homepage": "https://lynx.invisible-island.net/",
+  "icon": "📟"
+ },
+ {
+  "id": "native-w3m",
+  "name": "w3m",
+  "summary": "Terminal web browsing with inline image support.",
+  "category": "Internet",
+  "source": "native",
+  "package": "w3m",
+  "install": "navi-extras --install w3m",
+  "remove": "doas apt remove -y w3m",
+  "homepage": "https://salsa.debian.org/debian/w3m",
+  "icon": "🌐"
+ },
+ {
+  "id": "native-falkon",
+  "name": "Falkon",
+  "summary": "KDE's lightweight QtWebEngine browser.",
+  "category": "Internet",
+  "source": "native",
+  "package": "falkon",
+  "install": "navi-extras --install falkon",
+  "remove": "doas apt remove -y falkon",
+  "homepage": "https://www.falkon.org/",
+  "icon": "🦅"
+ },
+ {
+  "id": "native-epiphany",
+  "name": "GNOME Web",
+  "summary": "GNOME's clean WebKit browser — the WebKit option on Linux.",
+  "category": "Internet",
+  "source": "native",
+  "package": "epiphany",
+  "install": "navi-extras --install epiphany",
+  "remove": "doas apt remove -y epiphany-browser",
+  "homepage": "https://apps.gnome.org/Epiphany/",
+  "icon": "🧭"
+ },
+ {
   "id": "native-signal",
   "name": "Signal",
   "summary": "Private messaging — end-to-end encrypted texts, voice, and video calls. The native desktop app.",
