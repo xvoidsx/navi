@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# navi-theme — choose the Navi waybar theme.
+# navi-theme — choose the Navi bar theme.
 #
+# Session-aware: waybar themes on Wayland, polybar themes on X11.
 # The distro that feels alive, and lets you pick how it looks.
 #
 #   navi-theme                  interactive picker with real screenshots
@@ -11,29 +12,48 @@
 #   navi-theme edit <name>      open a theme's css in $EDITOR
 #   navi-theme --help
 #
-# Themes live one-per-directory so a theme can grow to carry its own config.json
-# later without breaking anything:
+# Themes live one-per-directory:
 #
-#   ~/.local/share/navi/waybar/themes/<name>/theme.css   user  (wins)
-#   /usr/share/navi/waybar/themes/<name>/theme.css      system (distro)
+#   Wayland: ~/.local/share/navi/waybar/themes/<name>/theme.css   user  (wins)
+#            /usr/share/navi/waybar/themes/<name>/theme.css      system (distro)
+#   X11:     ~/.local/share/navi/polybar/themes/<name>/config.ini user (wins)
+#            /usr/share/navi/polybar/themes/<name>/config.ini    system (distro)
 #   .../<name>/meta                                    optional key=value info
 #
-# The active theme is simply the one whose theme.css matches the live style.css,
-# so there is no separate state file to drift out of sync.
+# The active theme is simply the one whose theme file matches the live
+# style.css (waybar) / config.ini (polybar), so there is no separate state
+# file to drift out of sync.
 
 set -uo pipefail
 
-WAYBAR_DIR="${WAYBAR_DIR:-$HOME/.config/waybar}"
-USER_THEMES="${NAVI_THEMES_USER:-$HOME/.local/share/navi/waybar/themes}"
-SYS_THEMES="${NAVI_THEMES_SYS:-/usr/share/navi/waybar/themes}"
+is_x11() {
+    # X11 when the session says so, or when there's a DISPLAY but no Wayland
+    [ "${XDG_SESSION_TYPE:-}" = "x11" ] || { [ -n "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; }
+}
+
+if is_x11; then
+    BAR="polybar"
+    THEME_FILE="config.ini"
+    BAR_DIR="${POLYBAR_DIR:-$HOME/.config/polybar}"
+    USER_THEMES="${NAVI_THEMES_USER:-$HOME/.local/share/navi/polybar/themes}"
+    SYS_THEMES="${NAVI_THEMES_SYS:-/usr/share/navi/polybar/themes}"
+else
+    BAR="waybar"
+    THEME_FILE="theme.css"
+    BAR_DIR="${WAYBAR_DIR:-$HOME/.config/waybar}"
+    USER_THEMES="${NAVI_THEMES_USER:-$HOME/.local/share/navi/waybar/themes}"
+    SYS_THEMES="${NAVI_THEMES_SYS:-/usr/share/navi/waybar/themes}"
+fi
+WAYBAR_DIR="$BAR_DIR" # legacy name kept for the die() message below
 CACHE="${NAVI_THEME_CACHE:-$HOME/.cache/navi-theme}"
-STYLE="$WAYBAR_DIR/style.css"
+STYLE="$BAR_DIR/$THEME_FILE"
+[ "$BAR" = waybar ] && STYLE="$BAR_DIR/style.css"
 SHOTS="$CACHE/shots"
 
 die() { printf 'navi-theme: %s\n' "$*" >&2; exit 1; }
 say() { printf '%s\n' "$*"; }
 
-[ -d "$WAYBAR_DIR" ] || die "no waybar config at $WAYBAR_DIR"
+[ -d "$BAR_DIR" ] || die "no $BAR config at $BAR_DIR"
 
 # ---------------------------------------------------------------- discovery --
 
@@ -41,15 +61,15 @@ say() { printf '%s\n' "$*"; }
 # the same name shadows the system one.
 all_themes() {
     {
-        [ -d "$SYS_THEMES" ] && find "$SYS_THEMES" -mindepth 2 -maxdepth 2 -name theme.css -printf '%h\n' 2>/dev/null
-        [ -d "$USER_THEMES" ] && find "$USER_THEMES" -mindepth 2 -maxdepth 2 -name theme.css -printf '%h\n' 2>/dev/null
+        [ -d "$SYS_THEMES" ] && find "$SYS_THEMES" -mindepth 2 -maxdepth 2 -name "$THEME_FILE" -printf '%h\n' 2>/dev/null
+        [ -d "$USER_THEMES" ] && find "$USER_THEMES" -mindepth 2 -maxdepth 2 -name "$THEME_FILE" -printf '%h\n' 2>/dev/null
     } | while read -r d; do basename "$d"; done | awk '!seen[$0]++' | sort
 }
 
 theme_dir() {
     # user overrides system
-    [ -f "$USER_THEMES/$1/theme.css" ] && { printf '%s\n' "$USER_THEMES/$1"; return; }
-    [ -f "$SYS_THEMES/$1/theme.css" ] && { printf '%s\n' "$SYS_THEMES/$1"; return; }
+    [ -f "$USER_THEMES/$1/$THEME_FILE" ] && { printf '%s\n' "$USER_THEMES/$1"; return; }
+    [ -f "$SYS_THEMES/$1/$THEME_FILE" ] && { printf '%s\n' "$SYS_THEMES/$1"; return; }
     return 1
 }
 
@@ -62,7 +82,7 @@ current_theme() {
     local n
     for n in $(all_themes); do
         local d; d=$(theme_dir "$n") || continue
-        cmp -s "$d/theme.css" "$STYLE" 2>/dev/null && { printf '%s\n' "$n"; return; }
+        cmp -s "$d/$THEME_FILE" "$STYLE" 2>/dev/null && { printf '%s\n' "$n"; return; }
     done
     printf 'custom\n'
 }
@@ -102,6 +122,28 @@ sys.exit(1 if errs else 0)
 PY
 }
 
+validate_ini() {
+    python3 - "$1" <<'PY' 2>/dev/null
+import sys, configparser
+c = configparser.ConfigParser(interpolation=None)
+c.optionxform = str
+try:
+    c.read(sys.argv[1])
+    assert c.sections(), "no sections"
+except Exception as e:
+    print("  %s" % e)
+    sys.exit(1)
+PY
+}
+
+reload_bar() {
+    if [ "$BAR" = polybar ]; then
+        polybar-msg cmd restart 2>/dev/null || true
+    else
+        pkill -SIGUSR2 -x waybar 2>/dev/null || true
+    fi
+}
+
 apply_theme() { # <name>
     local name="$1" d out
     d=$(theme_dir "$name") || {
@@ -111,13 +153,20 @@ apply_theme() { # <name>
     }
 
     # Capture stderr too: a hard parse failure raises rather than reporting.
-    if ! out=$(validate_css "$d/theme.css" 2>&1); then
-        printf '%s\n' "$out" >&2
-        die "theme '$name' is invalid — bar left on '$(current_theme)'"
+    if [ "$BAR" = polybar ]; then
+        if ! out=$(validate_ini "$d/$THEME_FILE" 2>&1); then
+            printf '%s\n' "$out" >&2
+            die "theme '$name' is invalid — bar left on '$(current_theme)'"
+        fi
+    else
+        if ! out=$(validate_css "$d/$THEME_FILE" 2>&1); then
+            printf '%s\n' "$out" >&2
+            die "theme '$name' is invalid — bar left on '$(current_theme)'"
+        fi
     fi
 
-    cp -f "$d/theme.css" "$STYLE"
-    pkill -SIGUSR2 -x waybar 2>/dev/null || true
+    cp -f "$d/$THEME_FILE" "$STYLE"
+    reload_bar
 
     if command -v notify-send >/dev/null 2>&1; then
         notify-send -a "navi-theme" -u low -t 2200 \
@@ -129,24 +178,36 @@ apply_theme() { # <name>
 # ---------------------------------------------------------------- previews --
 
 bar_width() {
-    swaymsg -t get_outputs 2>/dev/null | jq -r '.[] | select(.active) | (.width // .modes[0].width) // empty' 2>/dev/null | head -1
+    if is_x11; then
+        xrandr 2>/dev/null | grep '\*' | head -1 | grep -o '[0-9]*x[0-9]*' | cut -dx -f1
+    else
+        swaymsg -t get_outputs 2>/dev/null | jq -r '.[] | select(.active) | (.width // .modes[0].width) // empty' 2>/dev/null | head -1
+    fi
 }
 
 # Real screenshots, not mockups: switch, let waybar settle, grim the bar, then
 # put the previous theme back. A rendered approximation would lie about exactly
 # the things these themes are trying to show.
 shoot() { # <name>
-    command -v grim >/dev/null 2>&1 || return 1
+    if is_x11; then
+        command -v maim >/dev/null 2>&1 || return 1
+    else
+        command -v grim >/dev/null 2>&1 || return 1
+    fi
     mkdir -p "$SHOTS"
     local w; w=$(bar_width)
     [ -n "$w" ] || w=1366
     local d; d=$(theme_dir "$1") || return 1
     local settle="${SHOT_SETTLE:-1.8}"
 
-    cp -f "$d/theme.css" "$STYLE"
-    pkill -SIGUSR2 -x waybar 2>/dev/null || true
+    cp -f "$d/$THEME_FILE" "$STYLE"
+    reload_bar
     sleep "$settle"
-    grim -g "0,0 ${w}x56" "$SHOTS/$1.png" 2>/dev/null || return 1
+    if is_x11; then
+        maim -g "${w}x56+0+0" "$SHOTS/$1.png" 2>/dev/null || return 1
+    else
+        grim -g "0,0 ${w}x56" "$SHOTS/$1.png" 2>/dev/null || return 1
+    fi
     return 0
 }
 
@@ -219,7 +280,7 @@ picker() {
                 fi
             done
         } | rofi -dmenu -i \
-            -p "navi · waybar theme" \
+            -p "navi · $BAR theme" \
             -theme "$HOME/.config/rofi/navi-theme.rasi"
     )
 

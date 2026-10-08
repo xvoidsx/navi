@@ -1257,6 +1257,45 @@ deploy_waybar_themes() {
   ok "waybar themes -> ~/.local/share/navi/waybar/themes"
 }
 
+deploy_polybar_themes() {
+  # deploy_polybar_themes — the polybar theme store (X11 session).
+  # system: /usr/share/navi/polybar/themes/<name>/{config.ini,meta}
+  # user:   ~/.local/share/navi/polybar/themes/<name>/{config.ini,meta} (wins)
+  # navi-theme resolves user-first and applies the winner live via
+  # `polybar-msg cmd restart`. Same untouched-only overwrite rule as waybar.
+  local src_dir="$WIRED_SHARE/polybar/themes"
+  [ -d "$src_dir" ] || { warn "missing polybar themes in wired/ — skipping"; return 0; }
+  local sys_dir="$SHARE_DIR/polybar/themes"
+  $DOAS mkdir -p "$sys_dir"
+  $DOAS cp -a "$src_dir/." "$sys_dir/"
+  $DOAS chmod -R a+rX "$sys_dir"
+  ok "polybar themes -> $sys_dir"
+
+  local user_dir="$HOME/.local/share/navi/polybar/themes"
+  mkdir -p "$user_dir"
+  local theme
+  for theme in "$src_dir"/*/; do
+    theme="$(basename "$theme")"
+    local dest="$user_dir/$theme"
+    if [ "$NAVI_UPDATE_MODE" -eq 1 ] && [ -d "$dest" ]; then
+      local baseline live_sha
+      baseline="$(manifest_lookup "$dest/config.ini")"
+      if [ -n "$baseline" ]; then
+        live_sha="$(sha256sum "$dest/config.ini" 2>/dev/null | cut -d' ' -f1 || true)"
+        if [ "$live_sha" != "$baseline" ]; then
+          info "kept your modified polybar theme: $theme"
+          continue
+        fi
+      fi
+    fi
+    backup_if_changed "$src_dir/$theme/config.ini" "$dest/config.ini"
+    mkdir -p "$dest"
+    cp -a "$src_dir/$theme/." "$dest/"
+    manifest_record "$src_dir/$theme/config.ini" "polybar/themes/$theme/config.ini" "$dest/config.ini" "644"
+  done
+  ok "polybar themes -> ~/.local/share/navi/polybar/themes"
+}
+
 deploy_waybar_service() {
   # deploy_waybar_service — the waybar systemd user unit.
   # replaces the packaged /usr/lib/systemd/user/waybar.service outright:
@@ -1300,6 +1339,7 @@ deploy_configs() {
   deploy_config "rofi/navi-theme.rasi"       "$HOME/.config/rofi/navi-theme.rasi"
   deploy_waybar_service
   deploy_config "polybar/config.ini"          "$HOME/.config/polybar/config.ini"
+  deploy_polybar_themes
   deploy_config "polybar/battery-combined-shell.sh" "$HOME/.config/polybar/battery-combined-shell.sh" 755
   deploy_config "rofi/config.rasi"            "$HOME/.config/rofi/config.rasi"
   deploy_config "picom/picom.conf"            "$HOME/.config/picom/picom.conf"
@@ -1417,6 +1457,15 @@ install_commands() {
   install_bin "nslock.sh"           "nslock"
   install_bin "naviWalls.sh"        "naviWalls"
   install_bin "gifpaperslain.sh"    "gifpaperslain"
+  install_bin "navi-blur-toggle.sh" "navi-blur-toggle"
+
+  # xwinwrap (X11 animated wallpapers — not in Debian, vendored under wired/bin)
+  if [ -e "$WIRED_SHARE/bin/xwinwrap/xwinwrap" ]; then
+    $DOAS install -m 0755 "$WIRED_SHARE/bin/xwinwrap/xwinwrap" "/usr/bin/xwinwrap"
+    ok "xwinwrap"
+  else
+    warn "missing vendored binary: bin/xwinwrap/xwinwrap — skipping"
+  fi
   install_bin "navi-wallpaper.sh"   "navi-wallpaper"
   install_bin "navi-fetch.sh"      "navi-fetch"
   install_bin "navi-dmenu-run.sh"  "navi-dmenu-run"

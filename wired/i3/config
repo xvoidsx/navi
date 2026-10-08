@@ -107,7 +107,12 @@ exec --no-startup-id lxpolkit
 exec --no-startup-id nitrogen --restore
 
 # X11 compositor
-exec --no-startup-id "picom -f -e 0.9 --corner-radius 3"
+# The bonus round: frosted blur, rounded corners, dimming, soft shadows —
+# the stuff sway can't do. Toggle blur with $mod+Shift+b (weak GPUs).
+exec --no-startup-id "picom --config ~/.config/picom/picom.conf"
+
+# Compositor blur toggle (X11 only — sway has no blur to toggle)
+bindsym $mod+Shift+b exec --no-startup-id "navi-blur-toggle"
 
 # Desktop information
 exec --no-startup-id conky
@@ -386,6 +391,9 @@ bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit command detected. Are y
 
 # polybar is the status bar we use in the X session
 exec --no-startup-id polybar
+
+# bar theme picker: live-switch the polybar theme (mirrors sway's Mod1+t)
+bindsym Mod1+t exec --no-startup-id "navi-theme"
 
 
 ################################################################

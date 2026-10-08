@@ -1,0 +1,14 @@
+xwinwrap — vendored for X11 gifpapers
+==========================================
+xwinwrap pins a window to the desktop layer so mpv can play animated
+wallpapers behind everything on X11 (the equivalent of mpvpaper on Wayland).
+
+Not packaged in Debian — vendored here instead.
+
+Source: https://github.com/r00tdaemon/xwinwrap (fork; gif-background use case)
+Build:  gcc -o xwinwrap xwinwrap.c -lX11 -lXext -lXrender
+        (needs libx11-dev; binary is ~30KB)
+
+The committed binary is x86_64. Rebuild for ARM when the ARM image lands.
+
+Used by: gifpaperslain (X11 branch) -> /usr/bin/xwinwrap
