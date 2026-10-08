@@ -172,6 +172,13 @@ system via `--deploy-only` (this is what `navi-update` runs after pulling).
 
 - Writes a deploy manifest to `/var/lib/navi/deploy-manifest.tsv`
   (`sha256/version/relpath/dest/mode`) so drift can be detected later.
+- **All `deploy_config` calls must live in `deploy_configs()`** (2026-10-08):
+  `manifest_write` clears `MANIFEST_TMP` when it finishes, and `setup_*`
+  functions run *after* it — a `deploy_config` in a `setup_*` function
+  hits `>> ""` and dies with `: No such file or directory` (caught live
+  on a navi-update when setup_chromium grew deploy_config calls).
+  `setup_*` may do direct `$DOAS install` writes, but never
+  `deploy_config`.
 - Sets `install -m 0755` on `/usr/bin` copies and `chmod 0755` on every
   `*.sh` under `/usr/share/navi` — scripts run no matter how the repo was
   fetched (clone, zip, tarball).

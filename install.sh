@@ -1350,6 +1350,15 @@ deploy_configs() {
   # itself, so both land in ~/.config/qutebrowser/.
   deploy_config "qutebrowser/config.py"       "$HOME/.config/qutebrowser/config.py"
   deploy_config "qutebrowser/startpage.html"  "$HOME/.config/qutebrowser/startpage.html"
+  # chromium extensions per-user (deliberately NOT managed policy — that
+  # dir is shared with forks like Helium): nightshadeNeon theme + blackice
+  # as External Extensions, scoped to ~/.config/chromium so forks never
+  # see them. /etc/skel for future users is handled in setup_chromium.
+  local ext
+  for ext in lllmaajdpjgggpijpcaholegiejdoihk nncobpmjfngafidkngebojkabaabbkhm; do
+    deploy_config "chromium/external-extensions/$ext.json" \
+      "$HOME/.config/chromium/External Extensions/$ext.json"
+  done
   # best-effort agent configs; paths to be confirmed against the apps
   deploy_config "ai/opencode/tui.json"        "$HOME/.config/opencode/tui.json"
   deploy_config "ai/pi/agent/themes/nightshadeNeon.json" \
@@ -1900,14 +1909,12 @@ setup_chromium() {
     $DOAS rmdir /etc/chromium/policies 2>/dev/null || true
     ok "retired /etc/chromium managed policy (was leaking into Helium)"
   fi
-  # nightshadeNeon theme + blackice as External Extensions: installed on
-  # first Chromium launch, scoped to Chromium's own config dir so forks
-  # (Helium) never see them. Deployed for this user (customized configs
-  # stay sacred via deploy_config) and /etc/skel (future users).
+  # nightshadeNeon theme + blackice as External Extensions, installed on
+  # first Chromium launch and scoped to Chromium's own config dir so forks
+  # (Helium) never see them. $HOME side is deployed in deploy_configs
+  # (customized configs stay sacred); /etc/skel here covers future users.
   local ext skel_ext
   for ext in lllmaajdpjgggpijpcaholegiejdoihk nncobpmjfngafidkngebojkabaabbkhm; do
-    deploy_config "chromium/external-extensions/$ext.json" \
-      "$HOME/.config/chromium/External Extensions/$ext.json"
     skel_ext="/etc/skel/.config/chromium/External Extensions/$ext.json"
     if [ ! -f "$skel_ext" ]; then
       $DOAS install -d -m 755 "/etc/skel/.config/chromium/External Extensions"
