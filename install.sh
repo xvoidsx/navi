@@ -1823,6 +1823,16 @@ setup_cyberia() {
     fi
     rm -f "$cyberia_tmp"
   fi
+  # icon: katakana placeholder (Ryoko owns the final design) — Icon=cyberia
+  # in navi-cyberia.desktop resolves via hicolor
+  local icon_src="$REPO_DIR/wired/icons/cyberia.svg"
+  if [ -f "$icon_src" ]; then
+    $DOAS install -m 0644 "$icon_src" /usr/share/icons/hicolor/scalable/apps/cyberia.svg \
+      && ok "cyberia icon -> hicolor/scalable/apps" \
+      || warn "cyberia icon install failed"
+  else
+    warn "cyberia icon not in repo (wired/icons/cyberia.svg) — skipping"
+  fi
 }
 
 setup_tailscale() {
