@@ -513,6 +513,28 @@ setup_agents() {
     rm -f "$herdr_tmp"
   fi
 
+  # cyberia (xvoidsx's nightshadeNeon Matrix client — friendly fork of
+  # pkulak's matui): pinned release, one static binary, no installer
+  # script. x86_64 only for now — the release workflow builds on
+  # ubuntu-latest; aarch64 warns and skips until an ARM build lands.
+  if [ -x /usr/bin/cyberia ]; then
+    ok "cyberia already in /usr/bin"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping cyberia (re-run install.sh --yes later)"
+  else
+    info "installing cyberia cyberia-v1.1.1..."
+    local cyberia_tmp
+    cyberia_tmp="$(mktemp)"
+    if fetch "https://github.com/xvoidsx/cyberia-matui/releases/download/cyberia-v1.1.1/cyberia" -o "$cyberia_tmp" \
+        && [ "$(uname -m)" = "x86_64" ] \
+        && $DOAS install -m 0755 "$cyberia_tmp" /usr/bin/cyberia; then
+      ok "cyberia cyberia-v1.1.1 -> /usr/bin/cyberia"
+    else
+      warn "cyberia install failed or unsupported arch — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$cyberia_tmp"
+  fi
+
   # hermes (Nous Research's open-source agent — navi's default agent, "Lain"):
   # self-improving AI agent with persistent memory. MIT licensed.
   # Install script is fetched first (never pipe-to-bash), then run with
