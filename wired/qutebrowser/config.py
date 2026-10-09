@@ -8,9 +8,13 @@ config.load_autoconfig(False)
 
 # ── nightshadeNeon palette ──
 PINK = "#ff2d95"
+PINK_DIM = "#8f1a56"   # hairline borders; bright pink reads as a divider line
 CYAN = "#00ffff"
+RED = "#ff3131"
 PURPLE = "#b967ff"
 GREEN = "#39ff14"
+GREEN_CALM = "#8fbc8f" # desaturated green for insert mode; see note below
+INK = "#06140a"        # text on the calm green — deeper than BG for contrast
 BG = "#0d0d14"
 FG = "#e0e0e0"
 MUTED = "#888888"
@@ -22,6 +26,19 @@ c.colors.webpage.darkmode.policy.page = "always"
 c.colors.webpage.preferred_color_scheme = "dark"
 # page background before first paint — no white flash, ever
 c.colors.webpage.bg = BG
+
+# ── User agent ─────────────────────────────────────────────────────────────
+# qutebrowser identifies itself as "...QtWebEngine/x.y.z ..." and several
+# sites reject that outright. Present as Chrome stable instead.
+#
+# Track this against navi's chromium package: apt-cache policy chromium, or
+# grep Version from `dpkg -l chromium`. Chrome's UA string does not carry a
+# real minor version, so bumping only the major is correct.
+config.set(
+    'content.headers.user_agent',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36',
+    'accounts.google.com',
+)
 
 # ── Appearance ──
 c.colors.completion.fg = FG
@@ -35,8 +52,13 @@ c.colors.completion.match.fg = CYAN
 
 c.colors.statusbar.normal.fg = FG
 c.colors.statusbar.normal.bg = BG
-c.colors.statusbar.insert.fg = BG
-c.colors.statusbar.insert.bg = GREEN
+# Insert mode is calmer than the rest of the palette on purpose. Full neon
+# green behind dark text is legible but glaring, and the indicators pile up
+# on that one segment, so it uses a desaturated green instead. The keyhint
+# widget (c.colors.keyhint.bg below) stays full neon — you read it
+# deliberately, not constantly.
+c.colors.statusbar.insert.fg = INK
+c.colors.statusbar.insert.bg = GREEN_CALM
 c.colors.statusbar.command.fg = CYAN
 c.colors.statusbar.command.bg = BG
 c.colors.statusbar.url.fg = FG
@@ -53,6 +75,17 @@ c.colors.tabs.selected.even.fg = BG
 c.colors.tabs.selected.even.bg = PINK
 c.colors.tabs.indicator.start = PINK
 c.colors.tabs.indicator.stop = CYAN
+
+# Neon edges. qutebrowser 3.4.0 only exposes eight border colour keys, and
+# none of them sit on the tab bar or statusbar — those are the two places a
+# hairline would help most, so there is no way to draw one here. What is
+# available: prompts, messages and completion rows.
+c.colors.prompts.border = PINK_DIM
+c.colors.messages.info.border = CYAN
+c.colors.messages.warning.border = "#ffaa00"
+c.colors.messages.error.border = RED
+c.colors.completion.item.selected.border.bottom = PINK
+c.colors.completion.category.border.bottom = PINK_DIM
 
 c.colors.hints.fg = BG
 c.colors.hints.bg = PINK
@@ -190,10 +223,62 @@ c.hints.chars = "asdfghjkl"
 c.hints.uppercase = True
 c.fonts.hints = "bold 11pt JetBrains Mono"
 
-# ── Keybindings ──
+# Tab behaviour — Chrome-like: elide the middle of long titles and show a
+# tooltip with the full URL.
+c.tabs.tooltips = True
+c.tabs.title.elide = "middle"
+c.tabs.width = 180
+
+# Completion popup — readable timestamps in the history column.
+c.completion.timestamp_format = "%Y-%m-%d %H:%M"
+
+# ── Chrome opacity ─────────────────────────────────────────────────────────
+# Fully opaque nightshadeNeon. Transparency was tried and rejected: without
+# blur behind it, transparent bars just let the wallpaper through raw, and
+# Sway has no compositor-side blur. If a blurring compositor ever comes
+# along, c.window.transparent plus "transparent" bar colours is the switch
+# to flip — colours take "transparent" or hex, but not rgba, so there is no
+# partial alpha either way.
+TRANSPARENT = False
+
+if TRANSPARENT:
+    c.window.transparent = True
+    c.colors.statusbar.normal.bg = "transparent"
+    c.colors.statusbar.command.bg = "transparent"
+    c.colors.tabs.bar.bg = "transparent"
+    c.colors.tabs.odd.bg = "transparent"
+    c.colors.tabs.even.bg = "transparent"
+    # Keep chrome legible over an unknown wallpaper.
+    c.colors.statusbar.normal.fg = FG
+    c.colors.tabs.odd.fg = FG
+    c.colors.tabs.even.fg = FG
+    c.colors.tabs.selected.odd.bg = PINK
+    c.colors.tabs.selected.even.bg = PINK
+
+# ── Keybindings ────────────────────────────────────────────────────────────
 config.bind(",n", "open https://neighborli.xyz")
 config.bind(",r", "open https://xvoidsx.github.io/navi-radio/")
 config.bind(",g", "open https://glyyph.app")
 config.bind(",x", "open https://xvoidsx.org")
 config.bind(",a", "open file:///usr/share/navi/wired/naviApps/index.html")
 config.bind(",d", "config-cycle colors.webpage.darkmode.enabled true false")
+
+# navi pages on the wired
+config.bind(",m", "open https://rav3ndust.xyz/wiki/x3nyth.html")
+config.bind(",1", "open https://rav3ndust.xyz/now.html")
+config.bind(",2", "open https://rav3ndust.xyz/blog.html")
+config.bind(",3", "open https://rav3ndust.xyz/wiki/wiki.html")
+
+# View control without a mouse. Note the syntax is <Ctrl-...>, not <C-...>;
+# qutebrowser rejects <C-*> outright and aborts loading the rest of the file.
+config.bind("<Ctrl-h>", "navigate prev")
+config.bind("<Ctrl-l>", "navigate next")
+config.bind("<Ctrl-d>", "scroll-page down 0.5")
+config.bind("<Ctrl-u>", "scroll-page up 0.5")
+config.bind("gu", "navigate back")
+config.bind("gd", "navigate forward")
+config.bind("gi", "navigate home")
+config.bind("gq", "tab-close")
+config.bind("gJ", "tab-focus next")
+config.bind("gK", "tab-focus prev")
+config.bind("B", "open -b https://neighborli.xyz")
