@@ -1830,6 +1830,8 @@ setup_cyberia() {
     $DOAS install -m 0644 "$icon_src" /usr/share/icons/hicolor/scalable/apps/cyberia.svg \
       && ok "cyberia icon -> hicolor/scalable/apps" \
       || warn "cyberia icon install failed"
+    # refresh the icon cache so rofi/panels pick it up without a relog
+    $DOAS gtk-update-icon-cache -q /usr/share/icons/hicolor 2>/dev/null || true
   else
     warn "cyberia icon not in repo (wired/icons/cyberia.svg) — skipping"
   fi
