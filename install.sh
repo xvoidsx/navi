@@ -1806,18 +1806,26 @@ setup_cyberia() {
   step "cyberia (xvoidsx's nightshadeNeon Matrix client)"
   # Friendly fork of pkulak's matui — pinned release, one static binary.
   # x86_64 only for now; aarch64 warns and skips until an ARM build lands.
-  if [ -x /usr/bin/cyberia ]; then
-    ok "cyberia already in /usr/bin"
+  # Version-stamped so navi-update upgrades it when the pin moves
+  # (previously: binary-exists check meant updates never landed).
+  local want="cyberia-v1.1.4"
+  local stamp="/var/lib/navi/cyberia-version"
+  local have=""
+  [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
+  if [ -x /usr/bin/cyberia ] && [ "$have" = "$want" ]; then
+    ok "cyberia $want already in /usr/bin"
   elif ! host_up https://github.com; then
     warn "github unreachable — skipping cyberia (re-run install.sh --yes later)"
   else
-    info "installing cyberia cyberia-v1.1.4..."
+    info "installing cyberia $want..."
     local cyberia_tmp
     cyberia_tmp="$(mktemp)"
-    if fetch "https://github.com/xvoidsx/cyberia/releases/download/cyberia-v1.1.4/cyberia" -o "$cyberia_tmp" \
+    if fetch "https://github.com/xvoidsx/cyberia/releases/download/${want}/cyberia" -o "$cyberia_tmp" \
         && [ "$(uname -m)" = "x86_64" ] \
         && $DOAS install -m 0755 "$cyberia_tmp" /usr/bin/cyberia; then
-      ok "cyberia cyberia-v1.1.4 -> /usr/bin/cyberia"
+      $DOAS mkdir -p "$(dirname "$stamp")"
+      echo "$want" | $DOAS tee "$stamp" >/dev/null
+      ok "cyberia $want -> /usr/bin/cyberia"
     else
       warn "cyberia install failed or unsupported arch — skipping (re-run install.sh --yes later)"
     fi
