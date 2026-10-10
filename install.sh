@@ -1808,7 +1808,7 @@ setup_cyberia() {
   # x86_64 only for now; aarch64 warns and skips until an ARM build lands.
   # Version-stamped so navi-update upgrades it when the pin moves
   # (previously: binary-exists check meant updates never landed).
-  local want="cyberia-v1.1.4"
+  local want="cyberia-v1.1.5"
   local stamp="/var/lib/navi/cyberia-version"
   local have=""
   [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
