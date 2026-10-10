@@ -51,10 +51,10 @@
     "category": "navi",
     "source": "webapp",
     "package": "sumi",
-    "url": "https://xvoidsx.github.io/sumi/sumi.html",
+    "url": "https://github.com/xvoidsx/sumi",
     "install": "navi-webapp install sumi",
     "downloadUrl": "webapps/sumi.desktop",
-    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=sumi\nExec=navi-browser-run --force-dark-mode --app=https://xvoidsx.github.io/sumi/sumi.html\nComment=墨 — a tiny offline-first Markdown writing app. Just writing.\nTerminal=false\nType=Application\nIcon=navi-sumi\nStartupNotify=true\nCategories=Office;TextEditor;",
+    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=sumi\nExec=navi-browser-run --force-dark-mode --app=file:///usr/share/navi/wired/sumi/sumi.html\nComment=墨 — a tiny offline-first Markdown writing app. Just writing.\nTerminal=false\nType=Application\nIcon=navi-sumi\nStartupNotify=true\nCategories=Office;TextEditor;",
     "homepage": "https://github.com/xvoidsx/sumi",
     "logo": "icons/sumi.svg",
     "icon": "墨"
