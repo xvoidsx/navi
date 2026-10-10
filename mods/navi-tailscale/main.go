@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -192,18 +193,52 @@ func spinnerTick() tea.Msg {
 	return spinnerTickMsg{}
 }
 
-// tailscaleUpCapture runs `tailscale up` and returns combined output so we
-// can extract the login URL for the QR code.
-//
-// Note: we deliberately do NOT retry with doas here. doas needs an interactive
-// password prompt, which cannot work from inside the alt-screen TUI (stdin is
-// detached, the prompt never renders). If `tailscale up` needs elevation, we
-// surface that clearly and let the user run it in a real terminal.
+// tailscaleUpCapture runs `tailscale up` and returns the login URL.
+// 
+// Critical: `tailscale up` BLOCKS waiting for browser authentication — it
+// prints the login URL then waits. So we stream stdout, extract the URL as
+// soon as it appears, and return immediately while the process keeps running
+// in the background. The old CombinedOutput() approach deadlocked: it waited
+// for process exit, which waits for the user, who waits for the URL.
 func tailscaleUpCapture() (string, error) {
 	cmd := exec.Command("tailscale", "up")
 	cmd.Stdin = nil
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	cmd.Stderr = cmd.Stdout
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+	// Don't wait for the process — it blocks on auth. Just read until we
+	// find the URL or hit a timeout.
+	urlCh := make(chan string, 1)
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			if url := extractLoginURL(scanner.Text()); url != "" {
+				urlCh <- url
+				return
+			}
+		}
+		close(urlCh)
+	}()
+	select {
+	case url, ok := <-urlCh:
+		if !ok {
+			// process exited without printing a URL — probably already logged in
+			// or a real error. Wait for it and return what we got.
+			out, err := cmd.CombinedOutput()
+			return string(out), err
+		}
+		// URL found — leave the process running in background; the mod's
+		// auth polling will detect when login completes.
+		return url, nil
+	case <-time.After(30 * time.Second):
+		cmd.Process.Kill()
+		return "", fmt.Errorf("timed out waiting for tailscale login URL")
+	}
 }
 
 // needsElevation reports whether tailscale up output looks like a privilege issue.
@@ -819,11 +854,10 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.busyMsg = "requesting login link..."
 			return m, tea.Batch(
 				func() tea.Msg {
-					out, err := tailscaleUpCapture()
+					url, err := tailscaleUpCapture()
 					if err != nil {
-						return authMsg{"", "", err, out}
+						return authMsg{"", "", err, ""}
 					}
-					url := extractLoginURL(out)
 					if url == "" {
 						return authMsg{"", "", nil, ""}
 					}
@@ -889,11 +923,10 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.busyMsg = "requesting login link..."
 		return m, tea.Batch(
 			func() tea.Msg {
-				out, err := tailscaleUpCapture()
+				url, err := tailscaleUpCapture()
 				if err != nil {
-					return authMsg{"", "", err, out}
+					return authMsg{"", "", err, ""}
 				}
-				url := extractLoginURL(out)
 				if url == "" {
 					// no URL = already authenticated
 					return authMsg{"", "", nil, ""}
