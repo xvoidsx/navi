@@ -1,18 +1,41 @@
 [
   {
-    "id": "web-navi-radio",
+    "id": "native-navi-radio",
     "name": "navi radio",
-    "summary": "Our own music app. Note: moving to its own domain soon.",
+    "summary": "Our own music app — now a proper Electron desktop app with native filesystem access for your local music library. Internet radio + local files.",
     "category": "navi",
-    "source": "webapp",
+    "source": "native",
     "package": "navi-radio",
-    "url": "https://xvoidsx.github.io/navi-radio",
-    "install": "navi-webapp install navi-radio",
-    "downloadUrl": "webapps/navi-radio.desktop",
-    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=navi radio\nExec=navi-browser-run --force-dark-mode --app=https://xvoidsx.github.io/navi-radio\nComment=navi radio, our own music app\nTerminal=false\nType=Application\nIcon=navi-navi-radio\nStartupNotify=true\nCategories=AudioVideo;Audio;",
-    "homepage": "https://xvoidsx.github.io/navi-radio",
+    "install": "navi-extras --install navi-radio",
+    "homepage": "https://github.com/xvoidsx/navi-radio",
     "logo": "icons/navi-radio.svg",
-    "icon": "📻"
+    "icon": "📻",
+    "remove": "doas dpkg -r navi-radio"
+  },
+  {
+    "id": "native-sumi",
+    "name": "sumi",
+    "summary": "墨 — a tiny distraction-free Markdown writing app, now a proper Electron desktop app with native open/save file dialogs. Just writing. Our own.",
+    "category": "navi",
+    "source": "native",
+    "package": "sumi",
+    "install": "navi-extras --install sumi",
+    "homepage": "https://github.com/xvoidsx/sumi",
+    "logo": "icons/sumi.svg",
+    "icon": "墨",
+    "remove": "doas dpkg -r sumi"
+  },
+  {
+    "id": "native-fossfit",
+    "name": "FOSSfit",
+    "summary": "Our own fitness tracker — a proper Electron desktop app. Workouts, weight charts, meditation. Our own.",
+    "category": "navi",
+    "source": "native",
+    "package": "fossfit",
+    "install": "navi-extras --install fossfit",
+    "homepage": "https://github.com/xvoidsx/FOSSfit",
+    "icon": "💪",
+    "remove": "doas dpkg -r fossfit"
   },
   {
     "id": "web-neighborli",
@@ -43,21 +66,6 @@
     "homepage": "https://xvoidsx.github.io/glyyph",
     "logo": "icons/glyyph.svg",
     "icon": "👁️"
-  },
-  {
-    "id": "web-sumi",
-    "name": "sumi",
-    "summary": "墨 — a tiny offline-first Markdown writing app. Just writing. Our own.",
-    "category": "navi",
-    "source": "webapp",
-    "package": "sumi",
-    "url": "https://github.com/xvoidsx/sumi",
-    "install": "navi-webapp install sumi",
-    "downloadUrl": "webapps/sumi.desktop",
-    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=sumi\nExec=navi-browser-run --force-dark-mode --app=file:///usr/share/navi/wired/sumi/sumi.html\nComment=墨 — a tiny offline-first Markdown writing app. Just writing.\nTerminal=false\nType=Application\nIcon=navi-sumi\nStartupNotify=true\nCategories=Office;TextEditor;",
-    "homepage": "https://github.com/xvoidsx/sumi",
-    "logo": "icons/sumi.svg",
-    "icon": "墨"
   },
   {
     "id": "web-discord",

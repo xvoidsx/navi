@@ -137,7 +137,7 @@ PKGS=(
 # (telegram and element graduated to native apps — both install via
 # setup_telegram/setup_element below.)
 DEFAULT_WEBAPPS=(
-  navi-radio neighborli glyyph pandora sumi
+  neighborli glyyph pandora
   github youtube yomi twitch discord perplexity dropbox
   xbox-cloud geforce-now
   # Workspace Stack — installed out of the box on every fresh install
@@ -1845,6 +1845,98 @@ setup_cyberia() {
   fi
 }
 
+setup_navi_radio() {
+  step "navi-radio (xvoidsx's Electron music app)"
+  # Pinned release .deb — native filesystem access for the local music library.
+  # (The webapp is retired: Brave disables the File System Access API by default.)
+  # Version-stamped so navi-update upgrades it when the pin moves.
+  local want="v1.0.0"
+  local ver="${want#v}"
+  local stamp="/var/lib/navi/navi-radio-version"
+  local have=""
+  [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
+  if [ "$have" = "$want" ] && dpkg -s navi-radio >/dev/null 2>&1; then
+    ok "navi-radio $want already installed"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping navi-radio (re-run install.sh --yes later)"
+  else
+    info "installing navi-radio $want..."
+    local deb_tmp
+    deb_tmp="$(mktemp --suffix=.deb)"
+    if fetch "https://github.com/xvoidsx/navi-radio/releases/download/${want}/navi-radio_${ver}_amd64.deb" -o "$deb_tmp" \
+        && [ "$(uname -m)" = "x86_64" ] \
+        && $DOAS dpkg -i "$deb_tmp"; then
+      $DOAS mkdir -p "$(dirname "$stamp")"
+      echo "$want" | $DOAS tee "$stamp" >/dev/null
+      ok "navi-radio $want installed"
+    else
+      warn "navi-radio install failed or unsupported arch — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$deb_tmp"
+  fi
+}
+
+setup_sumi() {
+  step "sumi (xvoidsx's Electron writing app)"
+  # Pinned release .deb — native open/save file dialogs.
+  # (The webapp is retired: Brave disables the File System Access API by default.)
+  # Version-stamped so navi-update upgrades it when the pin moves.
+  local want="v1.0.0"
+  local ver="${want#v}"
+  local stamp="/var/lib/navi/sumi-version"
+  local have=""
+  [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
+  if [ "$have" = "$want" ] && dpkg -s sumi >/dev/null 2>&1; then
+    ok "sumi $want already installed"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping sumi (re-run install.sh --yes later)"
+  else
+    info "installing sumi $want..."
+    local deb_tmp
+    deb_tmp="$(mktemp --suffix=.deb)"
+    if fetch "https://github.com/xvoidsx/sumi/releases/download/${want}/sumi_${ver}_amd64.deb" -o "$deb_tmp" \
+        && [ "$(uname -m)" = "x86_64" ] \
+        && $DOAS dpkg -i "$deb_tmp"; then
+      $DOAS mkdir -p "$(dirname "$stamp")"
+      echo "$want" | $DOAS tee "$stamp" >/dev/null
+      ok "sumi $want installed"
+    else
+      warn "sumi install failed or unsupported arch — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$deb_tmp"
+  fi
+}
+
+setup_fossfit() {
+  step "FOSSfit (xvoidsx's Electron fitness app)"
+  # Pinned release .deb.
+  # Version-stamped so navi-update upgrades it when the pin moves.
+  local want="v2.4.0"
+  local ver="${want#v}"
+  local stamp="/var/lib/navi/fossfit-version"
+  local have=""
+  [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
+  if [ "$have" = "$want" ] && dpkg -s fossfit >/dev/null 2>&1; then
+    ok "FOSSfit $want already installed"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping FOSSfit (re-run install.sh --yes later)"
+  else
+    info "installing FOSSfit $want..."
+    local deb_tmp
+    deb_tmp="$(mktemp --suffix=.deb)"
+    if fetch "https://github.com/xvoidsx/FOSSfit/releases/download/${want}/fossfit_${ver}_amd64.deb" -o "$deb_tmp" \
+        && [ "$(uname -m)" = "x86_64" ] \
+        && $DOAS dpkg -i "$deb_tmp"; then
+      $DOAS mkdir -p "$(dirname "$stamp")"
+      echo "$want" | $DOAS tee "$stamp" >/dev/null
+      ok "FOSSfit $want installed"
+    else
+      warn "FOSSfit install failed or unsupported arch — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$deb_tmp"
+  fi
+}
+
 setup_tailscale() {
   step "tailscale (mesh VPN)"
   if command -v tailscale >/dev/null 2>&1; then
@@ -2407,6 +2499,9 @@ main() {
     setup_telegram
     setup_element
     setup_cyberia
+    setup_navi_radio
+    setup_sumi
+    setup_fossfit
     setup_tailscale
     ok "deploy-only refresh complete (navi $NAVI_VERSION)"
     exit 0
@@ -2450,6 +2545,9 @@ main() {
   setup_telegram
   setup_element
   setup_cyberia
+  setup_navi_radio
+  setup_sumi
+  setup_fossfit
   setup_tailscale
   tighten_sudo
   done_banner
