@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # cyberia installer
 # ( cyberia is xvoidsx's nightshadeNeon Matrix client — a friendly fork of pkulak's matui )
-# ( https://github.com/xvoidsx/cyberia-matui )
+# ( https://github.com/xvoidsx/cyberia )
 set -euo pipefail
 x="= = = = = cyberia installer = = = = ="
 
 PRIV="sudo"
 command -v doas >/dev/null 2>&1 && PRIV="doas"
 
-VERSION="cyberia-v1.1.1"
-URL="https://github.com/xvoidsx/cyberia-matui/releases/download/${VERSION}/cyberia"
+VERSION="cyberia-v1.1.2"
+URL="https://github.com/xvoidsx/cyberia/releases/download/${VERSION}/cyberia"
 
 main() {
     echo "$x"; sleep 1

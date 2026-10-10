@@ -959,7 +959,7 @@
   "package": "cyberia",
   "install": "navi-extras --install cyberia",
   "remove": "doas rm -f /usr/bin/cyberia /usr/local/bin/cyberia",
-  "homepage": "https://github.com/xvoidsx/cyberia-matui",
+  "homepage": "https://github.com/xvoidsx/cyberia",
   "icon": "💬"
  },
  {
