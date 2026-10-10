@@ -1811,13 +1811,13 @@ setup_cyberia() {
   elif ! host_up https://github.com; then
     warn "github unreachable — skipping cyberia (re-run install.sh --yes later)"
   else
-    info "installing cyberia cyberia-v1.1.2..."
+    info "installing cyberia cyberia-v1.1.4..."
     local cyberia_tmp
     cyberia_tmp="$(mktemp)"
-    if fetch "https://github.com/xvoidsx/cyberia/releases/download/cyberia-v1.1.2/cyberia" -o "$cyberia_tmp" \
+    if fetch "https://github.com/xvoidsx/cyberia/releases/download/cyberia-v1.1.4/cyberia" -o "$cyberia_tmp" \
         && [ "$(uname -m)" = "x86_64" ] \
         && $DOAS install -m 0755 "$cyberia_tmp" /usr/bin/cyberia; then
-      ok "cyberia cyberia-v1.1.2 -> /usr/bin/cyberia"
+      ok "cyberia cyberia-v1.1.4 -> /usr/bin/cyberia"
     else
       warn "cyberia install failed or unsupported arch — skipping (re-run install.sh --yes later)"
     fi
