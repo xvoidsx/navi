@@ -1874,6 +1874,12 @@ setup_navi_radio() {
     fi
     rm -f "$deb_tmp"
   fi
+  # Retire the old webapp launcher — the native app replaces it.
+  # (navi-webapp can't uninstall it: the .desktop left the repo.)
+  if [ -f "$HOME/.local/share/applications/navi-radio.desktop" ]; then
+    rm -f "$HOME/.local/share/applications/navi-radio.desktop"
+    ok "retired navi-radio webapp launcher (native app replaces it)"
+  fi
 }
 
 setup_sumi() {
@@ -1904,6 +1910,12 @@ setup_sumi() {
       warn "sumi install failed or unsupported arch — skipping (re-run install.sh --yes later)"
     fi
     rm -f "$deb_tmp"
+  fi
+  # Retire the old webapp launcher — the native app replaces it.
+  # (navi-webapp can't uninstall it: the .desktop left the repo.)
+  if [ -f "$HOME/.local/share/applications/sumi.desktop" ]; then
+    rm -f "$HOME/.local/share/applications/sumi.desktop"
+    ok "retired sumi webapp launcher (native app replaces it)"
   fi
 }
 
