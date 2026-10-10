@@ -8,7 +8,7 @@ x="= = = = = cyberia installer = = = = ="
 PRIV="sudo"
 command -v doas >/dev/null 2>&1 && PRIV="doas"
 
-VERSION="cyberia-v1.1.5"
+VERSION="cyberia-v1.1.6"
 URL="https://github.com/xvoidsx/cyberia/releases/download/${VERSION}/cyberia"
 
 main() {
