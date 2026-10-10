@@ -326,7 +326,10 @@ build_mpvpaper() {
 # The installer scripts themselves get the same treatment: every one runs
 # under `timeout -k 30 300` with stdin from /dev/null, so a hung installer
 # degrades to a warning instead of wedging the whole provision (seen on the
-# Cloudbook with the omp and pi installers). Third-party install scripts
+# Cloudbook with the omp and pi installers). Exception: hermes gets 20 minutes
+# (timeout -k 60 1200) — it downloads ~120MB of Python plus a full dep sync,
+# and 5 minutes isn't enough on slow hardware (killed mid-install on the Acer,
+# 2026-10-10). Third-party install scripts
 # additionally run under `setsid` (no controlling terminal): pi's official
 # installer waits for a keypress on /dev/tty when a terminal is present,
 # and detaching takes its designed non-interactive path instead.
@@ -514,7 +517,7 @@ setup_agents() {
     local hermestmp
     hermestmp="$(mktemp)"
     if fetch https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh -o "$hermestmp" \
-        && setsid timeout -k 30 300 bash "$hermestmp" --non-interactive </dev/null \
+        && setsid timeout -k 60 1200 bash "$hermestmp" --non-interactive </dev/null \
         && command -v hermes >/dev/null 2>&1; then
       ok "hermes -> $(command -v hermes)"
     else
