@@ -173,8 +173,17 @@ func isInstalled(a app, extras map[string]string, flatpaks map[string]bool) bool
 		// so the install string itself can never say whether the binary
 		// is on PATH — ask the shell instead.
 		if a.Package != "" {
-			_, err := exec.LookPath(a.Package)
-			return err == nil
+			if _, err := exec.LookPath(a.Package); err == nil {
+				return true
+			}
+			// wisp installs to ~/.wisp/bin (user install), which isn't on
+			// the default PATH — check there too.
+			if home, err := os.UserHomeDir(); err == nil {
+				if _, err := os.Stat(filepath.Join(home, ".wisp", "bin", a.Package)); err == nil {
+					return true
+				}
+			}
+			return false
 		}
 		return false
 	}
