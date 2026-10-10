@@ -137,7 +137,7 @@ PKGS=(
 # (telegram and element graduated to native apps — both install via
 # setup_telegram/setup_element below.)
 DEFAULT_WEBAPPS=(
-  navi-radio neighborli glyyph pandora
+  navi-radio neighborli glyyph pandora sumi
   github youtube yomi twitch discord perplexity dropbox
   xbox-cloud geforce-now
   # Workspace Stack — installed out of the box on every fresh install
