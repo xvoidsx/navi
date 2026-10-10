@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -207,34 +208,39 @@ func tailscaleUpCapture() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cmd.Stderr = cmd.Stdout
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return "", err
+	}
 	if err := cmd.Start(); err != nil {
 		return "", err
 	}
-	// Don't wait for the process — it blocks on auth. Just read until we
-	// find the URL or hit a timeout.
+	// Don't wait for the process — it blocks on auth. Scan both stdout and
+	// stderr until we find the URL or hit a timeout.
 	urlCh := make(chan string, 1)
+	doneCh := make(chan struct{})
 	go func() {
-		scanner := bufio.NewScanner(stdout)
+		defer close(doneCh)
+		// Merge both pipes into one scanner stream.
+		merged := io.MultiReader(stdout, stderr)
+		scanner := bufio.NewScanner(merged)
 		for scanner.Scan() {
 			if url := extractLoginURL(scanner.Text()); url != "" {
 				urlCh <- url
 				return
 			}
 		}
-		close(urlCh)
 	}()
 	select {
-	case url, ok := <-urlCh:
-		if !ok {
-			// process exited without printing a URL — probably already logged in
-			// or a real error. Wait for it and return what we got.
-			out, err := cmd.CombinedOutput()
-			return string(out), err
-		}
+	case url := <-urlCh:
 		// URL found — leave the process running in background; the mod's
 		// auth polling will detect when login completes.
 		return url, nil
+	case <-doneCh:
+		// both pipes hit EOF without a URL — process exited. Probably
+		// already logged in, or a real error.
+		cmd.Wait()
+		return "", nil
 	case <-time.After(30 * time.Second):
 		cmd.Process.Kill()
 		return "", fmt.Errorf("timed out waiting for tailscale login URL")
