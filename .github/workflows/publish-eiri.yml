@@ -1,5 +1,9 @@
 # publish-eiri — cut a PUBLIC eiri release from a built ISO artifact.
 #
+# Publish history:
+#   - build 19 (2026-10-11): Edge Dev, GRUB --removable fallback (navi#5),
+#     Electron apps (navi-radio/sumi/FOSSfit), cyberia v1.1.6, tailscale fix.
+#
 # eiri ISOs build as workflow artifacts (private — downloading needs a
 # GitHub login). This workflow promotes one to a public GitHub Release
 # asset under the rolling `eiri` tag. Dispatched manually with the
