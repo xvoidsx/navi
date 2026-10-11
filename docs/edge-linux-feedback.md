@@ -25,12 +25,15 @@ For context on where these issues bite:
 
 - navi's webapps (navi radio, neighborli, glyyph, naviApps, and user-added
   ones) launch through `/usr/bin/navi-webapp` as Chromium `--app` windows.
-- navi manages Chromium-family browsers with managed policies: force-installed
-  nightshadeNeon theme and the blackice ad-blocker. (Brave is the exception —
-  it gets the light touch: no managed policy, no force-installed extensions.)
+- navi ships the nightshadeNeon theme and the blackice ad-blocker on vanilla
+  Chromium per-user via Chromium's External Extensions mechanism (scoped to
+  `~/.config/chromium`) — not via managed enterprise policy. The old
+  force-install policy was retired after it leaked into Chromium forks that
+  share the policy directory. (Brave gets the light touch: no extensions
+  imposed at all — Shields already covers blocking.)
 - Planned: a settings TUI to choose which installed Chromium-based browser the
   webapps launch through (tracked in the navi repo). The picker stays
-  Chromium-based — `--app` windows and policy management only work there.
+  Chromium-based — `--app` windows only work there.
 
 ## Open issues
 
