@@ -76,3 +76,7 @@ base) against Edge Dev and Stable, and update the statuses above. A fix isn't
 
 Found an Edge-on-Linux bug that affects navi? Open an issue on the navi repo
 and it'll be triaged into this tracker.
+
+## Elsewhere
+
+Upstream citizenship for Edge is also tracked at [the chromium page](https://navi.xvoidsx.org/chromium.html) on our site, as well as with our broader [upstream work](https://navi.xvoidsx.org/upstream.html).
