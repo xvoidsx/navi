@@ -36,10 +36,17 @@ For context on where these issues bite:
 
 | ID | Issue | Detail | Reported | Status |
 |----|-------|--------|----------|--------|
-| EDGE-LINUX-001 | Copilot button broken on Linux | The Copilot button in the toolbar does not function on Linux builds. | 2026-09-23, via Edge in-app feedback (screenshot + video + write-up) | Open — awaiting Edge team response |
+| EDGE-LINUX-001 | Copilot button broken on Linux | The Copilot button in the toolbar does not function on Linux builds. | 2026-09-23, via Edge in-app feedback (screenshot + video + write-up) | Fixed in Dev channel — verified 2026-10-11 (sidebar opens, greets by name); Stable pending verification |
 | EDGE-LINUX-002 | "Use system title bar and borders" has no effect | Enabling the option produces no change at all — the custom Edge chrome stays exactly as it was, as if the toggle weren't there. | 2026-09-23, via Edge in-app feedback (screenshot + video + write-up) | Open — awaiting Edge team response |
 
 ## Feedback log
+
+- **2026-10-11** — EDGE-LINUX-001 verified fixed on the Dev channel. Raven
+  installed Edge Dev (via the new `edge-dev` navi-extras entry) to check,
+  and the Copilot button now works — the sidebar opens and functions. Stable
+  channel still pending verification. Whether our September feedback report
+  contributed to the fix is unknown; the Edge team's bug notes aren't public
+  to us.
 
 - **2026-09-23** — Raven (rav3ndust), navi maintainer, submitted both issues
   above to the Edge Linux team through Edge's built-in feedback system, with a
