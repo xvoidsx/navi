@@ -35,7 +35,8 @@ jobs:
           }
           req = urllib.request.Request(
               webhook, data=json.dumps(payload).encode(),
-              headers={"Content-Type": "application/json"},
+              headers={"Content-Type": "application/json",
+                       "User-Agent": "navi-release-announcer/1.0"},
               method="POST")
           with urllib.request.urlopen(req, timeout=30) as r:
               print("discord:", r.status)
