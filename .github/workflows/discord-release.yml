@@ -1,0 +1,42 @@
+name: discord-release-announce
+
+# Posts navi releases to the Discord #announcements channel via webhook.
+# Webhook URL lives in the DISCORD_RELEASES_WEBHOOK repo secret.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          BODY_TRIMMED=$(printf '%s' "$RELEASE_BODY" | head -c 1500)
+          python3 - "$WEBHOOK_URL" "$RELEASE_NAME" "$RELEASE_TAG" "$RELEASE_URL" "$BODY_TRIMMED" << 'EOF'
+          import json, sys, urllib.request
+          webhook, name, tag, url, body = sys.argv[1:6]
+          title = name or tag
+          payload = {
+              "username": "navi releases",
+              "embeds": [{
+                  "title": f"navi {title} is out",
+                  "url": url,
+                  "description": (body[:1500] + "…") if len(body) > 1500 else body,
+                  "color": 16711935,
+              }],
+          }
+          req = urllib.request.Request(
+              webhook, data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST")
+          with urllib.request.urlopen(req, timeout=30) as r:
+              print("discord:", r.status)
+          EOF
