@@ -93,5 +93,8 @@ jobs:
           done
 
           git commit -qm "lainVII[bot]: posted queued PR comments"
-          git push -q origin "HEAD:${BRANCH}"
+          # Full refspec: the repo has both a branch AND a rolling tag named
+          # eiri, so a bare "HEAD:${BRANCH}" is ambiguous ("dst refspec
+          # matches more than one").
+          git push -q origin "HEAD:refs/heads/${BRANCH}"
           echo "done."
