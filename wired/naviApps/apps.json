@@ -1621,6 +1621,18 @@
     "icon": "🌐"
   },
   {
+    "id": "native-edge-dev",
+    "name": "Microsoft Edge Dev",
+    "summary": "Weekly dev-channel Edge builds — from Microsoft's own apt repo.",
+    "category": "Internet",
+    "source": "native",
+    "package": "edge-dev",
+    "install": "navi-extras --install edge-dev",
+    "remove": "doas apt remove -y microsoft-edge-dev",
+    "homepage": "https://www.microsoft.com/edge",
+    "icon": "🌐"
+  },
+  {
     "id": "native-zen",
     "name": "Zen Browser",
     "summary": "The beautiful Firefox-based browser.",
