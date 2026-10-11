@@ -877,6 +877,11 @@ grub-install --target=i386-pc --bootloader-id=navi --recheck "@DISK@"
 if [ -d /sys/firmware/efi ]; then
   grub-install --target=x86_64-efi --efi-directory=/boot/efi \
     --bootloader-id=navi --recheck
+  # Fallback/removable loader: some firmware (notably Lenovo) drops the
+  # named NVRAM entry, so also write EFI/BOOT/BOOTX64.EFI, which the
+  # firmware always probes. --no-nvram: no entry to register, nothing to lose.
+  grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+    --removable --no-nvram --recheck
 fi
 update-grub
 update-initramfs -u -k all
