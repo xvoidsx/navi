@@ -549,21 +549,25 @@ setup_agents() {
     # 1. Hermes-native persona — every hermes invocation picks this up.
     #    SOUL.md lives at ~/.hermes/; USER.md and MEMORY.md live at
     #    ~/.hermes/memories/ (per Hermes docs).
-    #    On navi, Hermes IS Lain — so if the existing SOUL.md is the stock
-    #    Hermes default (not Lain, not user-customized), we replace it.
-    #    Genuine user customizations are backed up, never lost.
+    #    On navi, Hermes IS Lain — so on fresh installs, if the existing
+    #    SOUL.md is the stock Hermes default (not Lain), we replace it.
+    #    On --deploy-only we never touch an existing SOUL.md without our
+    #    marker: that's a user customization, and the OS doesn't clobber
+    #    user space. Backups are timestamped, never single-generation.
     mkdir -p "$HOME/.hermes" "$HOME/.hermes/memories"
     if [ -f "$REPO_DIR/wired/lain/SOUL.md" ]; then
       if [ ! -f "$HOME/.hermes/SOUL.md" ]; then
         cp "$REPO_DIR/wired/lain/SOUL.md" "$HOME/.hermes/SOUL.md"
         ok "Lain SOUL.md deployed"
-      elif ! grep -q "Lain, the navi assistant" "$HOME/.hermes/SOUL.md"; then
-        # Not Lain — either the Hermes default or a user customization.
-        # Back it up, then deploy Lain. The OS suggests, the user decides:
-        # they can restore the backup if they preferred the old one.
-        cp "$HOME/.hermes/SOUL.md" "$HOME/.hermes/SOUL.md.pre-lain-backup"
+      elif ! grep -q "Lain, the navi assistant" "$HOME/.hermes/SOUL.md" \
+          && [ "$DEPLOY_ONLY" -eq 0 ]; then
+        # Fresh install: not Lain, so it's the Hermes stock default.
+        # Back it up (timestamped), then deploy Lain.
+        _bak="$HOME/.hermes/SOUL.md.pre-lain-backup-$(date +%Y%m%d-%H%M%S)"
+        cp "$HOME/.hermes/SOUL.md" "$_bak"
         cp "$REPO_DIR/wired/lain/SOUL.md" "$HOME/.hermes/SOUL.md"
-        ok "Lain SOUL.md deployed (previous saved to SOUL.md.pre-lain-backup)"
+        ok "Lain SOUL.md deployed (previous saved to $(basename "$_bak"))"
+        unset _bak
       fi
     fi
     for _f in USER.md MEMORY.md; do
@@ -607,6 +611,9 @@ setup_agents() {
       # nightshadeNeon even when hermes stamped its own default skin first
       # (its installer runs before us); --deploy-only never overwrites an
       # existing skin value — a user's deliberate choice wins on updates.
+      # When no skin: line exists but a display: section does, the key goes
+      # INSIDE it — appending a second top-level display: block would let
+      # PyYAML's last-wins silently discard the user's first section.
       _cfg="$HOME/.hermes/config.yaml"
       if [ -f "$_cfg" ]; then
         if grep -qE "^[[:space:]]*skin:" "$_cfg"; then
@@ -614,6 +621,8 @@ setup_agents() {
               && [ "$DEPLOY_ONLY" -eq 0 ]; then
             sed -i -E 's|^([[:space:]]*skin:).*|\1 nightshadeNeon|' "$_cfg"
           fi
+        elif grep -qE "^display:" "$_cfg"; then
+          sed -i -E 's|^(display:[[:space:]]*)$|\1\n  skin: nightshadeNeon|' "$_cfg"
         else
           printf '
 display:
@@ -953,12 +962,15 @@ setup_mods() {
 
   # navi-reminders runs on systemd user timers — they only fire from boot
   # (before first login) with lingering enabled for the installing user.
-  if command -v loginctl >/dev/null 2>&1; then
-    if $DOAS loginctl enable-linger "$USER" >/dev/null 2>&1; then
-      ok "linger enabled for $USER (reminder timers run from boot)"
-    else
-      warn "could not enable linger for $USER — reminders only fire while logged in"
-    fi
+  # NOTE: `loginctl enable-linger` is just `touch /var/lib/systemd/linger/$USER`,
+  # so do that directly: during ISO chroot provisioning the system bus is the
+  # LIVE ISO's bus, and loginctl would linger the wrong user db (or fail) —
+  # while a direct touch lands on the target (we're chrooted).
+  if $DOAS mkdir -p /var/lib/systemd/linger \
+      && $DOAS touch "/var/lib/systemd/linger/$USER" 2>/dev/null; then
+    ok "linger enabled for $USER (reminder timers run from boot)"
+  else
+    warn "could not enable linger for $USER — reminders only fire while logged in"
   fi
 }
 
@@ -1100,7 +1112,10 @@ setup_heylain() {
     fi
     return 0
   fi
-  rm -rf "$dest.venv-keep" 2>/dev/null
+  # the venv-keep dir is root-owned ($DOAS mv below) — an unprivileged rm
+  # fails, and under `set -e` that aborts the whole install silently
+  # (2>/dev/null hides the error, not the exit code).
+  $DOAS rm -rf "$dest.venv-keep" 2>/dev/null || true
   if ! host_up https://pypi.org/simple/; then
     warn "pypi unreachable — hey-lain voice backend skipped (re-run install.sh --yes later)"
     return 0
@@ -2201,19 +2216,34 @@ setup_brave() {
   step "brave (navi's default browser)"
   # Brave's official apt repo — same keyring/sources pattern as
   # scripts/installers/brave-origin-installer.sh.
+  # Guarded like every third-party fetch in setup_agents: Brave's S3 host
+  # flaking must degrade to a warning, never abort the whole provision
+  # under `set -e` (Brave is the default browser — losing it silently is
+  # bad, killing a multi-hour install over it is worse).
   if [ ! -f /etc/apt/sources.list.d/brave-browser-release.sources ]; then
-    $DOAS curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
-      https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
-    $DOAS curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources \
-      https://brave-browser-apt-release.s3.brave.com/brave-browser.sources
-    $DOAS apt-get update
-    ok "Brave apt repository added"
+    if ! host_up https://brave-browser-apt-release.s3.brave.com; then
+      warn "Brave S3 unreachable — skipping brave-browser (re-run install.sh --yes later)"
+      return 0
+    fi
+    if $DOAS curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
+        https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg \
+      && $DOAS curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources \
+        https://brave-browser-apt-release.s3.brave.com/brave-browser.sources \
+      && $DOAS apt-get update; then
+      ok "Brave apt repository added"
+    else
+      warn "Brave repo setup failed — skipping brave-browser (re-run install.sh --yes later)"
+      return 0
+    fi
   else
     info "Brave apt repository already present"
   fi
   if ! command -v brave-browser >/dev/null 2>&1; then
-    $DOAS apt-get install -y brave-browser
-    ok "brave-browser installed"
+    if $DOAS apt-get install -y brave-browser; then
+      ok "brave-browser installed"
+    else
+      warn "brave-browser install failed — skipping (re-run install.sh --yes later)"
+    fi
   else
     info "brave-browser already installed"
   fi

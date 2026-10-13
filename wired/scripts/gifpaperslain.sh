@@ -31,6 +31,14 @@ main () {
 	if [ -z "$gifpaper" ]; then
 		exit 0
 	fi
+	# a manual pick clears the "animated unsupported" marker — the user
+	# just proved they want animation, so navi-wallpaper tries again
+	# on next login instead of staying stuck on static forever.
+	rm -f "$HOME/.local/share/navi-wallpaper.noanim"
+	# persist the choice: navi-wallpaper prefers this over the default
+	# on next login, so the pick survives reboots.
+	mkdir -p "$HOME/.local/share"
+	printf '%s\n' "$gifpaper" > "$HOME/.local/share/navi-wallpaper.choice"
 	kill_last_instance
 	if is_x11; then
 		# X11: xwinwrap pins mpv to the desktop layer, behind everything.

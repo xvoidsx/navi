@@ -19,7 +19,14 @@ main () {
 	# TODO fill out logic here
 	notifier
 	new_wall=$(zenity --file-selection --title "$nw | Select a new wallpaper:" --filename="/usr/share/navi/wired/wp/")
+	if [ -z "$new_wall" ]; then
+		exit 0
+	fi
 	original_removal
+	# a static pick clears any persisted animated choice — the static
+	# wallpaper is now the choice, and navi-wallpaper must not override
+	# it with a gif on next login.
+	rm -f "$HOME/.local/share/navi-wallpaper.choice"
 	swaybg -m fill -i "$new_wall" &
 }
 # - - - entry

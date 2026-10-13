@@ -21,17 +21,14 @@ if [ -d "$REPO_LAIN" ]; then
         mkdir -p "$LAIN_DIR"
         cp -r "$REPO_LAIN/." "$LAIN_DIR/"
     fi
-    # Hermes-native persona. On navi, Hermes IS Lain — if the existing
-    # SOUL.md isn't Lain (stock Hermes default), back it up and deploy ours.
+    # Hermes-native persona. On navi, Hermes IS Lain. Deploy our SOUL.md
+    # only when none exists — never overwrite on launch. A user who
+    # customized (or deleted) their SOUL.md keeps it; the installer handles
+    # first-deploy and fresh-install replacement, not this wrapper.
     # SOUL.md at ~/.hermes/; USER.md and MEMORY.md at ~/.hermes/memories/
     mkdir -p "$HOME/.hermes" "$HOME/.hermes/memories"
-    if [ -f "$REPO_LAIN/SOUL.md" ]; then
-        if [ ! -f "$HOME/.hermes/SOUL.md" ]; then
-            cp "$REPO_LAIN/SOUL.md" "$HOME/.hermes/SOUL.md"
-        elif ! grep -q "Lain, the navi assistant" "$HOME/.hermes/SOUL.md"; then
-            cp "$HOME/.hermes/SOUL.md" "$HOME/.hermes/SOUL.md.pre-lain-backup"
-            cp "$REPO_LAIN/SOUL.md" "$HOME/.hermes/SOUL.md"
-        fi
+    if [ -f "$REPO_LAIN/SOUL.md" ] && [ ! -f "$HOME/.hermes/SOUL.md" ]; then
+        cp "$REPO_LAIN/SOUL.md" "$HOME/.hermes/SOUL.md"
     fi
     for _f in USER.md MEMORY.md; do
         if [ -f "$REPO_LAIN/$_f" ] && [ ! -f "$HOME/.hermes/memories/$_f" ]; then
@@ -58,4 +55,8 @@ fi
 # hand off to the engine
 # The persona comes from ~/.hermes/SOUL.md (native Hermes) — every hermes
 # invocation is Lain. This wrapper adds the LAIN banner on top.
+if ! command -v hermes >/dev/null 2>&1; then
+    echo "hermes isn't installed yet — re-run the navi installer or: install.sh --yes"
+    exit 127
+fi
 exec hermes "$@"

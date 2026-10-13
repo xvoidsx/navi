@@ -118,7 +118,11 @@ function render() {
   const cat = catEl.value;
   const isNavi = (a) => a.category === "navi";
   const isGame = (a) => a.category === "Games";
-  const isNative = (a) => a.source === "native" && a.category !== "navi";
+  // native-source apps with the navi category live in the navi section by
+  // default — but under the "native" source filter they belong with the
+  // other native packages, or they match the filter yet vanish (their
+  // section stays hidden).
+  const isNative = (a) => a.source === "native" && (a.category !== "navi" || activeSource === "native");
   const isAgent = (a) => a.source === "agent";
   const naviApps = curated.filter((a) => isNavi(a) && matches(a, q, cat));
   const gameApps = curated.filter((a) => isGame(a) && matches(a, q, cat));

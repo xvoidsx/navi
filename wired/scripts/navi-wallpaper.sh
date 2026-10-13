@@ -23,6 +23,17 @@ STATIC="$SHARE/wp/lain-hairclip-neon.png"
 LOCAL_SHARE="$HOME/.local/share"
 LOG="$LOCAL_SHARE/navi-wallpaper.log"
 NOANIM="$LOCAL_SHARE/navi-wallpaper.noanim"
+CHOICE="$LOCAL_SHARE/navi-wallpaper.choice"
+
+# a persisted manual pick (written by gifpaperslain) wins over the default:
+# the user's choice survives reboots instead of resetting to the default gif.
+if [ -f "$CHOICE" ]; then
+  _chosen="$(head -n 1 "$CHOICE" 2>/dev/null)"
+  if [ -n "$_chosen" ] && [ -f "$_chosen" ]; then
+    ANIMATED="$_chosen"
+  fi
+  unset _chosen
+fi
 
 log() { printf 'navi-wallpaper: %s\n' "$*" >&2; }
 
@@ -118,8 +129,14 @@ if command -v mpvpaper >/dev/null 2>&1 && [ -f "$ANIMATED" ]; then
   fi
 
   log "mpvpaper failed to stay up — see $LOG; falling back to static"
-  touch "$NOANIM"
-  log "marked animated wallpapers unsupported on this machine ($NOANIM)"
+  # only mark the machine when the log proves a broken graphics stack.
+  # mpvpaper can also die for transient reasons (e.g. gifpaperslain's
+  # killall landing inside our probe window) — marking on those would
+  # kill animated wallpapers permanently for no reason.
+  if egl_failed "$log_start"; then
+    touch "$NOANIM"
+    log "marked animated wallpapers unsupported on this machine ($NOANIM)"
+  fi
   static_fallback
 else
   [ -f "$ANIMATED" ] || log "no animated wallpaper at $ANIMATED"
