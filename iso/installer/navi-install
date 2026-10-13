@@ -81,10 +81,11 @@ TIPS=(
   "your full name lands in the system — the login screen knows who you are."
   "the cli installer is intentional. it is indeed very navi."
   "hostname defaults to 'navi'. name it like you'd name a ship."
-  "sddm is the front door: pick wayland or x11, then your password."
+  "sddm is the front door: sign in and the wired is yours. wayland all the way down."
   "timezone is guessed from your network — type to overrule it."
   "∅ is the empty set. it is also the navi logo. both mean: nothing missing."
-  "the wired ships with agents — ollama, opencode, omp, goose. everybody has already entered."
+  "the wired ships with agents — ollama, opencode, wisp, omp, goose. everybody has already entered."
+  "hermes is the default agent — your lain, in nightshadeNeon."
   "click the waybar modules — each one opens a navi mod. the panel is the control room."
   "navi-audio grew a PLAYING tab — every media player, one floating window."
   "blackice ships in chromium — xvoidsx's adblocker. the web, minus the noise."
@@ -93,13 +94,17 @@ TIPS=(
   "wiredrop flings files across the LAN — no cloud, no account, just the wire."
   "alt+v wakes lain — the voice assistant. your voice never leaves the machine."
   "super+ctrl+h opens herdr — your agents, tiled and ready."
+  "that wallpaper? lain, hairclip and all. gifpaperslain swaps the animation."
   "if a download host is down, the installer skips it and carries on. the wired provides. eventually."
   "thirteen phases. lucky number thirteen."
   "that stopwatch is timing your wifi, not you. probably."
   "the ∅ cycles magenta → cyan → green while it works. watch it. it's calming."
-  "experimental eiri build: the cohesion release. note what glows, report what breaks."
   "the wired will provide."
 )
+# eiri-only tip: the cohesion release is still in flight on this channel.
+if [ "$IS_EIRI" -eq 1 ]; then
+  TIPS+=( "experimental eiri build: the cohesion release. note what glows, report what breaks." )
+fi
 
 # log: everything the installer says, plus everything noisy commands say.
 # while the frame runs it stays in the log window; while paused (prompts)
@@ -1028,6 +1033,42 @@ sync_clock() {
 
 # ---------------------------------------------------------------- main
 
+# last chance to fix a typo: every choice on one screen, redo any section
+# before anything destructive happens. Without this, a mistyped username
+# meant rebooting the whole installer.
+review_inputs() {
+  local ans redo
+  while true; do
+    echo ""
+    echo "──▶ review your choices"
+    echo ""
+    printf "    %-16s %s\n" \
+      "install disk:" "$DISK ($(lsblk -rn -o SIZE,MODEL "$DISK" 2>/dev/null | tr -s ' '))" \
+      "username:" "$NAVI_USER" \
+      "full name:" "$FULLNAME" \
+      "hostname:" "$HOSTNAME" \
+      "timezone:" "$TIMEZONE" \
+      "locale:" "$LOCALE_NAME" \
+      "keymap:" "$KEYMAP" \
+      "user password:" "(set)" \
+      "disk passphrase:" "(set)"
+    echo ""
+    read -r -p "    everything look right? [Y/n] " ans
+    case "${ans:-Y}" in
+      [Yy]*) ok "choices confirmed"; return 0 ;;
+    esac
+    echo "    change one: [d]isk  [u]ser + passwords + locale  [n]etwork  [a]bort install"
+    read -r -p "    redo: " redo
+    case "$redo" in
+      [Dd]*) pick_disk ;;
+      [Uu]*) get_credentials ;;
+      [Nn]*) setup_network ;;
+      [Aa]*) die "aborted — nothing was touched." ;;
+      *) echo "    keeping everything as-is." ;;
+    esac
+  done
+}
+
 main() {
   # Never let the machine sleep mid-install: a suspend/resume cycle drops the
   # network and can re-read a dead hardware clock (classic old-laptop
@@ -1050,6 +1091,7 @@ main() {
   ui_pause
   pick_disk
   get_credentials
+  review_inputs
   ui_resume
   partition_disk
   format_encrypt

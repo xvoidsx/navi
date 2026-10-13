@@ -27,7 +27,7 @@ kill_last_instance () {
 }
 main () {
 	notifier
-	gifpaper=$(zenity --file-selection --title "$x | Select an animated wallpaper:" --filename="$HOME/wiredWM/wp/gifpaperslain/")
+	gifpaper=$(zenity --file-selection --title "$x | Select an animated wallpaper:" --filename="/usr/share/navi/wired/wp/gifpaperslain/")
 	if [ -z "$gifpaper" ]; then
 		exit 0
 	fi

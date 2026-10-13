@@ -17,8 +17,8 @@
 set -u
 
 SHARE="/usr/share/navi/wired"
-ANIMATED="$SHARE/wp/gifpaperslain/navi-lain-rgbsplit.gif"
-STATIC="$SHARE/wp/navi-lain-rgbsplit.jpg"
+ANIMATED="$SHARE/wp/gifpaperslain/hairclip-neon.gif"
+STATIC="$SHARE/wp/lain-hairclip-neon.png"
 
 LOCAL_SHARE="$HOME/.local/share"
 LOG="$LOCAL_SHARE/navi-wallpaper.log"

@@ -399,8 +399,8 @@ setup_agents() {
   # wisp (xvoidsx/wisp — navi's own coding agent, opencode fork with
   # nightshadeNeon theme, Ollama-first, herdr integration). Installs from
   # the GitHub releases via the install.sh script.
-  # wisp lives in ~/.wisp/bin (user install) or /usr/bin (system install).
-  # Check both, and always try to update — the installer is idempotent and
+  # wisp lives in /usr/bin (system install, via WISP_INSTALL_DIR).
+  # Check both the old user path and /usr/bin, and always try to update — the installer is idempotent and
   # fetches the latest release. The old "[ -x /usr/bin/wisp ] → skip" logic
   # meant navi-update never picked up new wisp releases.
   local wisp_bin=""
@@ -417,9 +417,13 @@ setup_agents() {
     info "installing/updating wisp..."
     local wisptmp
     wisptmp="$(mktemp)"
+    # WISP_INSTALL_DIR=/usr/bin: the wisp installer defaults to $HOME/.wisp/bin,
+    # but under $DOAS (how we run it) HOME is /root — so without this the binary
+    # lands in /root/.wisp/bin, invisible to the user. Same pattern as omp's
+    # PI_INSTALL_DIR below.
     if fetch https://raw.githubusercontent.com/xvoidsx/wisp/dev/install.sh -o "$wisptmp" \
-        && $DOAS setsid timeout -k 30 300 bash "$wisptmp" </dev/null; then
-      ok "wisp installed/updated"
+        && $DOAS setsid timeout -k 30 300 env WISP_INSTALL_DIR=/usr/bin bash "$wisptmp" </dev/null; then
+      ok "wisp installed/updated -> /usr/bin/wisp"
     else
       warn "wisp install failed — skipping (re-run install.sh --yes later)"
     fi
@@ -599,10 +603,18 @@ setup_agents() {
     if [ -f "$REPO_DIR/wired/lain/skins/nightshadeNeon.yaml" ]; then
       mkdir -p "$HOME/.hermes/skins"
       cp "$REPO_DIR/wired/lain/skins/nightshadeNeon.yaml" "$HOME/.hermes/skins/"
-      # activate: merge display.skin into config.yaml without clobbering
+      # activate: merge display.skin into config.yaml. Fresh installs get
+      # nightshadeNeon even when hermes stamped its own default skin first
+      # (its installer runs before us); --deploy-only never overwrites an
+      # existing skin value — a user's deliberate choice wins on updates.
       _cfg="$HOME/.hermes/config.yaml"
       if [ -f "$_cfg" ]; then
-        if ! grep -qE "^[[:space:]]*skin:" "$_cfg"; then
+        if grep -qE "^[[:space:]]*skin:" "$_cfg"; then
+          if ! grep -qE "^[[:space:]]*skin:[[:space:]]*nightshadeNeon([[:space:]]|$)" "$_cfg" \
+              && [ "$DEPLOY_ONLY" -eq 0 ]; then
+            sed -i -E 's|^([[:space:]]*skin:).*|\1 nightshadeNeon|' "$_cfg"
+          fi
+        else
           printf '
 display:
   skin: nightshadeNeon
@@ -988,6 +1000,23 @@ ensure_heylain_model() {
   fi
 }
 
+# First-boot model pull service. The installer-time pull above can never
+# succeed during ISO chroot provisioning (no ollama daemon to dial), so
+# this user unit does it at first login instead: waits for ollama.service,
+# pulls gemma3:270m once, then disables itself. Enabled via direct symlink
+# (the build-21 waybar/wiredrop pattern) because `systemctl --user enable`
+# has no user bus to talk to during provisioning.
+deploy_model_pull_service() {
+  local src="$REPO_DIR/wired/systemd/navi-model-pull.service"
+  [ -f "$src" ] || { warn "missing navi-model-pull.service — skipping first-boot model pull"; return 0; }
+  local unit_dir="$HOME/.config/systemd/user"
+  mkdir -p "$unit_dir"
+  install -m 0644 "$src" "$unit_dir/navi-model-pull.service"
+  mkdir -p "$unit_dir/default.target.wants"
+  ln -sf "../navi-model-pull.service" "$unit_dir/default.target.wants/navi-model-pull.service"
+  ok "navi-model-pull.service -> ~/.config/systemd/user/ (first-boot gemma3:270m pull)"
+}
+
 # Hey Lain voice assistant (eiri): deploys mods/hey-lain to
 # /usr/share/navi/hey-lain and builds its STT/TTS venv in place. The venv
 # build (faster-whisper + piper + whisper model, a few hundred MB) is the
@@ -1051,6 +1080,7 @@ setup_heylain() {
   # a failed first model pull must be repaired by later updates, not
   # skipped forever behind the fast path below.
   ensure_heylain_model
+  deploy_model_pull_service
   if [ "$venv_ok" -eq 1 ]; then
     $DOAS mv "$dest.venv-keep" "$dest/venv"
     echo "$req_hash" | $DOAS tee "$dest/.venv-ready" >/dev/null
@@ -1436,7 +1466,7 @@ deploy_configs() {
 verify_wallpaper_wiring() {
   # the canonical sway config execs /usr/bin/navi-wallpaper, which paints the
   # animated wallpaper first (mpvpaper) and falls back to the static swaybg
-  # image at /usr/share/navi/wired/wp/navi-lain-rgbsplit.jpg.
+  # image at /usr/share/navi/wired/wp/lain-hairclip-neon.png.
   local cfg="$HOME/.config/sway/config"
   if grep -q "navi-wallpaper" "$cfg" 2>/dev/null; then
     ok "sway config wires navi-wallpaper (mpvpaper + swaybg fallback)"
