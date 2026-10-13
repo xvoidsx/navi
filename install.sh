@@ -916,6 +916,12 @@ setup_mods() {
     [ -f "$src" ] || { warn "missing wiredrop.service — skipping daemon setup"; return 0; }
     mkdir -p "$unit_dir"
     install -m 0644 "$src" "$unit_dir/wiredrop.service"
+    # enable without D-Bus: during ISO chroot provisioning there is no user
+    # bus (env -i, no XDG_RUNTIME_DIR), so `systemctl --user enable` fails
+    # into the warn path and the symlink never gets made. the symlink is all
+    # `enable` does for a WantedBy=default.target unit, so make it directly.
+    mkdir -p "$unit_dir/default.target.wants"
+    ln -sf "../wiredrop.service" "$unit_dir/default.target.wants/wiredrop.service"
     if ! command -v systemctl >/dev/null 2>&1; then
       warn "systemctl not found — enable the wiredrop daemon by hand: systemctl --user enable --now wiredrop"
       return 0
@@ -1302,6 +1308,12 @@ deploy_waybar_service() {
   install -m 0644 "$src" "$unit_dir/waybar.service"
   manifest_record "$src" "systemd/waybar.service" "$unit_dir/waybar.service" "644"
   ok "waybar.service -> ~/.config/systemd/user/"
+  # enable without D-Bus (same chroot problem as wiredrop above):
+  # `systemctl --user enable` cannot reach a user manager during ISO
+  # provisioning, so do the symlink directly. waybar never started on
+  # first boot until this existed.
+  mkdir -p "$unit_dir/default.target.wants"
+  ln -sf "../waybar.service" "$unit_dir/default.target.wants/waybar.service"
   if ! command -v systemctl >/dev/null 2>&1; then
     warn "systemctl not found — enable waybar by hand: systemctl --user enable --now waybar"
     return 0
