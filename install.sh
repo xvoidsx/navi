@@ -1966,6 +1966,37 @@ setup_sumi() {
   fi
 }
 
+setup_copland() {
+  step "copland (xvoidsx's Electron terminal)"
+  # Pinned release .deb — dogfooding build, NOT the default terminal yet.
+  # (Alacritty remains default until copland earns it via navi mods integration.)
+  # Version-stamped so navi-update upgrades it when the pin moves.
+  local want="v0.9.1"
+  local ver="${want#v}"
+  local stamp="/var/lib/navi/copland-version"
+  local have=""
+  [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
+  if [ "$have" = "$want" ] && dpkg -s copland >/dev/null 2>&1; then
+    ok "copland $want already installed"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping copland (re-run install.sh --yes later)"
+  else
+    info "installing copland $want (dogfood build)..."
+    local deb_tmp
+    deb_tmp="$(mktemp --suffix=.deb)"
+    if fetch "https://github.com/xvoidsx/copland/releases/download/${want}/copland_${ver}_amd64.deb" -o "$deb_tmp" \
+        && [ "$(uname -m)" = "x86_64" ] \
+        && $DOAS dpkg -i "$deb_tmp"; then
+      $DOAS mkdir -p "$(dirname "$stamp")"
+      echo "$want" | $DOAS tee "$stamp" >/dev/null
+      ok "copland $want installed (dogfood — alacritty remains default)"
+    else
+      warn "copland install failed or unsupported arch — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$deb_tmp"
+  fi
+}
+
 setup_fossfit() {
   step "FOSSfit (xvoidsx's Electron fitness app)"
   # Pinned release .deb.
@@ -2575,6 +2606,7 @@ main() {
     setup_cyberia
     setup_navi_radio
     setup_sumi
+    setup_copland
     setup_fossfit
     setup_tailscale
     ok "deploy-only refresh complete (navi $NAVI_VERSION)"
