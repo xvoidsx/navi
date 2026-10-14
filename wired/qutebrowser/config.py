@@ -29,16 +29,12 @@ c.colors.webpage.bg = BG
 
 # ── User agent ─────────────────────────────────────────────────────────────
 # qutebrowser identifies itself as "...QtWebEngine/x.y.z ..." and several
-# sites reject that outright. Present as Chrome stable instead.
+# sites reject that outright. Present as Chrome stable globally.
 #
-# Track this against navi's chromium package: apt-cache policy chromium, or
-# grep Version from `dpkg -l chromium`. Chrome's UA string does not carry a
-# real minor version, so bumping only the major is correct.
-config.set(
-    'content.headers.user_agent',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36',
-    'accounts.google.com',
-)
+# Track this against Chrome stable (currently 155): Chrome's UA string does
+# not carry a real minor version, so bumping only the major is correct.
+# Check https://chromereleases.googleblog.com or navi's chromium package.
+c.content.headers.user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36'
 
 # ── Appearance ──
 c.colors.completion.fg = FG
