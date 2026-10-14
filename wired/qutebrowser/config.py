@@ -141,11 +141,15 @@ c.content.blocking.hosts.lists = [
     "https://easylist.to/easylist/easyprivacy.txt",
 ]
 
-# kirie filter lists: Brave's curated lists, same philosophy as blackice
+# kirie filter lists: Brave's curated lists + uBO's standard filters,
+# same philosophy as blackice — block everything, no matter what
 c.content.blocking.adblock.lists = [
     "https://easylist.to/easylist/easylist.txt",
     "https://easylist.to/easylist/easyprivacy.txt",
     "https://raw.githubusercontent.com/brave/adblock-lists/master/brave-lists/brave-unbreak.txt",
+    "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt",
+    "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/quick-fixes.txt",
+    "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt",
 ]
 
 # ── navi bangs ──
