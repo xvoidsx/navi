@@ -2653,6 +2653,7 @@ main() {
   setup_cyberia
   setup_navi_radio
   setup_sumi
+  setup_copland
   setup_fossfit
   setup_tailscale
   tighten_sudo
