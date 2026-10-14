@@ -140,7 +140,19 @@ reload_bar() {
     if [ "$BAR" = polybar ]; then
         polybar-msg cmd restart 2>/dev/null || true
     else
-        pkill -SIGUSR2 -x waybar 2>/dev/null || true
+        # Full restart, not SIGUSR2: GTK does not re-trigger @keyframes on
+        # already-rendered widgets after a CSS hot-reload, so theme switches
+        # via SIGUSR2 silently lose animations. A fresh waybar process
+        # initializes them correctly. systemd manages the service on navi,
+        # so restart through it; fall back to kill+start if not.
+        if systemctl --user is-active -q waybar.service 2>/dev/null; then
+            systemctl --user restart waybar.service 2>/dev/null || true
+        else
+            pkill -x waybar 2>/dev/null || true
+            sleep 0.5
+            ( waybar -b bar-0 >/dev/null 2>&1 & )
+            disown 2>/dev/null || true
+        fi
     fi
 }
 
@@ -165,7 +177,12 @@ apply_theme() { # <name>
         fi
     fi
 
-    cp -f "$d/$THEME_FILE" "$STYLE"
+    # Atomic write: cp -f is not atomic, and waybar reading a partially-
+    # written style.css gets a truncated file — GTK fails the parse silently
+    # and animations never apply. Write temp + rename instead.
+    _tmp="$STYLE.tmp.$$"
+    cp -f "$d/$THEME_FILE" "$_tmp" && mv -f "$_tmp" "$STYLE"
+    rm -f "$_tmp"
     reload_bar
 
     if command -v notify-send >/dev/null 2>&1; then
@@ -200,7 +217,9 @@ shoot() { # <name>
     local d; d=$(theme_dir "$1") || return 1
     local settle="${SHOT_SETTLE:-1.8}"
 
-    cp -f "$d/$THEME_FILE" "$STYLE"
+    _tmp="$STYLE.tmp.$$"
+    cp -f "$d/$THEME_FILE" "$_tmp" && mv -f "$_tmp" "$STYLE"
+    rm -f "$_tmp"
     reload_bar
     sleep "$settle"
     if is_x11; then
