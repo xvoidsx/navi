@@ -69,7 +69,7 @@ jobs:
             --memtest none \
             --iso-application "navi" \
             --iso-publisher "xvoidsx" \
-            --iso-volume "navi 1.3 mika" \
+            --iso-volume "navi 1.7 mika" \
             --image-name "$ISO_BASENAME"
           lb build
 
