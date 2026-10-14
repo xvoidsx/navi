@@ -131,7 +131,7 @@ _startpage = os.path.join(_qute_dir, "startpage.html")
 c.url.start_pages = [f"file://{_startpage}"]
 c.url.default_page = f"file://{_startpage}"
 
-# Adblocking: python-adblock when present, hosts lists as fallback
+# kirie adblocking: Brave's adblock-rust engine when present, hosts lists as fallback
 # (for the full engine: pip install --break-system-packages adblock)
 try:
     import adblock  # noqa: F401
@@ -139,10 +139,17 @@ try:
 except ImportError:
     c.content.blocking.method = "hosts"
 
-# Custom EasyList/EasyPrivacy URLs
+# Custom EasyList/EasyPrivacy URLs (hosts fallback)
 c.content.blocking.hosts.lists = [
     "https://easylist.to/easylist/easylist.txt",
     "https://easylist.to/easylist/easyprivacy.txt",
+]
+
+# kirie filter lists: Brave's curated lists, same philosophy as blackice
+c.content.blocking.adblock.lists = [
+    "https://easylist.to/easylist/easylist.txt",
+    "https://easylist.to/easylist/easyprivacy.txt",
+    "https://raw.githubusercontent.com/brave/adblock-lists/master/brave-lists/brave-unbreak.txt",
 ]
 
 # ── navi bangs ──
