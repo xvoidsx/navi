@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl
           git clone --depth 1 --branch main \
             "https://x-access-token:${GH_TOKEN}@github.com/xvoidsx/navi.git" src
           cd src && git rev-parse --short HEAD
