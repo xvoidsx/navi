@@ -191,6 +191,13 @@ window#waybar > box { background: transparent; }
     text-shadow: 0 0 8px rgba(255, 16, 240, 0.95);
 }
 
+#workspaces button:hover {
+    color: @nw;
+    border-color: rgba(255, 16, 240, 0.45);
+    box-shadow: 0 0 10px rgba(255, 16, 240, 0.35);
+    text-shadow: 0 0 6px rgba(255, 16, 240, 0.6);
+}
+
 #workspaces button.urgent {
     color: @nw;
     background-color: rgba(255, 49, 49, 0.26);
