@@ -1,0 +1,1183 @@
+// navi-weather — a bubble tea weather mod for navi.
+//
+// wttr.in backend (no API key). IP geolocation by default; saved locations
+// and the imperial/metric toggle live in ~/.config/navi-weather/config.json,
+// shared with the waybar module script so the bar and the TUI always agree.
+// Styled entirely through the shared nightshadeNeon theme package
+// (mods/theme).
+package main
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	theme "github.com/rav3ndust/navi-theme"
+)
+
+const frameWidth = 62
+
+// Fixed-frame geometry: every view renders exactly wxBodyRows body lines.
+// The main forecast reserves fixed slots for the banner and the stale
+// indicator; lists (locations, alerts) are windowed; the alert detail
+// keeps its 14-line scroll window.
+const (
+	wxBodyRows  = 20
+	wxMaxLocs   = 6
+	wxMaxAlerts = 6
+)
+
+// ---------------------------------------------------------------------------
+// config — shared with wired/waybar/weather.sh
+// ---------------------------------------------------------------------------
+
+type weatherConfig struct {
+	Units           string   `json:"units"`            // "imperial" | "metric"
+	DefaultLocation string   `json:"default_location"` // "" = auto-detect via IP
+	Locations       []string `json:"locations"`        // "" = auto-detect
+}
+
+func configPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "."
+	}
+	return filepath.Join(home, ".config", "navi-weather", "config.json")
+}
+
+func defaultConfig() weatherConfig {
+	return weatherConfig{
+		Units:           "imperial",
+		DefaultLocation: "",
+		Locations:       []string{""},
+	}
+}
+
+func loadConfig() weatherConfig {
+	cfg := defaultConfig()
+	raw, err := os.ReadFile(configPath())
+	if err != nil {
+		return cfg
+	}
+	var loaded weatherConfig
+	if err := json.Unmarshal(raw, &loaded); err != nil {
+		return cfg
+	}
+	if loaded.Units != "metric" && loaded.Units != "imperial" {
+		loaded.Units = "imperial"
+	}
+	if len(loaded.Locations) == 0 {
+		loaded.Locations = []string{""}
+	}
+	return loaded
+}
+
+func saveConfig(cfg weatherConfig) {
+	p := configPath()
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return
+	}
+	raw, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(p, append(raw, '\n'), 0o644)
+}
+
+func locationLabel(loc string) string {
+	if loc == "" {
+		return "here (auto)"
+	}
+	return loc
+}
+
+// ---------------------------------------------------------------------------
+// wttr.in — format=j1
+// ---------------------------------------------------------------------------
+
+type wttrDesc struct {
+	Value string `json:"value"`
+}
+
+type wttrCurrent struct {
+	TempC           string     `json:"temp_C"`
+	TempF           string     `json:"temp_F"`
+	FeelsLikeC      string     `json:"FeelsLikeC"`
+	FeelsLikeF      string     `json:"FeelsLikeF"`
+	Humidity        string     `json:"humidity"`
+	WeatherCode     string     `json:"weatherCode"`
+	WeatherDesc     []wttrDesc `json:"weatherDesc"`
+	WindKmph        string     `json:"windspeedKmph"`
+	WindMph         string     `json:"windspeedMiles"`
+	WindDir         string     `json:"winddir16Point"`
+	VisibilityMi    string     `json:"visibilityMiles"`
+	VisibilityKm    string     `json:"visibility"`
+	ObservationTime string     `json:"observation_time"`
+}
+
+type wttrAreaName struct {
+	Value string `json:"value"`
+}
+
+type wttrArea struct {
+	AreaName  []wttrAreaName `json:"areaName"`
+	Region    []wttrAreaName `json:"region"`
+	Country   []wttrAreaName `json:"country"`
+	Latitude  string         `json:"latitude"`
+	Longitude string         `json:"longitude"`
+}
+
+type wttrAstronomy struct {
+	Sunrise string `json:"sunrise"`
+	Sunset  string `json:"sunset"`
+}
+
+type wttrHourly struct {
+	Time         string     `json:"time"`
+	TempC        string     `json:"tempC"`
+	TempF        string     `json:"tempF"`
+	WeatherCode  string     `json:"weatherCode"`
+	WeatherDesc  []wttrDesc `json:"weatherDesc"`
+	ChanceOfRain string     `json:"chanceofrain"`
+	Humidity     string     `json:"humidity"`
+}
+
+type wttrDay struct {
+	Date      string          `json:"date"`
+	MaxTempC  string          `json:"maxtempC"`
+	MaxTempF  string          `json:"maxtempF"`
+	MinTempC  string          `json:"mintempC"`
+	MinTempF  string          `json:"mintempF"`
+	Astronomy []wttrAstronomy `json:"astronomy"`
+	Hourly    []wttrHourly    `json:"hourly"`
+}
+
+type wttrResp struct {
+	Current []wttrCurrent `json:"current_condition"`
+	Areas   []wttrArea    `json:"nearest_area"`
+	Days    []wttrDay     `json:"weather"`
+}
+
+func getWeather(loc, units string) (*wttrResp, error) {
+	flag := "u"
+	if units == "metric" {
+		flag = "m"
+	}
+	path := ""
+	if loc != "" {
+		path = url.PathEscape(loc)
+	}
+	u := "https://wttr.in/" + path + "?format=j1&" + flag
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "navi-weather/1.0 (navi linux)")
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("wttr.in: %s", resp.Status)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var w wttrResp
+	if err := json.Unmarshal(body, &w); err != nil {
+		return nil, err
+	}
+	if len(w.Current) == 0 {
+		return nil, fmt.Errorf("wttr.in returned no current conditions")
+	}
+	return &w, nil
+}
+
+// ---------------------------------------------------------------------------
+// condition emoji + day/night
+// ---------------------------------------------------------------------------
+
+// emojiFor maps wttr.in weather codes to condition emoji.
+func emojiFor(code string, day bool) string {
+	switch code {
+	case "113": // clear / sunny
+		if day {
+			return "☀️"
+		}
+		return "🌙"
+	case "116": // partly cloudy
+		if day {
+			return "⛅"
+		}
+		return "☁️"
+	case "119", "122": // cloudy / overcast
+		return "☁️"
+	case "143", "248", "260": // mist / fog
+		return "🌫️"
+	case "176", "263", "266", "293", "296", "353": // drizzle / light showers
+		return "🌦️"
+	case "299", "302", "305", "308", "356", "359": // rain
+		return "🌧️"
+	case "179", "182", "185", "281", "284", "311", "314", "317", "350", "362", "365", "374", "377": // sleet / wintry mix
+		return "🌨️"
+	case "227", "230", "320", "323", "326", "329", "332", "335", "338", "368", "371": // snow
+		return "❄️"
+	case "200", "386", "389", "392", "395": // thunder
+		return "⛈️"
+	default:
+		return "☁️"
+	}
+}
+
+// hmToMin parses "07:02 AM" into minutes after midnight.
+func hmToMin(s string) (int, bool) {
+	s = strings.TrimSpace(s)
+	parts := strings.Fields(s)
+	if len(parts) != 2 {
+		return 0, false
+	}
+	hm := strings.Split(parts[0], ":")
+	if len(hm) != 2 {
+		return 0, false
+	}
+	h, err1 := strconv.Atoi(hm[0])
+	m, err2 := strconv.Atoi(hm[1])
+	if err1 != nil || err2 != nil {
+		return 0, false
+	}
+	ampm := strings.ToUpper(parts[1])
+	if ampm == "PM" && h != 12 {
+		h += 12
+	}
+	if ampm == "AM" && h == 12 {
+		h = 0
+	}
+	return h*60 + m, true
+}
+
+// isDay reports whether the location is currently in daylight, using the
+// observation time against today's sunrise/sunset. Falls back to day.
+func isDay(w *wttrResp) bool {
+	if len(w.Current) == 0 || len(w.Days) == 0 || len(w.Days[0].Astronomy) == 0 {
+		return true
+	}
+	obs, ok1 := hmToMin(w.Current[0].ObservationTime)
+	rise, ok2 := hmToMin(w.Days[0].Astronomy[0].Sunrise)
+	set, ok3 := hmToMin(w.Days[0].Astronomy[0].Sunset)
+	if !ok1 || !ok2 || !ok3 {
+		return true
+	}
+	return obs >= rise && obs < set
+}
+
+func atoi(s string) int {
+	n, _ := strconv.Atoi(strings.TrimSpace(s))
+	return n
+}
+
+// ---------------------------------------------------------------------------
+// model
+// ---------------------------------------------------------------------------
+
+type weatherMsg struct {
+	data *wttrResp
+	err  error
+}
+
+type alertsMsg struct {
+	res alertsResult
+}
+
+type tickMsg time.Time
+
+type alertsTickMsg time.Time
+
+type alertCycleMsg time.Time
+
+type model struct {
+	cfg       weatherConfig
+	data      *wttrResp
+	fetchErr  string
+	loading   bool
+	lastFetch time.Time
+	view      string // "main" | "locations" | "alerts" | "alertdetail"
+	locCursor int
+	adding    bool
+	input     textinput.Model
+
+	alerts            []nwsAlert
+	alertsUnsupported bool
+	alertsFromCache   bool
+	alertsFetchedAt   time.Time
+	alertsErr         string
+	alertCycle        int
+	alertCursor       int
+	detailOffset      int
+}
+
+func newModel() model {
+	cfg := loadConfig()
+	ti := textinput.New()
+	ti.Placeholder = "City, State or ZIP…"
+	ti.CharLimit = 80
+	return model{
+		cfg:     cfg,
+		loading: true,
+		input:   ti,
+	}
+}
+
+func (m model) activeLocation() string {
+	return m.cfg.DefaultLocation
+}
+
+func fetchWeatherCmd(loc, units string) tea.Cmd {
+	return func() tea.Msg {
+		data, err := getWeather(loc, units)
+		return weatherMsg{data: data, err: err}
+	}
+}
+
+// fetchAlertsCmd is cache-aware: a fresh cache returns without touching
+// the network, so this is cheap to call on every weather refresh.
+func fetchAlertsCmd(lat, lon string) tea.Cmd {
+	return func() tea.Msg {
+		return alertsMsg{res: getAlerts(lat, lon)}
+	}
+}
+
+func tickCmd() tea.Cmd {
+	return tea.Tick(30*time.Minute, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
+func alertsTickCmd() tea.Cmd {
+	return tea.Tick(10*time.Minute, func(t time.Time) tea.Msg {
+		return alertsTickMsg(t)
+	})
+}
+
+// alertCycleCmd rotates a multi-alert banner every few seconds.
+func alertCycleCmd() tea.Cmd {
+	return tea.Tick(4*time.Second, func(t time.Time) tea.Msg {
+		return alertCycleMsg(t)
+	})
+}
+
+func (m model) Init() tea.Cmd {
+	return tea.Batch(
+		fetchWeatherCmd(m.activeLocation(), m.cfg.Units),
+		tickCmd(),
+		alertsTickCmd(),
+	)
+}
+
+func (m model) refetch() (model, tea.Cmd) {
+	m.loading = true
+	m.fetchErr = ""
+	return m, fetchWeatherCmd(m.activeLocation(), m.cfg.Units)
+}
+
+func (m *model) setLocation(loc string) {
+	m.cfg.DefaultLocation = loc
+	if !contains(m.cfg.Locations, loc) {
+		m.cfg.Locations = append(m.cfg.Locations, loc)
+	}
+	saveConfig(m.cfg)
+}
+
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case weatherMsg:
+		m.loading = false
+		if msg.err != nil {
+			// keep last good data on screen; note the staleness
+			m.fetchErr = msg.err.Error()
+		} else {
+			m.data = msg.data
+			m.fetchErr = ""
+			m.lastFetch = time.Now()
+		}
+		// chain the alerts fetch off whatever coordinates we have —
+		// getAlerts is cache-aware, so this costs nothing when fresh.
+		if lat, lon, ok := coordsOf(m.data); ok {
+			return m, fetchAlertsCmd(lat, lon)
+		}
+		return m, nil
+
+	case alertsMsg:
+		r := msg.res
+		m.alerts = r.Alerts
+		m.alertsUnsupported = r.Unsupported
+		m.alertsFromCache = r.FromCache
+		m.alertsFetchedAt = r.FetchedAt
+		m.alertCycle = 0
+		if m.alertCursor >= len(m.alerts) {
+			m.alertCursor = 0
+		}
+		if r.Err != nil {
+			m.alertsErr = r.Err.Error()
+		} else {
+			m.alertsErr = ""
+		}
+		if len(m.alerts) > 1 {
+			return m, alertCycleCmd()
+		}
+		return m, nil
+
+	case alertsTickMsg:
+		if lat, lon, ok := coordsOf(m.data); ok {
+			return m, tea.Batch(fetchAlertsCmd(lat, lon), alertsTickCmd())
+		}
+		return m, alertsTickCmd()
+
+	case alertCycleMsg:
+		if len(m.alerts) > 1 && m.view == "main" {
+			m.alertCycle = (m.alertCycle + 1) % len(m.alerts)
+			return m, alertCycleCmd()
+		}
+		return m, nil
+
+	case tickMsg:
+		m.loading = true
+		return m, tea.Batch(
+			fetchWeatherCmd(m.activeLocation(), m.cfg.Units),
+			tickCmd(),
+		)
+
+	case tea.KeyMsg:
+		if m.adding {
+			switch msg.String() {
+			case "enter":
+				loc := strings.TrimSpace(m.input.Value())
+				if loc != "" {
+					m.setLocation(loc)
+					m.adding = false
+					m.input.Reset()
+					m.view = "main"
+					return m.refetch()
+				}
+				return m, nil
+			case "esc":
+				m.adding = false
+				m.input.Reset()
+				return m, nil
+			}
+			var cmd tea.Cmd
+			m.input, cmd = m.input.Update(msg)
+			return m, cmd
+		}
+
+		switch m.view {
+		case "locations":
+			switch msg.String() {
+			case "esc", "q":
+				m.view = "main"
+				return m, nil
+			case "up", "k":
+				if m.locCursor > 0 {
+					m.locCursor--
+				}
+				return m, nil
+			case "down", "j":
+				if m.locCursor < len(m.cfg.Locations)-1 {
+					m.locCursor++
+				}
+				return m, nil
+			case "enter":
+				if len(m.cfg.Locations) > 0 {
+					m.setLocation(m.cfg.Locations[m.locCursor])
+					m.view = "main"
+					return m.refetch()
+				}
+				return m, nil
+			case "a":
+				m.adding = true
+				m.input.Focus()
+				return m, nil
+			case "d":
+				if len(m.cfg.Locations) > 1 && m.locCursor < len(m.cfg.Locations) {
+					m.cfg.Locations = append(m.cfg.Locations[:m.locCursor], m.cfg.Locations[m.locCursor+1:]...)
+					if m.locCursor >= len(m.cfg.Locations) {
+						m.locCursor = len(m.cfg.Locations) - 1
+					}
+					if !contains(m.cfg.Locations, m.cfg.DefaultLocation) {
+						m.cfg.DefaultLocation = m.cfg.Locations[0]
+					}
+					saveConfig(m.cfg)
+				}
+				return m, nil
+			}
+			return m, nil
+
+		case "alerts":
+			switch msg.String() {
+			case "esc", "q":
+				m.view = "main"
+				return m, nil
+			case "up", "k":
+				if m.alertCursor > 0 {
+					m.alertCursor--
+				}
+				return m, nil
+			case "down", "j":
+				if m.alertCursor < len(m.alerts)-1 {
+					m.alertCursor++
+				}
+				return m, nil
+			case "enter":
+				if len(m.alerts) > 0 {
+					m.view = "alertdetail"
+					m.detailOffset = 0
+				}
+				return m, nil
+			case "r":
+				m.openRadar()
+				return m, nil
+			}
+			return m, nil
+
+		case "alertdetail":
+			lines := len(m.detailLines())
+			const page = 10
+			switch msg.String() {
+			case "esc", "q":
+				m.view = "alerts"
+				return m, nil
+			case "up", "k":
+				if m.detailOffset > 0 {
+					m.detailOffset--
+				}
+				return m, nil
+			case "down", "j":
+				if m.detailOffset < lines-1 {
+					m.detailOffset++
+				}
+				return m, nil
+			case "pgup":
+				m.detailOffset -= page
+				if m.detailOffset < 0 {
+					m.detailOffset = 0
+				}
+				return m, nil
+			case "pgdown":
+				m.detailOffset += page
+				if m.detailOffset > lines-1 {
+					m.detailOffset = lines - 1
+				}
+				if m.detailOffset < 0 {
+					m.detailOffset = 0
+				}
+				return m, nil
+			case "r":
+				m.openRadar()
+				return m, nil
+			}
+			return m, nil
+		}
+
+		// main view keys
+		switch msg.String() {
+		case "q", "esc", "ctrl+c":
+			return m, tea.Quit
+		case "a":
+			m.view = "alerts"
+			m.alertCursor = 0
+			return m, nil
+		case "u":
+			if m.cfg.Units == "imperial" {
+				m.cfg.Units = "metric"
+			} else {
+				m.cfg.Units = "imperial"
+			}
+			saveConfig(m.cfg)
+			return m.refetch()
+		case "r":
+			return m.refetch()
+		case "l":
+			m.view = "locations"
+			m.locCursor = 0
+			for i, loc := range m.cfg.Locations {
+				if loc == m.cfg.DefaultLocation {
+					m.locCursor = i
+					break
+				}
+			}
+			return m, nil
+		case "tab":
+			if len(m.cfg.Locations) > 1 {
+				idx := 0
+				for i, loc := range m.cfg.Locations {
+					if loc == m.cfg.DefaultLocation {
+						idx = i
+						break
+					}
+				}
+				m.setLocation(m.cfg.Locations[(idx+1)%len(m.cfg.Locations)])
+				return m.refetch()
+			}
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+// ---------------------------------------------------------------------------
+// view
+// ---------------------------------------------------------------------------
+
+func (m model) temp(f, c string) string {
+	if m.cfg.Units == "metric" {
+		return c + "°C"
+	}
+	return f + "°F"
+}
+
+func (m model) wind(kmph, mph, dir string) string {
+	if m.cfg.Units == "metric" {
+		return kmph + " km/h " + dir
+	}
+	return mph + " mph " + dir
+}
+
+func (m model) vis(km, mi string) string {
+	if m.cfg.Units == "metric" {
+		return km + " km"
+	}
+	return mi + " mi"
+}
+
+func areaLabel(w *wttrResp, fallback string) string {
+	if len(w.Areas) > 0 {
+		a := w.Areas[0]
+		name := ""
+		if len(a.AreaName) > 0 {
+			name = a.AreaName[0].Value
+		}
+		region := ""
+		if len(a.Region) > 0 {
+			region = a.Region[0].Value
+		}
+		if name == "" {
+			name = fallback
+		}
+		if region != "" && region != name {
+			return name + ", " + region
+		}
+		return name
+	}
+	if fallback == "" {
+		return "here"
+	}
+	return fallback
+}
+
+func descOf(d []wttrDesc) string {
+	if len(d) > 0 {
+		return d[0].Value
+	}
+	return ""
+}
+
+// hourLabel converts wttr.in's "0".."2100" slot into a 24h "HH" label.
+func hourLabel(t string) string {
+	return fmt.Sprintf("%02d", atoi(t)/100)
+}
+
+// dayLabel converts "2026-09-18" into "Today" or "19 Sep".
+func dayLabel(date string, idx int) string {
+	if idx == 0 {
+		return "Today"
+	}
+	if t, err := time.Parse("2006-01-02", date); err == nil {
+		return t.Format("02 Jan")
+	}
+	return date
+}
+
+// nextSlots returns up to n hourly slots starting from the current time.
+func nextSlots(w *wttrResp, n int) []wttrHourly {
+	if len(w.Current) == 0 || len(w.Days) == 0 {
+		return nil
+	}
+	obsMin, ok := hmToMin(w.Current[0].ObservationTime)
+	if !ok {
+		obsMin = 12 * 60
+	}
+	var slots []wttrHourly
+	for di, day := range w.Days {
+		for _, h := range day.Hourly {
+			slotMin := (atoi(h.Time) / 100) * 60
+			if di == 0 && slotMin < obsMin-90 {
+				continue // already passed (with a little overlap)
+			}
+			slots = append(slots, h)
+			if len(slots) >= n {
+				return slots
+			}
+		}
+	}
+	return slots
+}
+
+func (m model) frame(content string) string {
+	return theme.FrameFixed(frameWidth, "navi weather", true, "", content, wxBodyRows)
+}
+
+func (m model) viewMain() string {
+	if m.loading && m.data == nil {
+		return m.frame(theme.PadLines(theme.Grayed.Render("  asking the sky…"), wxBodyRows))
+	}
+	if m.data == nil {
+		return m.frame(theme.PadLines(
+			theme.Error.Render("  couldn't reach wttr.in — check your connection and press r to retry."),
+			wxBodyRows))
+	}
+
+	w := m.data
+	cur := w.Current[0]
+	day := isDay(w)
+
+	var b strings.Builder
+	// location
+	b.WriteString(theme.Header.Render("  "+areaLabel(w, m.activeLocation())) + "\n")
+	// severe-weather banner slot: always one line.
+	if line := m.bannerLine(); line != "" {
+		b.WriteString(line + "\n")
+	} else {
+		b.WriteString("\n")
+	}
+	// current conditions, big
+	b.WriteString("  " + theme.Normal.Render(emojiFor(cur.WeatherCode, day)+"  "+m.temp(cur.TempF, cur.TempC)) +
+		theme.Grayed.Render("  —  "+descOf(cur.WeatherDesc)) + "\n")
+	// feels like + today's high/low
+	hi, lo := "", ""
+	if len(w.Days) > 0 {
+		hi = m.temp(w.Days[0].MaxTempF, w.Days[0].MaxTempC)
+		lo = m.temp(w.Days[0].MinTempF, w.Days[0].MinTempC)
+	}
+	details := "feels like " + m.temp(cur.FeelsLikeF, cur.FeelsLikeC)
+	if hi != "" {
+		details += "   ·   H " + hi + "  L " + lo
+	}
+	b.WriteString(theme.Grayed.Render("  "+details) + "\n")
+	b.WriteString(theme.Grayed.Render("  humidity "+cur.Humidity+"%   ·   wind "+m.wind(cur.WindKmph, cur.WindMph, cur.WindDir)+
+		"   ·   visibility "+m.vis(cur.VisibilityKm, cur.VisibilityMi)) + "\n")
+
+	b.WriteString("\n" + theme.Header.Render("  next 12 hours") + "\n")
+	for _, h := range nextSlots(w, 4) {
+		line := "  " + hourLabel(h.Time) + "   " + emojiFor(h.WeatherCode, true) + "   " +
+			m.temp(h.TempF, h.TempC)
+		if r := atoi(h.ChanceOfRain); r > 0 {
+			line += theme.Grayed.Render(fmt.Sprintf("   ·   %d%% rain", r))
+		}
+		b.WriteString(line + "\n")
+	}
+
+	if len(w.Days) > 1 {
+		b.WriteString("\n" + theme.Header.Render("  3-day") + "\n")
+		for i, d := range w.Days {
+			if i > 2 {
+				break
+			}
+			code := ""
+			if len(d.Hourly) > 4 {
+				code = d.Hourly[4].WeatherCode // midday slot
+			}
+			line := "  " + dayLabel(d.Date, i) + "   " + emojiFor(code, true) + "   " +
+				m.temp(d.MaxTempF, d.MaxTempC) + " / " + m.temp(d.MinTempF, d.MinTempC)
+			b.WriteString(line + "\n")
+		}
+	}
+
+	if m.fetchErr != "" {
+		b.WriteString("\n" + theme.Error.Render("  stale — couldn't refresh ("+shortErr(m.fetchErr)+")") + "\n")
+	} else {
+		b.WriteString("\n\n")
+	}
+
+	unitKey := "°F/°C"
+	footer := theme.Footer(true,
+		[2]string{"q", "quit"},
+		[2]string{"a", "alerts"},
+		[2]string{"u", unitKey},
+		[2]string{"r", "refresh"},
+		[2]string{"l", "saved"},
+		[2]string{"tab", "next"},
+	)
+	return m.frame(b.String() + footer)
+}
+
+func shortErr(s string) string {
+	if len(s) > 60 {
+		return s[:57] + "…"
+	}
+	return s
+}
+
+func (m model) viewLocations() string {
+	var b strings.Builder
+	b.WriteString(theme.Header.Render("  saved locations") + "\n\n")
+	// Locations: windowed around the cursor, fixed wxMaxLocs+1 region.
+	var lb strings.Builder
+	start, end := theme.ListWindow(len(m.cfg.Locations), m.locCursor, wxMaxLocs)
+	for i := start; i < end; i++ {
+		loc := m.cfg.Locations[i]
+		marker := "  "
+		if loc == m.cfg.DefaultLocation {
+			marker = "● "
+		}
+		line := marker + locationLabel(loc)
+		if i == m.locCursor {
+			lb.WriteString("  " + theme.Selected.Render("▸ "+line) + "\n")
+		} else {
+			lb.WriteString("  " + theme.Normal.Render("  "+line) + "\n")
+		}
+	}
+	if hint := theme.ScrollHint(len(m.cfg.Locations), start, end); hint != "" {
+		lb.WriteString("  " + hint + "\n")
+	}
+	b.WriteString(theme.PadLines(lb.String(), wxMaxLocs+1))
+	b.WriteString("\n")
+	// Add-form slot: always two lines.
+	if m.adding {
+		b.WriteString("  " + theme.Grayed.Render("add location:") + "\n")
+		b.WriteString("  " + m.input.View() + "\n")
+	} else {
+		b.WriteString("\n\n")
+	}
+	var footer string
+	if m.adding {
+		footer = theme.Footer(false,
+			[2]string{"enter", "save"},
+			[2]string{"esc", "cancel"},
+		)
+	} else {
+		footer = theme.Footer(false,
+			[2]string{"enter", "select"},
+			[2]string{"a", "add"},
+			[2]string{"d", "delete"},
+			[2]string{"esc", "back"},
+		)
+	}
+	return m.frame(b.String() + footer)
+}
+
+// ---------------------------------------------------------------------------
+// severe-weather alerts views
+// ---------------------------------------------------------------------------
+
+// bannerLine is the one-line alert strip above the forecast. Empty when
+// there is nothing to say; a dim honest note outside NWS coverage.
+func (m model) bannerLine() string {
+	if m.alertsUnsupported {
+		return "  " + theme.Dimmed.Render("alerts unavailable outside the US")
+	}
+	if len(m.alerts) == 0 {
+		return ""
+	}
+	a := m.alerts[m.alertCycle%len(m.alerts)]
+	txt := "▲ " + strings.ToUpper(a.Event)
+	if exp := expiresShort(a.Expires); exp != "" {
+		txt += " · expires " + exp
+	}
+	if len(m.alerts) > 1 {
+		txt += fmt.Sprintf(" · %d/%d", m.alertCycle%len(m.alerts)+1, len(m.alerts))
+	}
+	return "  " + severityStyle(a.Severity).Render(txt)
+}
+
+// openRadar opens the NEXRAD loop for the current location in a chromium
+// webapp view. Failures land in alertsErr — honest, never silent.
+func (m *model) openRadar() {
+	if m.alertsUnsupported {
+		m.alertsErr = "radar unavailable outside the US"
+		return
+	}
+	lat, lon, ok := coordsOf(m.data)
+	if !ok {
+		m.alertsErr = "no coordinates yet — wait for the forecast to load"
+		return
+	}
+	station, err := radarStationFor(lat, lon)
+	if err != nil {
+		m.alertsErr = "couldn't find your radar station (" + shortErr(err.Error()) + ")"
+		return
+	}
+	if err := openRadarLoop(station); err != nil {
+		m.alertsErr = err.Error()
+		return
+	}
+	m.alertsErr = ""
+}
+
+func (m model) viewAlerts() string {
+	var b strings.Builder
+	b.WriteString(theme.Header.Render("  weather alerts") + "\n\n")
+	// Alert list: windowed, fixed wxMaxAlerts+2 region.
+	var ab strings.Builder
+	switch {
+	case m.alertsUnsupported:
+		ab.WriteString(theme.Dimmed.Render("  alerts unavailable outside the US") + "\n")
+		ab.WriteString(theme.Grayed.Render("  api.weather.gov only covers US territories —") + "\n")
+		ab.WriteString(theme.Grayed.Render("  the forecast itself is unaffected.") + "\n")
+	case len(m.alerts) == 0:
+		ab.WriteString("  " + lipgloss.NewStyle().Foreground(theme.Green).Render("✓ all clear") + "\n")
+		ab.WriteString(theme.Grayed.Render("  no active alerts for this location.") + "\n")
+	default:
+		if m.alertsFromCache {
+			ab.WriteString(theme.Grayed.Render("  cached "+m.alertsFetchedAt.Local().Format("15:04")+" — press r on the main screen to refresh") + "\n\n")
+		}
+		start, end := theme.ListWindow(len(m.alerts), m.alertCursor, wxMaxAlerts)
+		for i := start; i < end; i++ {
+			a := m.alerts[i]
+			chip := severityStyle(a.Severity).Render("[" + strings.ToUpper(strings.TrimSpace(a.Severity)) + "]")
+			line := chip + " " + a.Event
+			if exp := expiresShort(a.Expires); exp != "" {
+				line += theme.Grayed.Render(" · expires " + exp)
+			}
+			if i == m.alertCursor {
+				ab.WriteString("  " + theme.Selected.Render("▸ "+line) + "\n")
+			} else {
+				ab.WriteString("  " + theme.Normal.Render("  "+line) + "\n")
+			}
+		}
+		if hint := theme.ScrollHint(len(m.alerts), start, end); hint != "" {
+			ab.WriteString("  " + hint + "\n")
+		}
+	}
+	b.WriteString(theme.PadLines(ab.String(), wxMaxAlerts+2))
+	// Error slot: always two lines.
+	if m.alertsErr != "" {
+		b.WriteString("\n" + theme.Error.Render("  couldn't refresh alerts ("+shortErr(m.alertsErr)+")") + "\n")
+	} else {
+		b.WriteString("\n\n")
+	}
+	footer := theme.Footer(false,
+		[2]string{"enter", "details"},
+		[2]string{"r", "radar"},
+		[2]string{"esc", "back"},
+	)
+	return m.frame(b.String() + footer)
+}
+
+// detailLines assembles the full-text alert body as plain lines; the view
+// slices a scrolling window out of it.
+func (m model) detailLines() []string {
+	if m.alertCursor < 0 || m.alertCursor >= len(m.alerts) {
+		return nil
+	}
+	a := m.alerts[m.alertCursor]
+	var lines []string
+	lines = append(lines, "HEADLINE")
+	lines = append(lines, wrapText(a.Headline, frameWidth-6)...)
+	lines = append(lines, "")
+	lines = append(lines, "WHAT'S HAPPENING")
+	lines = append(lines, wrapText(a.Description, frameWidth-6)...)
+	if strings.TrimSpace(a.Instruction) != "" {
+		lines = append(lines, "")
+		lines = append(lines, "WHAT TO DO")
+		lines = append(lines, wrapText(a.Instruction, frameWidth-6)...)
+	}
+	return lines
+}
+
+// wrapText word-wraps s to width, preserving paragraph breaks.
+func wrapText(s string, width int) []string {
+	var out []string
+	for _, para := range strings.Split(s, "\n") {
+		para = strings.TrimSpace(para)
+		if para == "" {
+			out = append(out, "")
+			continue
+		}
+		var line string
+		for _, word := range strings.Fields(para) {
+			switch {
+			case line == "":
+				line = word
+			case len(line)+1+len(word) > width:
+				out = append(out, line)
+				line = word
+			default:
+				line += " " + word
+			}
+		}
+		if line != "" {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+func (m model) viewAlertDetail() string {
+	if m.alertCursor < 0 || m.alertCursor >= len(m.alerts) {
+		return m.viewAlerts()
+	}
+	a := m.alerts[m.alertCursor]
+	var b strings.Builder
+	b.WriteString("  " + severityStyle(a.Severity).Render("▲ "+strings.ToUpper(a.Event)) + "\n")
+	meta := "  " + a.SenderName
+	if eff := effectiveShort(a.Effective); eff != "" {
+		meta += "   ·   issued " + eff
+	}
+	if exp := expiresShort(a.Expires); exp != "" {
+		meta += "   ·   expires " + exp
+	}
+	b.WriteString(theme.Grayed.Render(meta) + "\n\n")
+
+	const winLines = 14
+	lines := m.detailLines()
+	if m.detailOffset > len(lines)-1 {
+		// render-time clamp; the key handler keeps it in range too
+		m.detailOffset = len(lines) - 1
+	}
+	if m.detailOffset < 0 {
+		m.detailOffset = 0
+	}
+	// Scroll-hint slots: always two lines (one above, one below).
+	if m.detailOffset > 0 {
+		b.WriteString(theme.Dimmed.Render("  ▲ more above") + "\n")
+	} else {
+		b.WriteString("\n")
+	}
+	end := m.detailOffset + winLines
+	if end > len(lines) {
+		end = len(lines)
+	}
+	for _, ln := range lines[m.detailOffset:end] {
+		if ln == "HEADLINE" || ln == "WHAT'S HAPPENING" || ln == "WHAT TO DO" {
+			b.WriteString("  " + theme.Header.Render(ln) + "\n")
+		} else if ln == "" {
+			b.WriteString("\n")
+		} else {
+			b.WriteString("  " + theme.Normal.Render(ln) + "\n")
+		}
+	}
+	// Pad the window to exactly winLines so short alerts don't shift the footer.
+	for i := end - m.detailOffset; i < winLines; i++ {
+		b.WriteString("\n")
+	}
+	if end < len(lines) {
+		b.WriteString(theme.Dimmed.Render("  ▼ more below") + "\n")
+	} else {
+		b.WriteString("\n")
+	}
+
+	footer := theme.Footer(false,
+		[2]string{"up/down", "scroll"},
+		[2]string{"r", "radar"},
+		[2]string{"esc", "back"},
+	)
+	return m.frame(b.String() + footer)
+}
+
+func (m model) View() string {
+	switch m.view {
+	case "locations":
+		return m.viewLocations()
+	case "alerts":
+		return m.viewAlerts()
+	case "alertdetail":
+		return m.viewAlertDetail()
+	default:
+		return m.viewMain()
+	}
+}
+
+// --- headless --dump for visual checks ---
+
+func sampleData() *wttrResp {
+	desc := func(s string) []wttrDesc { return []wttrDesc{{Value: s}} }
+	hourly := func(t, f, code, rain string) wttrHourly {
+		return wttrHourly{Time: t, TempF: f, TempC: "20", WeatherCode: code, WeatherDesc: desc("Partly cloudy"), ChanceOfRain: rain}
+	}
+	return &wttrResp{
+		Current: []wttrCurrent{{
+			TempF: "72", TempC: "22", FeelsLikeF: "74", FeelsLikeC: "23",
+			Humidity: "55", WeatherCode: "116", WeatherDesc: desc("Partly cloudy"),
+			WindKmph: "15", WindMph: "9", WindDir: "SW",
+			VisibilityKm: "16", VisibilityMi: "10",
+		}},
+		Areas: []wttrArea{{AreaName: []wttrAreaName{{Value: "Mena"}}, Region: []wttrAreaName{{Value: "Arkansas"}}}},
+		Days: []wttrDay{
+			{Date: "2026-09-28", MaxTempF: "78", MaxTempC: "26", MinTempF: "62", MinTempC: "17",
+				Hourly: []wttrHourly{hourly("0", "65", "113", "0"), hourly("300", "64", "113", "0"), hourly("600", "66", "116", "10"), hourly("900", "72", "116", "10"), hourly("1200", "77", "113", "0")}},
+			{Date: "2026-09-29", MaxTempF: "80", MaxTempC: "27", MinTempF: "63", MinTempC: "17",
+				Hourly: []wttrHourly{hourly("0", "66", "113", "0"), hourly("300", "65", "113", "0"), hourly("600", "68", "116", "20"), hourly("900", "74", "116", "20"), hourly("1200", "79", "113", "0")}},
+			{Date: "2026-09-30", MaxTempF: "75", MaxTempC: "24", MinTempF: "60", MinTempC: "16",
+				Hourly: []wttrHourly{hourly("0", "63", "116", "30"), hourly("300", "62", "116", "30"), hourly("600", "64", "119", "40"), hourly("900", "70", "119", "40"), hourly("1200", "74", "116", "20")}},
+		},
+	}
+}
+
+func dumpSample() {
+	m := newModel()
+	m.loading = false
+	m.data = sampleData()
+	m.cfg.Locations = []string{"Mena, AR", "Austin, TX", "Portland, OR"}
+	m.cfg.DefaultLocation = "Mena, AR"
+	m.alerts = []nwsAlert{
+		{Event: "Heat Advisory", Severity: "Moderate", Headline: "Heat Advisory for Polk County",
+			Description: "Hot temperatures expected.", Instruction: "Stay hydrated.",
+			SenderName: "NWS Little Rock", Expires: "2026-09-28T20:00:00-05:00"},
+	}
+
+	fmt.Println("=== MAIN ===")
+	fmt.Println(m.View())
+	m.view = "locations"
+	m.adding = true
+	m.input.SetValue("Denver, CO")
+	fmt.Println("=== LOCATIONS ===")
+	fmt.Println(m.View())
+	m.view = "alerts"
+	fmt.Println("=== ALERTS ===")
+	fmt.Println(m.View())
+	m.view = "alertdetail"
+	m.alertCursor = 0
+	fmt.Println("=== ALERT DETAIL ===")
+	fmt.Println(m.View())
+}
+
+func main() {
+	dump := flag.Bool("dump", false, "print the initial view and exit")
+	flag.Parse()
+
+	m := newModel()
+	if *dump {
+		dumpSample()
+		return
+	}
+
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintln(os.Stderr, "navi-weather:", err)
+		os.Exit(1)
+	}
+	// let the terminal restore cleanly, same as the other mods
+	time.Sleep(50 * time.Millisecond)
+}

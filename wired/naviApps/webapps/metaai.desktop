@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Meta AI
-Exec=chromium --force-dark-mode --app=https://www.meta.ai
+Exec=navi-browser-run --force-dark-mode --app=https://www.meta.ai
 Comment=Meta AI as a navi webapp
 Terminal=false
 Type=Application

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-bluetooth
+Comment=Bluetooth manager: pair, trust, connect devices, headset battery
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-bluetooth" navi-bluetooth
+Icon=bluetooth
+Terminal=false
+Categories=System;Settings;HardwareSettings;
+NoDisplay=false

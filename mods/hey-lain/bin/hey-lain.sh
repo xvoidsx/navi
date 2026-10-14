@@ -4,6 +4,21 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$HERE/bin"
+# Flag dispatch: --doctor runs pipeline self-diagnostics, --help prints
+# usage. (toggle.sh execs this with no args for the normal tap-to-talk loop,
+# so this changes nothing on the hotkey path.)
+if [ "${1:-}" = "--doctor" ]; then
+  exec "$BIN/doctor.sh"
+fi
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  cat <<'EOF'
+hey-lain: tap-to-talk voice assistant (normally driven by Alt+V via toggle.sh).
+  hey-lain.sh            run one tap-to-talk cycle (no args; used by toggle.sh)
+  hey-lain.sh --doctor   self-check the voice pipeline (venv, mic, TTS, ollama)
+  hey-lain.sh --help     this text
+EOF
+  exit 0
+fi
 VENV_PY="$HERE/venv/bin/python"
 TTS_PY="${HEY_LAIN_TTS_PYTHON:-$VENV_PY}"
 RUNTIME="${XDG_RUNTIME_DIR:-/tmp}/hey-lain"

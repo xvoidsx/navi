@@ -2,7 +2,7 @@
 Type=Application
 Name=navi-extras
 Comment=Optional extras for navi: nightly browsers, ani-cli, charm tools, and more — install what you want, post-install
-Exec=alacritty -e navi-extras
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-extras" navi-extras
 Icon=application-x-addon
 Terminal=false
 Categories=System;Settings;

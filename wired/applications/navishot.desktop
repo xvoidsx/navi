@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navishot
+Comment=Screenshot picker: area, window, or full screen (saves + copies to clipboard)
+Exec=navishot
+Icon=camera-photo
+Categories=Utility;
+Terminal=false
+NoDisplay=false

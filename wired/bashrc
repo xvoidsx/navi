@@ -20,3 +20,12 @@ alias grep='grep --color=auto'
 alias cls="clear"
 # /usr/sbin holds ufw and friends; Debian keeps it off a normal user's PATH
 case ":$PATH:" in *":/usr/sbin:"*) ;; *) export PATH="$PATH:/usr/sbin" ;; esac
+
+# Navi agent keys: system-wide AI provider API keys, managed by the
+# Navi Agent Configuration app (~/.config/navi/agents.env, mode 0600).
+# Exported here so interactive shells — and everything launched from them —
+# see them. Panel/rofi-launched apps get the same treatment from
+# wired/waybar/mod-open.sh, which sources the store before launching.
+if [ -f "$HOME/.config/navi/agents.env" ]; then
+  set -a; . "$HOME/.config/navi/agents.env" 2>/dev/null; set +a
+fi

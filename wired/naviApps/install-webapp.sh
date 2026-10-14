@@ -29,7 +29,7 @@ declare -A ICON_SRC=(
 )
 
 usage() {
-  echo "usage: $(basename "$0") <name>... | --all | --uninstall <name>... | --uninstall-all | --list | --doctor"
+  echo "usage: $(basename "$0") <name>... | --all | --repair | --uninstall <name>... | --uninstall-all | --list | --doctor"
 }
 
 # Launchers only trust an icon theme dir that has an index.theme.
@@ -147,6 +147,10 @@ doctor() {
       desktop-file-validate "$first" && echo "[ok] installed entries validate"
     fi
   fi
+  browser_runtime || fail=1
+  # stale hardcoded-chromium launchers predate navi-browser-run; bring them
+  # along (idempotent, reported).
+  migrate_launchers
   return "$fail"
 }
 
@@ -185,6 +189,42 @@ refresh_caches() {
   fi
 }
 
+# migrate_launchers: webapp launchers used to hardcode `Exec=chromium`.
+# They now Exec navi-browser-run so the default-browser setting applies at
+# launch time. Rewrite installed catalog launchers in place (idempotent).
+migrate_launchers() {
+  local app desktop
+  while IFS= read -r app; do
+    desktop="${APP_DIR}/${app}.desktop"
+    if [[ -f "$desktop" ]] && grep -q '^Exec=chromium ' "$desktop"; then
+      sed -i 's/^Exec=chromium /Exec=navi-browser-run /' "$desktop"
+      echo "migrated ${app} launcher to navi-browser-run"
+    fi
+  done < <(list_apps)
+}
+
+# browser_runtime: report which browser webapps will launch under.
+browser_runtime() {
+  local cfg="${HOME}/.config/navi/default-browser"
+  local id="(none — chromium is the fallback)"
+  if [[ -f "$cfg" ]]; then
+    id="$(tr -d '[:space:]' < "$cfg")"
+    [[ -n "$id" ]] || id="(none — chromium is the fallback)"
+  fi
+  local bin="(unresolved)"
+  if command -v navi-browser >/dev/null 2>&1; then
+    bin="$(navi-browser --print-binary 2>/dev/null)" || bin="(unresolved)"
+  elif command -v chromium >/dev/null 2>&1; then
+    bin="chromium"
+  fi
+  echo "[..] browser runtime: ${id} -> ${bin}"
+  if [[ "$bin" == "(unresolved)" ]]; then
+    echo "[!!] no Chromium-family browser found — webapps cannot launch"
+    return 1
+  fi
+  return 0
+}
+
 install_one() {
   local name="$1"
   local desktop="${REPO_DIR}/webapps/${name}.desktop"
@@ -200,6 +240,13 @@ install_one() {
   if [[ -n "$icon_info" ]]; then
     read -r src_path dest_path <<< "$icon_info"
     cp "$src_path" "$dest_path"
+    # drop the stale counterpart: if the shipped icon changed format
+    # (svg -> png or vice versa), the old one would otherwise linger in
+    # the theme and win the lookup (scalable svg beats 48x48 png).
+    case "$dest_path" in
+      *.svg) rm -f "${ICON_PNG_DIR}/navi-${name}.png" ;;
+      *.png) rm -f "${ICON_SVG_DIR}/navi-${name}.svg" ;;
+    esac
   fi
   # drop leftovers from the old pixmaps-based installs
   rm -f "${LEGACY_ICON_DIR}/navi-${name}.svg" "${LEGACY_ICON_DIR}/navi-${name}.png"
@@ -218,6 +265,24 @@ uninstall_one() {
   echo "removed ${name}"
 }
 
+# repair: re-copy the .desktop launcher and icon for every catalog webapp
+# the user already has installed. Icons and launchers sometimes ship after
+# the webapp was first installed (or predate navi-browser-run); without
+# this, existing installs never pick them up.
+repair() {
+  ensure_index_theme
+  local app n=0
+  while IFS= read -r app; do
+    if [[ -f "${APP_DIR}/${app}.desktop" ]]; then
+      install_one "$app" >/dev/null
+      n=$((n + 1))
+    fi
+  done < <(list_apps)
+  migrate_launchers
+  refresh_caches
+  echo "repaired ${n} installed webapps"
+}
+
 if [[ $# -eq 0 ]]; then
   usage >&2
   exit 1
@@ -232,7 +297,11 @@ case "$1" in
     while IFS= read -r app; do
       install_one "$app"
     done < <(list_apps)
+    migrate_launchers
     refresh_caches
+    ;;
+  --repair)
+    repair
     ;;
   --uninstall|--remove|-r)
     shift
@@ -264,6 +333,7 @@ case "$1" in
     for app in "$@"; do
       install_one "$app"
     done
+    migrate_launchers
     refresh_caches
     ;;
 esac

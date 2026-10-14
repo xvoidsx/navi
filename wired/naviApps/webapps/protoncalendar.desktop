@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Proton Calendar
-Exec=chromium --force-dark-mode --app=https://calendar.proton.me
+Exec=navi-browser-run --force-dark-mode --app=https://calendar.proton.me
 Comment=Proton Calendar as a navi webapp
 Terminal=false
 Type=Application

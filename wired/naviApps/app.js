@@ -4,7 +4,13 @@
 // Runs offline from the deployed tree; install via `navi-webapp <name>`.
 const grid = document.getElementById("grid");
 const naviGrid = document.getElementById("naviGrid");
+const gamesGrid = document.getElementById("gamesGrid");
+const nativeGrid = document.getElementById("nativeGrid");
+const agentsGrid = document.getElementById("agentsGrid");
 const naviSection = document.getElementById("naviSection");
+const gamesSection = document.getElementById("gamesSection");
+const nativeSection = document.getElementById("nativeSection");
+const agentsSection = document.getElementById("agentsSection");
 const appsSection = document.getElementById("appsSection");
 const statusEl = document.getElementById("status");
 const searchEl = document.getElementById("search");
@@ -36,12 +42,17 @@ function buildCategories() {
   }
 }
 
-function badgeFor() {
+function badgeFor(a) {
+  if (a.source === "agent") return '<span class="badge agent">agent</span>';
+  if (a.source === "native") return '<span class="badge native">native</span>';
+  if (a.source === "flatpak") return '<span class="badge flatpak">flatpak</span>';
   return '<span class="badge webapp">webapp</span>';
 }
 
 function matches(a, q, cat) {
   if (activeSource === "navi" && a.category !== "navi") return false;
+  if (activeSource === "games" && a.category !== "Games") return false;
+  if (activeSource === "native" && a.source !== "native") return false;
   if (cat && a.category !== cat) return false;
   if (!q) return true;
   const hay = `${a.name} ${a.summary} ${a.package} ${a.category}`.toLowerCase();
@@ -59,7 +70,7 @@ function cardHTML(a, i) {
   return `<article class="card" style="--d:${Math.min(i, 20) * 35}ms">
     <div class="top">${artFor(a, 32)}
     <h2>${escapeHTML(a.name)}</h2></div>
-    <div class="badges">${badgeFor()}</div>
+    <div class="badges">${badgeFor(a)}</div>
     <p>${escapeHTML(a.summary)}</p>
     <div class="row">
       <button class="btn primary" data-install="${a.id}">install</button>
@@ -72,23 +83,74 @@ function paintGrid(el, apps) {
   el.innerHTML = apps.map(cardHTML).join("");
 }
 
+// Games section: sub-rows grouped by subcategory, in a fixed order
+// (Decomp & Ports lands with the navi-gaming helper in phase 2).
+const SUBCAT_ORDER = [
+  "Storefronts & Launchers",
+  "Emulation",
+  "FOSS Games",
+  "Cloud Gaming",
+  "Decomp & Ports",
+  "Streaming",
+];
+
+function paintGamesGrid(el, apps) {
+  const by = {};
+  for (const a of apps) {
+    const s = a.subcategory || "Other";
+    if (!by[s]) by[s] = [];
+    by[s].push(a);
+  }
+  const order = SUBCAT_ORDER.filter((s) => by[s]).concat(
+    Object.keys(by).filter((s) => !SUBCAT_ORDER.includes(s)).sort()
+  );
+  el.innerHTML = order
+    .map(
+      (s, si) =>
+        `<h3 class="subcat-title">${escapeHTML(s)}</h3>` +
+        `<div class="grid">${by[s].map((a, i) => cardHTML(a, si * 20 + i)).join("")}</div>`
+    )
+    .join("");
+}
+
 function render() {
   const q = searchEl.value.trim();
   const cat = catEl.value;
   const isNavi = (a) => a.category === "navi";
+  const isGame = (a) => a.category === "Games";
+  // native-source apps with the navi category live in the navi section by
+  // default — but under the "native" source filter they belong with the
+  // other native packages, or they match the filter yet vanish (their
+  // section stays hidden).
+  const isNative = (a) => a.source === "native" && (a.category !== "navi" || activeSource === "native");
+  const isAgent = (a) => a.source === "agent";
   const naviApps = curated.filter((a) => isNavi(a) && matches(a, q, cat));
-  const rest = curated.filter((a) => !isNavi(a) && matches(a, q, cat));
+  const gameApps = curated.filter((a) => isGame(a) && matches(a, q, cat));
+  const nativeApps = curated.filter((a) => isNative(a) && matches(a, q, cat));
+  const agentApps = curated.filter((a) => isAgent(a) && matches(a, q, cat));
+  const rest = curated.filter((a) => !isNavi(a) && !isGame(a) && !isNative(a) && !isAgent(a) && matches(a, q, cat));
 
-  // the "navi" filter spotlights first-party apps; "all" shows both sections
+  // the "navi" filter spotlights first-party apps, "games" spotlights the
+  // Games section, "native" spotlights native packages, "agents" spotlights
+  // AI agents; "all" shows every section
   const showNavi = activeSource === "" || activeSource === "navi";
+  const showGames = activeSource === "" || activeSource === "games";
+  const showNative = activeSource === "" || activeSource === "native";
+  const showAgents = activeSource === "" || activeSource === "agents";
   const showRest = activeSource === "";
 
   naviSection.hidden = !(showNavi && naviApps.length);
+  gamesSection.hidden = !(showGames && gameApps.length);
+  nativeSection.hidden = !(showNative && nativeApps.length);
+  agentsSection.hidden = !(showAgents && agentApps.length);
   appsSection.hidden = !(showRest && rest.length);
   if (!naviSection.hidden) paintGrid(naviGrid, naviApps);
+  if (!gamesSection.hidden) paintGamesGrid(gamesGrid, gameApps);
+  if (!nativeSection.hidden) paintGrid(nativeGrid, nativeApps);
+  if (!agentsSection.hidden) paintGrid(agentsGrid, agentApps);
   if (!appsSection.hidden) paintGrid(grid, rest);
 
-  const total = (showNavi ? naviApps.length : 0) + (showRest ? rest.length : 0);
+  const total = (showNavi ? naviApps.length : 0) + (showGames ? gameApps.length : 0) + (showNative ? nativeApps.length : 0) + (showAgents ? agentApps.length : 0) + (showRest ? rest.length : 0);
   statusEl.textContent = total
     ? `${total} app${total === 1 ? "" : "s"}`
     : "no apps found. try another search.";
@@ -96,7 +158,7 @@ function render() {
 }
 
 function wireButtons() {
-  for (const root of [grid, naviGrid]) {
+  for (const root of [grid, naviGrid, gamesGrid, nativeGrid, agentsGrid]) {
     root.querySelectorAll("[data-details]").forEach((b) =>
       b.addEventListener("click", () => openModal(findApp(b.dataset.details)))
     );
@@ -129,7 +191,7 @@ const mDesktop = document.getElementById("mDesktop");
 function openModal(a, highlightCopy = false) {
   if (!a) return;
   mName.innerHTML = `${artFor(a, 28)} ${escapeHTML(a.name)}`;
-  mMeta.textContent = `webapp · ${a.package} · ${a.category}`;
+  mMeta.textContent = `${a.source === "agent" ? "agent" : a.source === "native" ? "native app" : a.source === "flatpak" ? "flatpak app" : "webapp"} · ${a.package} · ${a.category}`;
   mSummary.textContent = a.summary;
   mCmd.textContent = a.install;
   if (a.homepage) {
@@ -146,8 +208,14 @@ function openModal(a, highlightCopy = false) {
     mDownload.hidden = true;
   }
   const mRemoveWrap = document.getElementById("mRemoveWrap");
-  mRemoveWrap.hidden = false;
-  document.getElementById("mRemove").textContent = `navi-webapp --uninstall ${a.package}`;
+  if (a.remove) {
+    mRemoveWrap.hidden = false;
+    document.getElementById("mRemove").textContent = a.remove;
+  } else {
+    // no remove command (e.g. pre-installed agents) — hide the box
+    // rather than showing a bogus default.
+    mRemoveWrap.hidden = true;
+  }
   if (a.desktopEntry) {
     mDesktopWrap.hidden = false;
     mDesktop.textContent = a.desktopEntry;

@@ -1,6 +1,7 @@
 package theme
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -55,6 +56,71 @@ func Frame(width int, name string, live bool, txRow, body string) string {
 
 	framed := lipgloss.NewStyle().Width(width).Render(body)
 	return Border.Render(header + "\n" + txRow + "\n" + framed)
+}
+
+// FrameFixed renders the standard mod window like Frame, but forces the
+// body to exactly bodyRows lines — padding short bodies with blanks — so
+// the frame holds a constant height on every screen of the mod. A body
+// taller than bodyRows is clipped as a safety net, but callers must not
+// rely on that: window any list that can exceed the budget (keeping the
+// footer outside the windowed region) so no entry or hint is ever lost.
+// Each mod picks one bodyRows for its whole window family.
+func FrameFixed(width int, name string, live bool, txRow, body string, bodyRows int) string {
+	lines := strings.Split(body, "\n")
+	if len(lines) > bodyRows {
+		lines = lines[:bodyRows]
+	} else {
+		for len(lines) < bodyRows {
+			lines = append(lines, "")
+		}
+	}
+	return Frame(width, name, live, txRow, strings.Join(lines, "\n"))
+}
+
+// ListWindow returns the [start, end) index window of at most maxRows
+// items, always containing cursor, for a list of n items. Pure — the row
+// renderer and the scroll indicator both call it, so they never disagree.
+func ListWindow(n, cursor, maxRows int) (start, end int) {
+	if n <= maxRows {
+		return 0, n
+	}
+	start = cursor - maxRows/2
+	if start < 0 {
+		start = 0
+	}
+	if start > n-maxRows {
+		start = n - maxRows
+	}
+	return start, start + maxRows
+}
+
+// PadLines forces s to exactly n lines (pads with blanks, clips the
+// tail). Fixed-height frames depend on it.
+func PadLines(s string, n int) string {
+	lines := strings.Split(strings.TrimSuffix(s, "\n"), "\n")
+	for len(lines) < n {
+		lines = append(lines, "")
+	}
+	if len(lines) > n {
+		lines = lines[:n]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// ScrollHint renders the "↑ N more · ↓ M more" indicator for a windowed
+// list, or "" when the whole list fits.
+func ScrollHint(n, start, end int) string {
+	var parts []string
+	if start > 0 {
+		parts = append(parts, "↑ "+fmt.Sprint(start)+" more")
+	}
+	if end < n {
+		parts = append(parts, "↓ "+fmt.Sprint(n-end)+" more")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return Dimmed.Render(strings.Join(parts, " · "))
 }
 
 // Meter renders a horizontal bar meter: frac is clamped to [0,1] and

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Linear
+Exec=navi-browser-run --force-dark-mode --app=https://linear.app
+Comment=Linear as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-linear
+StartupNotify=true
+Categories=Office;ProjectManagement;

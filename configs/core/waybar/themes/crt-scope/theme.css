@@ -1,0 +1,343 @@
+/* ============================================================================
+ * CRT // SCOPE
+ * ----------------------------------------------------------------------------
+ * The bar as a phosphor readout on a curved tube: monospace, scanlines, bloom,
+ * and a block cursor that blinks over the clock. Green where a real scope would
+ * be green, with pink and cyan for anything that wants attention.
+ *
+ * The most restrained theme here. Everything structural is static — scanlines,
+ * vignette, aperture grille — and the only motion is a slow phosphor decay on
+ * the readout plus the cursor, which is what a CRT actually does.
+ *
+ * Cost: the blink is ~1 change/sec and the decay ~1 per 9s, so this sits near
+ * the bottom of the range. ~15ms per repaint means motion is priced per visible
+ * change, and a scope does not need to move much to feel powered.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ *
+ * The white square the weather module used to show was NOT a missing font.
+ * weather.sh emitted each glyph followed by U+FE0F VARIATION SELECTOR-16, which
+ * forces emoji *presentation*. Pango honoured that and demanded a real colour
+ * emoji font, and the only one installed (Noto Color Emoji) is a fixed 109px
+ * strike that cannot be used at bar size — so GTK drew the .notdef box. The fix
+ * belongs in weather.sh, which now strips the selector in json_escape.
+ *
+ * Noto Color Emoji is deliberately NOT named in this stack for the same reason:
+ * it is a 109px bitmap strike and would downscale to mush at 10px.
+ * ========================================================================== */
+
+@define-color phos #39ff14;
+@define-color phos-dim rgba(57, 255, 20, 0.55);
+@define-color phos-mid rgba(57, 255, 20, 0.78);
+@define-color np #ff10f0;
+@define-color nc #00ffff;
+@define-color nr #ff3131;
+@define-color nw #e6ffe6;
+@define-color tube #020a02;
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", monospace;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* ----------------------------------------------------------------------------
+ * The tube face: scanlines, an aperture grille, a vignette, and a green wash.
+ * All static. A repeating-linear-gradient is the whole trick for scanlines.
+ * -------------------------------------------------------------------------- */
+window#waybar {
+    color: @phos;
+    background-color: @tube;
+    background-image:
+        /* vignette */
+        linear-gradient(to right,
+            rgba(0, 0, 0, 0.55) 0%,
+            rgba(0, 0, 0, 0) 8%,
+            rgba(0, 0, 0, 0) 92%,
+            rgba(0, 0, 0, 0.55) 100%),
+        /* phosphor wash */
+        linear-gradient(to bottom,
+            rgba(57, 255, 20, 0.07) 0%,
+            rgba(57, 255, 20, 0.02) 55%,
+            rgba(57, 255, 20, 0.05) 100%),
+        /* scanlines: 2px on, 2px off */
+        repeating-linear-gradient(to bottom,
+            rgba(0, 0, 0, 0) 0,
+            rgba(0, 0, 0, 0) 2px,
+            rgba(0, 0, 0, 0.30) 2px,
+            rgba(0, 0, 0, 0.30) 3px);
+
+    border: 1px solid rgba(57, 255, 20, 0.32);
+    border-radius: 4px;
+    box-shadow:
+        0 0 14px rgba(57, 255, 20, 0.20),
+        inset 0 0 26px rgba(57, 255, 20, 0.09);
+    animation: phosphor 9s steps(4, end) infinite;
+}
+
+/* Slow phosphor decay — the readout dims and comes back. */
+@keyframes phosphor {
+    0%   { border-color: rgba(57, 255, 20, 0.32); }
+    50%  { border-color: rgba(57, 255, 20, 0.16); }
+    100% { border-color: rgba(57, 255, 20, 0.32); }
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Readout. No boxes — a terminal has none. Separators do the work of module
+ * chrome, and the glyphs themselves are the interface.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#power-profiles-daemon,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 3px 4px;
+    padding: 2px 6px;
+    color: @phos-mid;
+    background: transparent;
+    border: none;
+    border-right: 1px solid rgba(57, 255, 20, 0.22);
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: 0 0 6px rgba(57, 255, 20, 0.55);
+    transition: color 200ms ease-out, text-shadow 200ms ease-out;
+}
+
+#tray { border-right: none; }
+
+/* The clock gets the block cursor — a scope blinking at its own refresh. */
+#clock {
+    color: @phos;
+    border-right: 1px solid rgba(57, 255, 20, 0.22);
+    animation: cursor-blink 1s steps(1, end) infinite;
+}
+
+@keyframes cursor-blink {
+    0%   { border-right-color: rgba(57, 255, 20, 0.22); }
+    49%  { border-right-color: rgba(57, 255, 20, 0.22); }
+    50%  { border-right-color: rgba(57, 255, 20, 0.95); }
+    100% { border-right-color: rgba(57, 255, 20, 0.95); }
+}
+
+/* Signature hues, phosphered. */
+#custom-wired-launcher,
+#custom-power,
+#clock,
+#power-profiles-daemon { color: @np; text-shadow: 0 0 6px rgba(255, 16, 240, 0.55); }
+
+#network,
+#backlight,
+#memory,
+#cpu { color: @phos-mid; }
+
+#custom-volume,
+#idle_inhibitor { color: @nc; text-shadow: 0 0 6px rgba(0, 255, 255, 0.50); }
+
+#battery { color: @phos; }
+
+#custom-wired-launcher,
+#custom-power { font-size: 12px; }
+
+/* Workspaces as a job table. */
+#workspaces button {
+    min-width: 20px;
+    margin: 0 1px;
+    padding: 1px 6px;
+    color: @phos-dim;
+    background-color: rgba(57, 255, 20, 0.05);
+    border: 1px solid rgba(57, 255, 20, 0.18);
+    border-radius: 2px;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.empty {
+    color: rgba(57, 255, 20, 0.28);
+    background: transparent;
+    border-color: rgba(57, 255, 20, 0.10);
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @tube;
+    background-color: @phos;
+    border-color: @phos;
+    box-shadow: 0 0 12px rgba(57, 255, 20, 0.75);
+    text-shadow: none;
+}
+
+#workspaces button.urgent {
+    color: @nr;
+    background-color: rgba(255, 49, 49, 0.16);
+    border-color: @nr;
+    box-shadow: 0 0 12px rgba(255, 49, 49, 0.55);
+}
+
+#window {
+    color: rgba(57, 255, 20, 0.42);
+    text-shadow: none;
+    border-right: none;
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+#custom-weather {
+    color: @phos-dim;
+    font-size: 8px;
+    border-right: none;
+    text-shadow: 0 0 5px rgba(57, 255, 20, 0.35);
+}
+
+/* ----------------------------------------------------------------------------
+ * State.
+ * -------------------------------------------------------------------------- */
+#network.disconnected,
+#battery.critical {
+    color: @nr;
+    text-shadow: 0 0 7px rgba(255, 49, 49, 0.85);
+    animation: scope-alert 1.1s steps(3, end) infinite alternate;
+}
+
+@keyframes scope-alert {
+    from { text-shadow: 0 0 5px rgba(255, 49, 49, 0.55); }
+    to   { text-shadow: 0 0 10px rgba(255, 49, 49, 1), 0 0 22px rgba(255, 49, 49, 0.6); }
+}
+
+#battery.warning { color: @np; text-shadow: 0 0 6px rgba(255, 16, 240, 0.60); }
+
+/* Bluetooth: rune plus link glyph. Never a dot — the bell owns that shape. */
+#bluetooth.off {
+    color: rgba(57, 255, 20, 0.30);
+    text-shadow: none;
+}
+
+#bluetooth.connected {
+    color: @nc;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.85);
+}
+
+#bluetooth.connecting {
+    color: @np;
+    text-shadow: 0 0 7px rgba(255, 16, 240, 0.75);
+}
+
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep {
+    color: rgba(57, 255, 20, 0.34);
+    text-shadow: none;
+}
+
+#custom-update.updates-available {
+    color: @np;
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.85);
+    animation: scope-alert 2s steps(3, end) infinite alternate;
+}
+
+#custom-bell.has-notifs,
+#custom-agent.agent-ready {
+    color: @nc;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.80);
+}
+
+#custom-agent.agent-working {
+    color: @phos;
+    text-shadow: 0 0 8px rgba(57, 255, 20, 0.85);
+    animation: scope-alert 1.6s steps(3, end) infinite alternate;
+}
+
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: @np;
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.85);
+    animation: scope-alert 0.9s steps(3, end) infinite alternate;
+}
+
+#custom-volume.muted {
+    color: rgba(57, 255, 20, 0.34);
+    text-shadow: none;
+}
+
+#idle_inhibitor.activated { color: @phos; text-shadow: 0 0 7px rgba(57, 255, 20, 0.70); }
+
+#custom-nowplaying.idle { color: rgba(57, 255, 20, 0.34); text-shadow: none; }
+
+#custom-nowplaying.playing {
+    color: @np;
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.80);
+}
+
+#custom-nowplaying.paused { color: @nc; text-shadow: 0 0 7px rgba(0, 255, 255, 0.70); }
+
+#tray > .passive { opacity: 0.45; }
+
+#tray > .needs-attention {
+    background-color: rgba(255, 49, 49, 0.18);
+    border-radius: 2px;
+}
+
+/* Hover: the cell under the pointer goes hot. */
+#workspaces:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#bluetooth:hover {
+    color: @nw;
+    background-color: rgba(57, 255, 20, 0.10);
+    text-shadow: 0 0 9px rgba(57, 255, 20, 0.85);
+}
+
+#custom-power:hover {
+    color: @nr;
+    background-color: rgba(255, 49, 49, 0.12);
+    text-shadow: 0 0 9px rgba(255, 49, 49, 0.85);
+}
+
+tooltip {
+    color: @phos;
+    background-color: rgba(2, 10, 2, 0.97);
+    border: 1px solid rgba(57, 255, 20, 0.45);
+    border-radius: 2px;
+    box-shadow: 0 0 14px rgba(57, 255, 20, 0.35);
+    text-shadow: 0 0 6px rgba(57, 255, 20, 0.50);
+}
+
+tooltip label { color: @phos; }

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=itch.io
-Exec=chromium --force-dark-mode --app=https://itch.io
+Exec=navi-browser-run --force-dark-mode --app=https://itch.io
 Comment=Indie games and weird little masterpieces.
 Terminal=false
 Type=Application

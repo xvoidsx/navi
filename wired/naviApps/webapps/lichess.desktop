@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Lichess
-Exec=chromium --force-dark-mode --app=https://lichess.org
+Exec=navi-browser-run --force-dark-mode --app=https://lichess.org
 Comment=Free FOSS chess for everyone.
 Terminal=false
 Type=Application

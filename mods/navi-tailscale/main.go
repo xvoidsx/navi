@@ -1,0 +1,1566 @@
+package main
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/mdp/qrterminal/v3"
+	theme "github.com/rav3ndust/navi-theme"
+)
+
+// ─────────────────────────────────────────────────────────────────────────
+// navi-tailscale — a native Tailscale manager for navi.
+//
+// Shows tailnet status, peers, and offers up/down/ping/ssh actions.
+// Wraps the `tailscale` CLI (JSON status) — no new daemons, no new deps.
+//
+// Philosophy: Tailscale is the mesh; this is navi's window into it.
+// ─────────────────────────────────────────────────────────────────────────
+
+var frameWidth = 62
+
+// ── Domain types ─────────────────────────────────────────────────────────
+
+type Peer struct {
+	Name    string
+	IP      string
+	OS      string
+	Online  bool
+	IsSelf  bool
+	IsExit  bool
+	Latency string // filled by ping, "" if unknown
+}
+
+type TailnetStatus struct {
+	Up       bool
+	Tailnet  string
+	Self     Peer
+	Peers    []Peer
+	LoggedIn bool
+}
+
+// tailscale status --json shape (subset we care about)
+type tsStatusJSON struct {
+	BackendState string `json:"BackendState"`
+	Self         *tsNode `json:"Self"`
+	Peer         map[string]*tsNode `json:"Peer"`
+	CurrentTailnet *tsTailnet `json:"CurrentTailnet"`
+}
+
+type tsNode struct {
+	DNSName    string   `json:"DNSName"`
+	TailscaleIPs []string `json:"TailscaleIPs"`
+	OS         string   `json:"OS"`
+	Online     *bool    `json:"Online"`
+	ExitNode   bool     `json:"ExitNode"`
+}
+
+type tsTailnet struct {
+	Name string `json:"Name"`
+}
+
+// ── Backend ──────────────────────────────────────────────────────────────
+
+func tailscaleStatus() (TailnetStatus, error) {
+	var st TailnetStatus
+	out, err := exec.Command("tailscale", "status", "--json").Output()
+	if err != nil {
+		// not logged in or tailscaled not running
+		st.LoggedIn = false
+		return st, nil
+	}
+	var js tsStatusJSON
+	if err := json.Unmarshal(out, &js); err != nil {
+		return st, fmt.Errorf("parse tailscale status: %w", err)
+	}
+	st.LoggedIn = true
+	st.Up = js.BackendState == "Running"
+	if js.CurrentTailnet != nil {
+		st.Tailnet = js.CurrentTailnet.Name
+	}
+	if js.Self != nil {
+		st.Self = nodeToPeer(js.Self, true)
+	}
+	for _, n := range js.Peer {
+		if n == nil {
+			continue
+		}
+		st.Peers = append(st.Peers, nodeToPeer(n, false))
+	}
+	return st, nil
+}
+
+func nodeToPeer(n *tsNode, self bool) Peer {
+	p := Peer{IsSelf: self}
+	// DNSName is like "hostname.tailnet.ts.net" — take the short name
+	p.Name = strings.SplitN(n.DNSName, ".", 2)[0]
+	if len(n.TailscaleIPs) > 0 {
+		p.IP = n.TailscaleIPs[0]
+	}
+	p.OS = n.OS
+	p.IsExit = n.ExitNode
+	if n.Online != nil {
+		p.Online = *n.Online
+	} else {
+		p.Online = true // assume online if field absent
+	}
+	return p
+}
+
+func tailscaleUp() error {
+	cmd := exec.Command("tailscale", "up")
+	cmd.Stdin = nil
+	return cmd.Run()
+}
+
+// tailscaleInstalled reports whether the tailscale binary is on PATH.
+func tailscaleInstalled() bool {
+	_, err := exec.LookPath("tailscale")
+	return err == nil
+}
+
+// tailscaledRunning reports whether the tailscaled daemon is reachable.
+// We run a cheap status call and look for the daemon-connection failure.
+func tailscaledRunning() bool {
+	cmd := exec.Command("tailscale", "status")
+	// capture stderr: "failed to connect to local tailscaled" means down
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	cmd.Stdout = nil
+	_ = cmd.Run()
+	errText := strings.ToLower(stderr.String())
+	return !strings.Contains(errText, "tailscaled") ||
+		!strings.Contains(errText, "failed to connect")
+}
+
+// startTailscaled brings the daemon up via systemd.
+func startTailscaled() tea.Msg {
+	cmd := exec.Command("doas", "systemctl", "start", "tailscaled")
+	if err := cmd.Run(); err != nil {
+		// fall back to plain systemctl (may work for user units or with sudo config)
+		if err2 := exec.Command("systemctl", "start", "tailscaled").Run(); err2 != nil {
+			return daemonMsg{fmt.Errorf("could not start tailscaled: %w", err)}
+		}
+	}
+	// give the daemon a moment to come up
+	time.Sleep(1500 * time.Millisecond)
+	return daemonMsg{nil}
+}
+
+// installTailscale runs the navi tailscale installer.
+func installTailscale() tea.Msg {
+	// prefer the shipped installer script, fall back to navi-extras
+	installer := "/usr/share/navi/installers/tailscale-installer.sh"
+	if _, err := os.Stat(installer); err != nil {
+		installer = ""
+	}
+	var cmd *exec.Cmd
+	if installer != "" {
+		cmd = exec.Command("doas", "bash", installer)
+	} else {
+		cmd = exec.Command("doas", "navi-extras", "--install", "tailscale")
+	}
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return installMsg{fmt.Errorf("install failed: %s", strings.TrimSpace(string(out)))}
+	}
+	return installMsg{nil}
+}
+
+// pollAuth checks whether the device has joined the tailnet yet.
+func pollAuth() tea.Msg {
+	st, _ := tailscaleStatus()
+	return authPollMsg{st.LoggedIn && st.Up}
+}
+
+// openAuthURL opens the tailscale login URL in the default browser.
+func openAuthURL(url string) tea.Msg {
+	_ = exec.Command("xdg-open", url).Start()
+	return nil
+}
+
+// spinnerTick advances the busy spinner.
+func spinnerTick() tea.Msg {
+	time.Sleep(120 * time.Millisecond)
+	return spinnerTickMsg{}
+}
+
+// tailscaleUpCapture runs `tailscale up` and returns the login URL.
+// 
+// Critical: `tailscale up` BLOCKS waiting for browser authentication — it
+// prints the login URL then waits. So we stream stdout, extract the URL as
+// soon as it appears, and return immediately while the process keeps running
+// in the background. The old CombinedOutput() approach deadlocked: it waited
+// for process exit, which waits for the user, who waits for the URL.
+func tailscaleUpCapture() (string, error) {
+	cmd := exec.Command("tailscale", "up")
+	cmd.Stdin = nil
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return "", err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+	// Don't wait for the process — it blocks on auth. Scan both stdout and
+	// stderr until we find the URL or hit a timeout.
+	urlCh := make(chan string, 1)
+	doneCh := make(chan struct{})
+	go func() {
+		defer close(doneCh)
+		// Merge both pipes into one scanner stream.
+		merged := io.MultiReader(stdout, stderr)
+		scanner := bufio.NewScanner(merged)
+		for scanner.Scan() {
+			if url := extractLoginURL(scanner.Text()); url != "" {
+				urlCh <- url
+				return
+			}
+		}
+	}()
+	select {
+	case url := <-urlCh:
+		// URL found — leave the process running in background; the mod's
+		// auth polling will detect when login completes.
+		return url, nil
+	case <-doneCh:
+		// both pipes hit EOF without a URL — process exited. Probably
+		// already logged in, or a real error.
+		cmd.Wait()
+		return "", nil
+	case <-time.After(30 * time.Second):
+		cmd.Process.Kill()
+		return "", fmt.Errorf("timed out waiting for tailscale login URL")
+	}
+}
+
+// needsElevation reports whether tailscale up output looks like a privilege issue.
+func needsElevation(output string) bool {
+	lower := strings.ToLower(output)
+	return strings.Contains(lower, "permission") ||
+		strings.Contains(lower, "access denied") ||
+		strings.Contains(lower, "must be root") ||
+		strings.Contains(lower, "operation not permitted")
+}
+
+// extractLoginURL finds the tailscale login URL in `tailscale up` output.
+func extractLoginURL(output string) string {
+	for _, line := range strings.Split(output, "\n") {
+		for _, field := range strings.Fields(line) {
+			if strings.HasPrefix(field, "https://login.tailscale.com/") {
+				return strings.Trim(field, "()[]")
+			}
+		}
+	}
+	return ""
+}
+
+// renderQR returns a text QR code for the given URL.
+func renderQR(url string) string {
+	var sb strings.Builder
+	// small QR, suitable for terminal
+	qrterminal.Generate(url, qrterminal.L, &sb)
+	return sb.String()
+}
+
+func tailscaleDown() error {
+	return exec.Command("tailscale", "down").Run()
+}
+
+// setExitNode routes traffic through the named peer ("" to clear).
+func setExitNode(peer string) error {
+	args := []string{"set", "--exit-node=" + peer}
+	cmd := exec.Command("tailscale", args...)
+	cmd.Stdin = nil
+	return cmd.Run()
+}
+
+// selectedPeer returns the peer under the cursor in the filtered list,
+// or nil if none.
+func (m model) selectedPeer() *Peer {
+	peers := m.filteredPeers()
+	if m.cursor >= 0 && m.cursor < len(peers) {
+		return &peers[m.cursor]
+	}
+	return nil
+}
+
+// filteredPeers returns peers matching the current filter (case-insensitive
+// substring on name, IP, or OS). Empty filter returns all peers.
+func (m model) filteredPeers() []Peer {
+	if m.filter == "" {
+		return m.status.Peers
+	}
+	f := strings.ToLower(m.filter)
+	var out []Peer
+	for _, p := range m.status.Peers {
+		if strings.Contains(strings.ToLower(p.Name), f) ||
+			strings.Contains(strings.ToLower(p.IP), f) ||
+			strings.Contains(strings.ToLower(p.OS), f) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// currentExitNode parses `tailscale status --json` for the active exit node.
+func currentExitNode() string {
+	out, err := exec.Command("tailscale", "status", "--json").Output()
+	if err != nil {
+		return ""
+	}
+	var js tsStatusJSON
+	if err := json.Unmarshal(out, &js); err != nil {
+		return ""
+	}
+	if js.Self != nil {
+		// Self has ExitNodeOption / ExitNode fields in full JSON;
+		// we check peer list for the one marked as our exit node.
+		// The JSON has "Self": {"ExitNode": ...} — simplified here.
+	}
+	return ""
+}
+
+// tdEntry is one row in the taildrop file browser.
+type tdEntry struct {
+	path  string
+	name  string
+	isDir bool
+}
+
+// listDir reads a directory for the taildrop browser: directories first,
+// then files, each sorted by name. Hidden entries are skipped.
+func listDir(dir string) []tdEntry {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var dirs, files []tdEntry
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		te := tdEntry{
+			path:  filepath.Join(dir, e.Name()),
+			name:  e.Name(),
+			isDir: e.IsDir(),
+		}
+		if te.isDir {
+			dirs = append(dirs, te)
+		} else {
+			files = append(files, te)
+		}
+	}
+	sort.Slice(dirs, func(i, j int) bool { return dirs[i].name < dirs[j].name })
+	sort.Slice(files, func(i, j int) bool { return files[i].name < files[j].name })
+	return append(dirs, files...)
+}
+
+// tdFiltered returns the browser entries matching the live filter.
+func (m model) tdFiltered() []tdEntry {
+	if m.tdFilter == "" {
+		return m.tdEntries
+	}
+	var out []tdEntry
+	q := strings.ToLower(m.tdFilter)
+	for _, e := range m.tdEntries {
+		if strings.Contains(strings.ToLower(e.name), q) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// tdChdir moves the browser into dir and resets cursor/filter.
+func (m *model) tdChdir(dir string) {
+	m.tdDir = dir
+	m.tdEntries = listDir(dir)
+	m.tdCursor = 0
+	m.tdFilter = ""
+	m.tdFiltering = false
+}
+
+// taildropSend sends a file to a peer via `tailscale file cp`.
+func taildropSend(file, peer string) error {
+	cmd := exec.Command("tailscale", "file", "cp", file, peer+":")
+	return cmd.Run()
+}
+
+// taildropReceive pulls waiting files into ~/Downloads.
+func taildropReceive() (int, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return 0, err
+	}
+	dl := filepath.Join(home, "Downloads")
+	out, err := exec.Command("tailscale", "file", "get", dl).CombinedOutput()
+	if err != nil {
+		// "no files" exits non-zero — treat as empty, not failure
+		if strings.Contains(string(out), "no files") ||
+			strings.Contains(strings.ToLower(string(out)), "empty") {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	}
+	// count received files from output lines
+	n := 0
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.TrimSpace(line) != "" {
+			n++
+		}
+	}
+	return n, nil
+}
+
+func tailscalePing(ip string) (string, error) {
+	out, err := exec.Command("tailscale", "ping", "-c", "3", ip).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("ping failed")
+	}
+	// parse "pong from X: 12.3ms" — take the last latency
+	lines := strings.Split(string(out), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.Contains(lines[i], "ms") {
+			parts := strings.Fields(lines[i])
+			for _, p := range parts {
+				if strings.HasSuffix(p, "ms") {
+					return p, nil
+				}
+			}
+		}
+	}
+	return "?", nil
+}
+
+// ── Model ────────────────────────────────────────────────────────────────
+
+type screen int
+
+const (
+	screenMain screen = iota
+	screenConfirmDown
+	screenAuth
+	screenTaildrop
+	screenTaildropInbox
+	screenNotInstalled
+	screenDaemonDown
+	screenExitNode
+	screenPeerDetail
+)
+
+type model struct {
+	status   TailnetStatus
+	err      string
+	msg      string
+	msgAt    time.Time
+	cursor   int
+	screen   screen
+	quitting bool
+	width    int
+	height   int
+	// auth flow
+	authURL string
+	authQR  string
+	// setup flow
+	busy        bool   // async operation in progress (spinner)
+	busyMsg     string // what the spinner is doing
+	spinnerTick int
+	// peer filter
+	filtering bool
+	filter    string
+	// exit node picker
+	exitCursor int
+	// taildrop
+	tdDir       string    // current browser directory
+	tdEntries   []tdEntry // entries in tdDir (dirs first, then files)
+	tdCursor    int
+	tdPeer      int  // selected peer index for sending
+	tdStep      int  // 0=pick file, 1=pick peer, 2=confirm
+	tdFile      string
+	tdFilter    string // live filename filter
+	tdFiltering bool   // typing a filter
+	// exit node
+	exitNode string
+}
+
+type statusMsg struct {
+	st  TailnetStatus
+	err error
+}
+
+type pingMsg struct {
+	name    string
+	latency string
+	err     error
+}
+
+type actionDoneMsg struct {
+	msg string
+	err error
+}
+
+type authMsg struct {
+	url    string
+	qr     string
+	err    error
+	output string
+}
+
+type taildropMsg struct {
+	msg string
+	err error
+}
+
+type installMsg struct {
+	err error
+}
+
+type daemonMsg struct {
+	err error
+}
+
+type authPollMsg struct {
+	loggedIn bool
+}
+
+type spinnerTickMsg struct{}
+
+func fetchStatus() tea.Msg {
+	st, err := tailscaleStatus()
+	return statusMsg{st, err}
+}
+
+func initialModel() model {
+	return model{screen: screenMain}
+}
+
+func (m model) Init() tea.Cmd {
+	// setup chain: installed? -> daemon? -> status
+	return func() tea.Msg {
+		if !tailscaleInstalled() {
+			return installMsg{fmt.Errorf("not installed")}
+		}
+		if !tailscaledRunning() {
+			return daemonMsg{fmt.Errorf("daemon down")}
+		}
+		return fetchStatus()
+	}
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+		return m, tea.ClearScreen
+
+	case tea.KeyMsg:
+		return m.handleKey(msg)
+
+	case statusMsg:
+		if msg.err != nil {
+			m.err = msg.err.Error()
+		} else {
+			m.status = msg.st
+			m.err = ""
+		}
+		return m, nil
+
+	case pingMsg:
+		if msg.err == nil {
+			for i := range m.status.Peers {
+				if m.status.Peers[i].Name == msg.name {
+					m.status.Peers[i].Latency = msg.latency
+					break
+				}
+			}
+			m.setMsg(fmt.Sprintf("ping %s: %s", msg.name, msg.latency))
+		} else {
+			m.setMsg("ping failed")
+		}
+		return m, nil
+
+	case actionDoneMsg:
+		if msg.err != nil {
+			m.setMsg("error: " + msg.err.Error())
+		} else {
+			m.setMsg(msg.msg)
+		}
+		// refresh status after any action
+		return m, fetchStatus
+
+	case authMsg:
+		m.busy = false
+		if msg.err != nil {
+			if needsElevation(msg.output) {
+				m.setMsg("need operator rights - run `doas tailscale set --operator=$USER` once, then press r")
+			} else {
+				errText := msg.err.Error()
+				if strings.TrimSpace(msg.output) != "" {
+					lines := strings.Split(strings.TrimSpace(msg.output), "\n")
+					errText = lines[0]
+					if len(errText) > 80 {
+						errText = errText[:80] + "..."
+					}
+				}
+				m.setMsg("auth failed: " + errText)
+			}
+			m.screen = screenMain
+		} else if msg.url != "" {
+			m.authURL = msg.url
+			m.authQR = msg.qr
+			m.screen = screenAuth
+			// start polling for completion
+			return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+				return pollAuth()
+			})
+		} else {
+			// already authenticated or no URL needed
+			m.setMsg("connected to tailnet")
+			m.screen = screenMain
+		}
+		return m, fetchStatus
+
+	case taildropMsg:
+		if msg.err != nil {
+			m.setMsg("taildrop failed: " + msg.err.Error())
+		} else {
+			m.setMsg(msg.msg)
+		}
+		m.screen = screenMain
+		return m, nil
+
+	case installMsg:
+		m.busy = false
+		if msg.err != nil && msg.err.Error() == "not installed" {
+			// initial check: tailscale isn't here
+			m.screen = screenNotInstalled
+			return m, nil
+		}
+		if msg.err != nil {
+			m.setMsg(msg.err.Error())
+			m.screen = screenNotInstalled
+			return m, nil
+		}
+		// install succeeded — check the daemon next
+		m.screen = screenMain
+		return m, func() tea.Msg {
+			if !tailscaledRunning() {
+				return daemonMsg{fmt.Errorf("daemon down")}
+			}
+			return fetchStatus()
+		}
+
+	case daemonMsg:
+		m.busy = false
+		if msg.err != nil && msg.err.Error() == "daemon down" {
+			// initial check or post-install: daemon isn't running.
+			// auto-start it — the user installed tailscale to use it.
+			m.screen = screenDaemonDown
+			m.busy = true
+			m.busyMsg = "starting tailscaled..."
+			return m, tea.Batch(startTailscaled, spinnerTick)
+		}
+		if msg.err != nil {
+			m.setMsg(msg.err.Error())
+			m.screen = screenDaemonDown
+			m.busy = false
+			return m, nil
+		}
+		// daemon is up — fetch status
+		m.screen = screenMain
+		return m, fetchStatus
+
+	case authPollMsg:
+		if msg.loggedIn {
+			// auth completed — clear the sensitive URL and go to main
+			m.authURL = ""
+			m.authQR = ""
+			m.screen = screenMain
+			m.setMsg("connected to tailnet")
+			return m, fetchStatus
+		}
+		// not yet — keep polling while on the auth screen
+		if m.screen == screenAuth {
+			return m, tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+				return pollAuth()
+			})
+		}
+		return m, nil
+
+	case spinnerTickMsg:
+		if m.busy {
+			m.spinnerTick++
+			return m, spinnerTick
+		}
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m *model) setMsg(s string) {
+	m.msg = s
+	m.msgAt = time.Now()
+}
+
+// exitNodeChoices returns exit-capable peers plus a "none" option.
+func (m model) exitNodeChoices() []Peer {
+	var out []Peer
+	for _, p := range m.status.Peers {
+		if p.IsExit {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func (m model) handleExitNodeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	choices := m.exitNodeChoices()
+	// +1 for the "none" option
+	total := len(choices) + 1
+	switch msg.String() {
+	case "esc", "q":
+		m.screen = screenMain
+		return m, nil
+	case "up", "k":
+		if m.exitCursor > 0 {
+			m.exitCursor--
+		}
+		return m, nil
+	case "down", "j":
+		if m.exitCursor < total-1 {
+			m.exitCursor++
+		}
+		return m, nil
+	case "enter":
+		m.screen = screenMain
+		if m.exitCursor == len(choices) {
+			// "none" selected — clear exit node
+			return m, func() tea.Msg {
+				if err := setExitNode(""); err != nil {
+					return actionDoneMsg{"", err}
+				}
+				return actionDoneMsg{"exit node cleared", nil}
+			}
+		}
+		peerName := choices[m.exitCursor].Name
+		return m, func() tea.Msg {
+			if err := setExitNode(peerName); err != nil {
+				return actionDoneMsg{"", err}
+			}
+			return actionDoneMsg{"exit node: " + peerName, nil}
+		}
+	}
+	return m, nil
+}
+
+func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// busy operations swallow keys (except ctrl+c)
+	if m.busy && msg.String() != "ctrl+c" {
+		return m, nil
+	}
+	// filter input mode swallows all keys
+	if m.filtering {
+		switch msg.String() {
+		case "esc":
+			m.filtering = false
+			m.filter = ""
+			m.cursor = 0
+			return m, nil
+		case "enter":
+			m.filtering = false
+			m.cursor = 0
+			return m, nil
+		case "backspace":
+			if len(m.filter) > 0 {
+				m.filter = m.filter[:len(m.filter)-1]
+				m.cursor = 0
+			}
+			return m, nil
+		default:
+			if len(msg.String()) == 1 {
+				m.filter += msg.String()
+				m.cursor = 0
+			}
+			return m, nil
+		}
+	}
+	switch m.screen {
+	case screenNotInstalled:
+		switch msg.String() {
+		case "i", "I":
+			// install tailscale
+			m.busy = true
+			m.busyMsg = "installing tailscale..."
+			return m, tea.Batch(installTailscale, spinnerTick)
+		case "q", "esc":
+			m.quitting = true
+			return m, tea.Quit
+		}
+		return m, nil
+	case screenDaemonDown:
+		switch msg.String() {
+		case "s", "S", "enter":
+			// retry starting the daemon
+			m.busy = true
+			m.busyMsg = "starting tailscaled..."
+			return m, tea.Batch(startTailscaled, spinnerTick)
+		case "q", "esc":
+			m.quitting = true
+			return m, tea.Quit
+		}
+		return m, nil
+	case screenExitNode:
+		return m.handleExitNodeKey(msg)
+	case screenPeerDetail:
+		if msg.String() == "esc" || msg.String() == "q" || msg.String() == "enter" {
+			m.screen = screenMain
+			return m, nil
+		}
+		return m, nil
+	case screenConfirmDown:
+		switch msg.String() {
+		case "y", "Y":
+			m.screen = screenMain
+			return m, func() tea.Msg {
+				if err := tailscaleDown(); err != nil {
+					return actionDoneMsg{"", err}
+				}
+				return actionDoneMsg{"disconnected from tailnet", nil}
+			}
+		case "n", "N", "esc":
+			m.screen = screenMain
+			return m, nil
+		}
+		return m, nil
+
+	case screenAuth:
+		switch msg.String() {
+		case "o", "O":
+			// open the auth URL in the default browser
+			if m.authURL != "" {
+				return m, func() tea.Msg { return openAuthURL(m.authURL) }
+			}
+			return m, nil
+		case "u", "U":
+			// regenerate the auth URL (old one may have expired)
+			m.busy = true
+			m.busyMsg = "requesting login link..."
+			return m, tea.Batch(
+				func() tea.Msg {
+					url, err := tailscaleUpCapture()
+					if err != nil {
+						return authMsg{"", "", err, ""}
+					}
+					if url == "" {
+						return authMsg{"", "", nil, ""}
+					}
+					return authMsg{url, renderQR(url), nil, ""}
+				},
+				spinnerTick,
+			)
+		default:
+			// any other key returns to main (auth happens in browser/phone)
+			m.screen = screenMain
+			m.authURL = ""
+			m.authQR = ""
+			return m, fetchStatus
+		}
+
+	case screenTaildrop:
+		return m.handleTaildropKey(msg)
+
+	case screenTaildropInbox:
+		if msg.String() == "esc" || msg.String() == "q" {
+			m.screen = screenMain
+			return m, nil
+		}
+		return m, nil
+	}
+
+	// main screen
+	peers := m.filteredPeers()
+	n := len(peers)
+	switch msg.String() {
+	case "ctrl+c", "q", "esc":
+		m.quitting = true
+		return m, tea.Quit
+
+	case "up", "k":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "down", "j":
+		if m.cursor < n-1 {
+			m.cursor++
+		}
+
+	case "/":
+		// peer filter
+		m.filtering = true
+		m.filter = ""
+		return m, nil
+
+	case "enter":
+		// peer details
+		if m.cursor < n {
+			m.screen = screenPeerDetail
+		}
+		return m, nil
+
+	case "r":
+		return m, fetchStatus
+
+	case "u":
+		// tailscale up with QR code auth flow
+		m.busy = true
+		m.busyMsg = "requesting login link..."
+		return m, tea.Batch(
+			func() tea.Msg {
+				url, err := tailscaleUpCapture()
+				if err != nil {
+					return authMsg{"", "", err, ""}
+				}
+				if url == "" {
+					// no URL = already authenticated
+					return authMsg{"", "", nil, ""}
+				}
+				return authMsg{url, renderQR(url), nil, ""}
+			},
+			spinnerTick,
+			)
+
+	case "d":
+		// confirm before disconnecting
+		if m.status.Up {
+			m.screen = screenConfirmDown
+		} else {
+			m.setMsg("not connected")
+		}
+
+	case "p":
+		// ping selected peer
+		if peer := m.selectedPeer(); peer != nil {
+			name, ip := peer.Name, peer.IP
+			return m, func() tea.Msg {
+				lat, err := tailscalePing(ip)
+				return pingMsg{name, lat, err}
+			}
+		}
+
+	case "s":
+		// ssh to selected peer (exits the TUI into ssh)
+		if peer := m.selectedPeer(); peer != nil {
+			if !peer.Online {
+				m.setMsg(peer.Name + " is offline")
+				return m, nil
+			}
+			return m, tea.ExecProcess(exec.Command("tailscale", "ssh", peer.Name), nil)
+		}
+
+	case "c", "y":
+		// copy IP — print to stdout for terminal copy
+		if peer := m.selectedPeer(); peer != nil {
+			fmt.Printf("\n%s\n", peer.IP)
+			m.setMsg("IP printed below (select + copy)")
+		}
+
+	case "e":
+		// exit node picker
+		m.exitCursor = 0
+		m.screen = screenExitNode
+		return m, nil
+
+	case "t":
+		// taildrop: send a file
+		if !m.status.Up {
+			m.setMsg("connect to tailnet first")
+			return m, nil
+		}
+		home, _ := os.UserHomeDir()
+		if home == "" {
+			home = "/"
+		}
+		m.tdChdir(home)
+		m.tdStep = 0
+		m.screen = screenTaildrop
+		return m, nil
+
+	case "i":
+		// taildrop inbox: pull waiting files into ~/Downloads
+		m.screen = screenTaildropInbox
+		return m, func() tea.Msg {
+			n, err := taildropReceive()
+			if err != nil {
+				return actionDoneMsg{"", err}
+			}
+			if n == 0 {
+				return actionDoneMsg{"inbox empty — nothing to pull", nil}
+			}
+			return actionDoneMsg{fmt.Sprintf("pulled %d file(s) into ~/Downloads", n), nil}
+		}
+	}
+	return m, nil
+}
+
+func (m model) handleTaildropKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	k := msg.String()
+	switch m.tdStep {
+	case 0: // pick file — a real file browser
+		entries := m.tdFiltered()
+		if m.tdFiltering {
+			switch k {
+			case "esc":
+				m.tdFiltering = false
+				m.tdFilter = ""
+				m.tdCursor = 0
+			case "backspace":
+				if len(m.tdFilter) > 0 {
+					m.tdFilter = m.tdFilter[:len(m.tdFilter)-1]
+					m.tdCursor = 0
+				} else {
+					m.tdFiltering = false
+				}
+			case "enter":
+				m.tdFiltering = false
+			default:
+				if len(k) == 1 {
+					m.tdFilter += k
+					m.tdCursor = 0
+				}
+			}
+			return m, nil
+		}
+		switch k {
+		case "esc", "q":
+			m.screen = screenMain
+			return m, nil
+		case "up", "k":
+			if m.tdCursor > 0 {
+				m.tdCursor--
+			}
+		case "down", "j":
+			if m.tdCursor < len(entries)-1 {
+				m.tdCursor++
+			}
+		case "enter", "l":
+			if len(entries) > 0 && m.tdCursor < len(entries) {
+				e := entries[m.tdCursor]
+				if e.isDir {
+					m.tdChdir(e.path)
+				} else {
+					m.tdFile = e.path
+					m.tdStep = 1
+					m.tdPeer = m.cursor // default to currently selected peer
+				}
+			}
+		case "h", "backspace":
+			parent := filepath.Dir(m.tdDir)
+			if parent != m.tdDir {
+				m.tdChdir(parent)
+			}
+		case "/":
+			m.tdFiltering = true
+			m.tdFilter = ""
+		case "~":
+			if home, err := os.UserHomeDir(); err == nil {
+				m.tdChdir(home)
+			}
+		}
+	case 1: // pick peer
+		n := len(m.status.Peers)
+		switch k {
+		case "esc":
+			m.tdStep = 0
+			return m, nil
+		case "up", "k":
+			if m.tdPeer > 0 {
+				m.tdPeer--
+			}
+		case "down", "j":
+			if m.tdPeer < n-1 {
+				m.tdPeer++
+			}
+		case "enter":
+			if m.tdPeer < n {
+				m.tdStep = 2
+			}
+		}
+	case 2: // confirm send
+		switch k {
+		case "y", "Y", "enter":
+			file := m.tdFile
+			peer := m.status.Peers[m.tdPeer].Name
+			m.screen = screenMain
+			return m, func() tea.Msg {
+				if err := taildropSend(file, peer); err != nil {
+					return taildropMsg{"", err}
+				}
+				return taildropMsg{fmt.Sprintf("sent %s → %s",
+					filepath.Base(file), peer), nil}
+			}
+		case "n", "N", "esc":
+			m.tdStep = 1
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+// ── View ─────────────────────────────────────────────────────────────────
+
+func (m model) View() string {
+	if m.quitting {
+		return ""
+	}
+	var b strings.Builder
+
+	// header — ∅ mark in green, title in pink, status badge
+	header := theme.Logo.Render("∅") + " " + theme.Title.Render("navi tailscale")
+	header += "  " + m.statusBadge()
+	b.WriteString(header + "\n")
+	b.WriteString(theme.Divider(frameWidth) + "\n")
+
+	// busy spinner overlays the content area
+	if m.busy {
+		b.WriteString("\n\n  " + m.spinner() + "  " + theme.Dimmed.Render(m.busyMsg) + "\n")
+	} else {
+	switch m.screen {
+	case screenMain, screenConfirmDown:
+		if !m.status.LoggedIn {
+			b.WriteString(m.renderNotLoggedIn())
+		} else {
+			b.WriteString(m.renderSelf())
+			b.WriteString("\n")
+			b.WriteString(m.renderPeers())
+		}
+	case screenAuth:
+		b.WriteString(m.renderAuth())
+	case screenTaildrop:
+		b.WriteString(m.renderTaildrop())
+	case screenTaildropInbox:
+		b.WriteString(m.renderInbox())
+	case screenNotInstalled:
+		b.WriteString(m.renderNotInstalled())
+	case screenDaemonDown:
+		b.WriteString(m.renderDaemonDown())
+	case screenExitNode:
+		b.WriteString(m.renderExitNodePicker())
+	case screenPeerDetail:
+		b.WriteString(m.renderPeerDetail())
+	}
+	}
+
+	// message line (fixed slot so footer never shifts)
+	b.WriteString("\n")
+	if m.msg != "" && time.Since(m.msgAt) < 4*time.Second {
+		b.WriteString("  " + theme.Dimmed.Render(m.msg))
+	}
+	b.WriteString("\n")
+
+	// confirm dialog
+	if m.screen == screenConfirmDown {
+		b.WriteString("  " + theme.Error.Render("disconnect from tailnet? (y/n)"))
+		b.WriteString("\n")
+	}
+
+	// footer
+	b.WriteString(m.footer())
+	return b.String()
+}
+
+func (m model) footer() string {
+	if m.busy {
+		return theme.Footer(false, [2]string{"please wait", ""})
+	}
+	switch m.screen {
+	case screenAuth:
+		return theme.Footer(true,
+			[2]string{"o", "open in browser"},
+			[2]string{"u", "new link"},
+			[2]string{"esc", "back"})
+	case screenTaildrop:
+		if m.tdStep == 0 {
+			return theme.Footer(true,
+				[2]string{"↑↓", "select file"},
+				[2]string{"enter", "choose"},
+				[2]string{"esc", "back"})
+		} else if m.tdStep == 1 {
+			return theme.Footer(true,
+				[2]string{"↑↓", "select peer"},
+				[2]string{"enter", "choose"},
+				[2]string{"esc", "back"})
+		}
+		return theme.Footer(true,
+			[2]string{"y", "send"},
+			[2]string{"n", "cancel"})
+	case screenTaildropInbox:
+		return theme.Footer(true, [2]string{"esc", "back"})
+	case screenNotInstalled:
+		return theme.Footer(true,
+			[2]string{"i", "install tailscale"},
+		[2]string{"q", "quit"})
+	case screenDaemonDown:
+		return theme.Footer(true,
+			[2]string{"s", "retry start"},
+			[2]string{"q", "quit"})
+	case screenExitNode:
+		return theme.Footer(true,
+			[2]string{"↑↓", "select"},
+			[2]string{"enter", "use exit node"},
+			[2]string{"esc", "cancel"})
+	case screenPeerDetail:
+		return theme.Footer(true, [2]string{"esc", "back"})
+	default:
+		// Grouped footer: navigate | connection | peer actions | system.
+		// Width-aware: single line when wide enough, two lines when narrow
+		// (instead of letting the terminal wrap it and ghost on resize).
+		nav := theme.Footer(true, [2]string{"↑↓", "navigate"})
+		conn := theme.Footer(true,
+			[2]string{"u", "up"},
+			[2]string{"d", "down"})
+		actions := theme.Footer(true,
+			[2]string{"p", "ping"},
+			[2]string{"s", "ssh"},
+			[2]string{"e", "exit node"},
+			[2]string{"t", "taildrop"},
+			[2]string{"i", "inbox"},
+			[2]string{"c", "copy IP"})
+		sys := theme.Footer(true,
+			[2]string{"/", "filter"},
+			[2]string{"enter", "details"},
+			[2]string{"r", "refresh"},
+			[2]string{"q", "quit"})
+		sep := theme.Dimmed.Render(" │ ")
+		if m.width >= 110 {
+			return nav + sep + conn + sep + actions + sep + sys
+		}
+		return nav + sep + conn + sep + sys + "\n" + actions
+	}
+}
+
+func (m model) statusBadge() string {
+	dot := lipgloss.NewStyle().Foreground(theme.Green)
+	txt := lipgloss.NewStyle().Foreground(theme.Green)
+	if !m.status.LoggedIn {
+		dot = lipgloss.NewStyle().Foreground(theme.Dim)
+		txt = theme.Dimmed
+		return dot.Render("○") + " " + txt.Render("not logged in")
+	}
+	if m.status.Up {
+		return dot.Render("●") + " " + txt.Render("connected")
+	}
+	dot = lipgloss.NewStyle().Foreground(theme.Dim)
+	return dot.Render("○") + " " + theme.Dimmed.Render("down")
+}
+
+func (m model) renderNotLoggedIn() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Dimmed.Render("tailscale is installed but this device") + "\n")
+	b.WriteString("  " + theme.Dimmed.Render("isn't on a tailnet yet.") + "\n\n")
+	b.WriteString("  press " + theme.Selected.Render("u") + " to join " +
+		theme.Dimmed.Render("(prints an approval link)") + "\n")
+	if m.err != "" {
+		b.WriteString("\n  " + theme.Error.Render(m.err) + "\n")
+	}
+	return b.String()
+}
+
+func (m model) renderSelf() string {
+	s := m.status.Self
+	pink := lipgloss.NewStyle().Foreground(theme.Pink).Bold(true)
+	cyan := lipgloss.NewStyle().Foreground(theme.Cyan)
+	line := fmt.Sprintf("  %s  %s",
+		pink.Render("this device"),
+		theme.Dimmed.Render(s.Name))
+	if s.IP != "" {
+		line += "  " + cyan.Render(s.IP)
+	}
+	if m.status.Tailnet != "" {
+		line += "\n  " + theme.Dimmed.Render("tailnet: "+m.status.Tailnet)
+	}
+	return line
+}
+
+func (m model) renderPeers() string {
+	var b strings.Builder
+	peers := m.filteredPeers()
+	n := len(peers)
+	total := len(m.status.Peers)
+	header := fmt.Sprintf("  %s (%d)", theme.Dimmed.Render("peers"), n)
+	if m.filter != "" {
+		header += "  " + theme.Selected.Render("filter: "+m.filter+" ▊")
+	} else if m.filtering {
+		header += "  " + theme.Selected.Render("filter: ▊")
+	} else if total > 5 {
+		header += "  " + theme.Dimmed.Render("(/ to filter)")
+	}
+	b.WriteString(header + "\n")
+	if n == 0 {
+		if m.filter != "" {
+			b.WriteString("  " + theme.Dimmed.Render("no peers match filter.") + "\n")
+		} else {
+			b.WriteString("  " + theme.Dimmed.Render("no other devices on this tailnet yet.") + "\n")
+		}
+		return b.String()
+	}
+	green := lipgloss.NewStyle().Foreground(theme.Green)
+	dimDot := lipgloss.NewStyle().Foreground(theme.Dim)
+	dim := theme.Dimmed
+	cyan := lipgloss.NewStyle().Foreground(theme.Cyan)
+	for i, p := range peers {
+		cursor := "  "
+		nameStyle := lipgloss.NewStyle().Foreground(theme.White)
+		if i == m.cursor {
+			cursor = theme.Selected.Render("▸ ")
+			nameStyle = nameStyle.Bold(true)
+		}
+		dot := dimDot.Render("○")
+		if p.Online {
+			dot = green.Render("●")
+		}
+		line := fmt.Sprintf("%s%s %s", cursor, dot, nameStyle.Render(p.Name))
+		line += "  " + dim.Render(p.IP)
+		if p.OS != "" {
+			line += "  " + dim.Render(p.OS)
+		}
+		if p.IsExit {
+			line += "  " + cyan.Render("exit")
+		}
+		if p.Latency != "" {
+			line += "  " + green.Render(p.Latency)
+		}
+		if !p.Online {
+			line += "  " + dim.Render("(offline)")
+		}
+		b.WriteString(line + "\n")
+	}
+	return b.String()
+}
+
+func (m model) renderAuth() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("JOIN TAILNET") + "\n\n")
+	b.WriteString("  " + theme.Dimmed.Render("scan with your phone to authenticate:") + "\n\n")
+	// indent QR code
+	for _, line := range strings.Split(m.authQR, "\n") {
+		if line != "" {
+			b.WriteString("  " + line + "\n")
+		}
+	}
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Dimmed.Render("or visit:") + "\n")
+	cyan := lipgloss.NewStyle().Foreground(theme.Cyan)
+	b.WriteString("  " + cyan.Render(m.authURL) + "\n\n")
+	b.WriteString("  " + theme.Dimmed.Render("press ") + theme.Selected.Render("o") +
+		theme.Dimmed.Render(" to open in browser") + "\n")
+	b.WriteString("  " + theme.Dimmed.Render("waiting for authentication — this screen updates automatically") + "\n")
+	return b.String()
+}
+
+func (m model) renderTaildrop() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("TAILDROP — SEND FILE") + "\n\n")
+
+	if m.tdStep == 0 {
+		entries := m.tdFiltered()
+		// breadcrumb — home collapses to ~
+		dir := m.tdDir
+		if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(dir, home) {
+			dir = "~" + dir[len(home):]
+		}
+		b.WriteString("  " + theme.Dimmed.Render("browse: ") + theme.Selected.Render(dir) + "\n")
+		if m.tdFiltering || m.tdFilter != "" {
+			b.WriteString("  " + theme.Dimmed.Render("filter: /" + m.tdFilter + "_") + "\n")
+		}
+		b.WriteString("\n")
+		if len(entries) == 0 {
+			b.WriteString("  " + theme.Dimmed.Render("empty directory") + "\n")
+		}
+		dirStyle := lipgloss.NewStyle().Foreground(theme.Cyan)
+		for i, e := range entries {
+			cursor := "  "
+			name := e.name
+			nameStyle := lipgloss.NewStyle().Foreground(theme.White)
+			if e.isDir {
+				name += "/"
+				nameStyle = dirStyle
+			}
+			if i == m.tdCursor {
+				cursor = theme.Selected.Render("▸ ")
+				nameStyle = nameStyle.Bold(true)
+			}
+			b.WriteString(fmt.Sprintf("%s%s\n", cursor, nameStyle.Render(name)))
+		}
+		b.WriteString("\n  " + theme.Dimmed.Render("enter/l open · h/backspace up · / filter · ~ home") + "\n")
+	} else if m.tdStep == 1 {
+		b.WriteString("  " + theme.Dimmed.Render("file: "+filepath.Base(m.tdFile)) + "\n\n")
+		b.WriteString("  " + theme.Dimmed.Render("send to:") + "\n")
+		for i, p := range m.status.Peers {
+			if !p.Online {
+				continue
+			}
+			cursor := "  "
+			nameStyle := lipgloss.NewStyle().Foreground(theme.White)
+			if i == m.tdPeer {
+				cursor = theme.Selected.Render("▸ ")
+				nameStyle = nameStyle.Bold(true)
+			}
+			b.WriteString(fmt.Sprintf("%s%s\n", cursor, nameStyle.Render(p.Name)))
+		}
+	} else {
+		peer := m.status.Peers[m.tdPeer]
+		b.WriteString("  send " + theme.Selected.Render(filepath.Base(m.tdFile)) + "\n")
+		b.WriteString("  to " + theme.Selected.Render(peer.Name) + "?\n\n")
+		b.WriteString("  " + theme.Dimmed.Render("press y to send, n to go back") + "\n")
+	}
+	return b.String()
+}
+
+func (m model) renderInbox() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("TAILDROP INBOX") + "\n\n")
+	b.WriteString("  " + theme.Dimmed.Render("pulling waiting files into ~/Downloads…") + "\n")
+	return b.String()
+}
+
+func (m model) renderExitNodePicker() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("EXIT NODE") + "\n\n")
+	b.WriteString("  " + theme.Dimmed.Render("route all traffic through:") + "\n\n")
+
+	choices := m.exitNodeChoices()
+	current := currentExitNode()
+
+	for i, p := range choices {
+		cursor := "  "
+		if i == m.exitCursor {
+			cursor = theme.Selected.Render("▸ ")
+		}
+		dot := theme.Dimmed.Render("○")
+		if p.Online {
+			dot = lipgloss.NewStyle().Foreground(theme.Green).Render("●")
+		}
+		line := fmt.Sprintf("%s%s %s  %s", cursor, dot, p.Name, theme.Dimmed.Render(p.IP))
+		if current == p.Name || current == p.IP {
+			line += "  " + lipgloss.NewStyle().Foreground(theme.Cyan).Render("(active)")
+		}
+		if !p.Online {
+			line += "  " + theme.Dimmed.Render("(offline)")
+		}
+		b.WriteString("  " + line + "\n")
+	}
+
+	// "none" option
+	cursor := "  "
+	if m.exitCursor == len(choices) {
+		cursor = theme.Selected.Render("▸ ")
+	}
+	noneLine := cursor + theme.Dimmed.Render("none (direct connection)")
+	if current == "" {
+		noneLine += "  " + lipgloss.NewStyle().Foreground(theme.Cyan).Render("(active)")
+	}
+	b.WriteString("  " + noneLine + "\n")
+
+	if len(choices) == 0 {
+		b.WriteString("\n  " + theme.Dimmed.Render("no exit nodes on this tailnet.") + "\n")
+	}
+	return b.String()
+}
+
+func (m model) renderPeerDetail() string {
+	var b strings.Builder
+	peer := m.selectedPeer()
+	if peer == nil {
+		return b.String()
+	}
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render(strings.ToUpper(peer.Name)) + "\n\n")
+
+	green := lipgloss.NewStyle().Foreground(theme.Green)
+	dimDot := lipgloss.NewStyle().Foreground(theme.Dim)
+	dot := dimDot.Render("○ offline")
+	if peer.Online {
+		dot = green.Render("● online")
+	}
+	b.WriteString("  " + dot + "\n\n")
+
+	row := func(label, val string) {
+		b.WriteString(fmt.Sprintf("  %-12s %s\n",
+			theme.Dimmed.Render(label), val))
+	}
+	row("IP", peer.IP)
+	if peer.OS != "" {
+		row("OS", peer.OS)
+	}
+	if peer.IsExit {
+		row("exit node", "yes")
+	}
+	if peer.Latency != "" {
+		row("latency", peer.Latency)
+	}
+	if peer.IsSelf {
+		row("this device", "yes")
+	}
+	return b.String()
+}
+
+// spinner returns the current spinner frame.
+func (m model) spinner() string {
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	cyan := lipgloss.NewStyle().Foreground(theme.Cyan)
+	return cyan.Render(frames[m.spinnerTick%len(frames)])
+}
+
+func (m model) renderNotInstalled() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("TAILSCALE NOT INSTALLED") + "\n\n")
+	b.WriteString("  " + theme.Dimmed.Render("navi-tailscale needs the tailscale client to") + "\n")
+	b.WriteString("  " + theme.Dimmed.Render("manage your tailnet.") + "\n\n")
+	b.WriteString("  press " + theme.Selected.Render("i") + " to install it now,\n")
+	b.WriteString("  or run " + theme.Dimmed.Render("navi-extras --install tailscale") + "\n")
+	b.WriteString("  in a terminal.\n")
+	return b.String()
+}
+
+func (m model) renderDaemonDown() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString("  " + theme.Header.Render("TAILSCALED NOT RUNNING") + "\n\n")
+	if m.err != "" {
+		b.WriteString("  " + theme.Error.Render(m.err) + "\n\n")
+	}
+	b.WriteString("  " + theme.Dimmed.Render("the tailscale daemon isn't running.") + "\n\n")
+	b.WriteString("  press " + theme.Selected.Render("s") + " to start it.\n")
+	return b.String()
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────
+
+func main() {
+	// no hard exit if tailscale is missing — the TUI handles it with
+	// an install screen instead (stderr goes nowhere from a panel launcher)
+	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
+	}
+}

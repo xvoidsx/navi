@@ -17,13 +17,44 @@
 x="= = = = = navi extras = = = = ="
 
 # id|name|description|detect-snippet|installer|installer-args
+# NOTE: the detect snippet is shell and may itself contain '|' (the
+# ani-cli and helium entries use '||'). field() parses the tail
+# backwards for exactly this reason — do not replace it with a naive
+# cut -d'|' -f5.
 EXTRAS=(
   "firefox-nightly|Firefox Nightly|Bleeding-edge Firefox, straight from Mozilla's apt repo|command -v firefox-nightly >/dev/null 2>&1|nightly-browsers.sh|firefox"
   "brave-nightly|Brave Nightly|Bleeding-edge Brave, for life on the edge|command -v brave-browser-nightly >/dev/null 2>&1|nightly-browsers.sh|brave"
+  "brave-origin|Brave Origin|Brave stripped to its essentials — Shields and speed, minus the crypto, AI, and VPN extras. Free on Linux|command -v brave-origin-stable >/dev/null 2>&1|brave-origin-installer.sh|"
+  "brave-origin-nightly|Brave Origin Nightly|Brave Origin on the bleeding edge — nightly builds for origin enjoyers|command -v brave-origin-nightly >/dev/null 2>&1|brave-origin-nightly-installer.sh|"
   "chrome|Google Chrome|The browser half the planet uses, from Google's own apt repo|command -v google-chrome >/dev/null 2>&1|chrome-installer.sh|"
+  "chrome-canary|Google Chrome Canary|Bleeding-edge Chrome, straight from Google's apt repo|command -v google-chrome-unstable >/dev/null 2>&1|chrome-canary-installer.sh|"
+  "edge|Microsoft Edge|Microsoft's Chromium-based browser, from Microsoft's own apt repo|command -v microsoft-edge-stable >/dev/null 2>&1|msedge-installer.sh|"
+  "edge-dev|Microsoft Edge Dev|Weekly dev-channel Edge builds, from Microsoft's own apt repo|command -v microsoft-edge-dev >/dev/null 2>&1|msedge-dev-installer.sh|"
+  "zen|Zen Browser|The beautiful Firefox-based browser, via Flathub|flatpak list --user --app 2>/dev/null | grep -q io.github.zen_browser.zen|zen-installer.sh|"
+  "vivaldi|Vivaldi|The power-user's Chromium browser, from Vivaldi's own apt repo|command -v vivaldi-stable >/dev/null 2>&1|vivaldi-installer.sh|"
+  "qutebrowser|qutebrowser|The keyboard-driven Vim-like browser — never touch the mouse|command -v qutebrowser >/dev/null 2>&1|qutebrowser-installer.sh|"
+  "nyxt|Nyxt|The hacker's keyboard-driven browser, extensible in Lisp|command -v nyxt >/dev/null 2>&1|nyxt-installer.sh|"
+  "lynx|Lynx|The classic terminal web browser — the web at the speed of text|command -v lynx >/dev/null 2>&1|lynx-installer.sh|"
+  "w3m|w3m|Terminal web browsing with inline images|command -v w3m >/dev/null 2>&1|w3m-installer.sh|"
+  "falkon|Falkon|KDE's lightweight QtWebEngine browser|command -v falkon >/dev/null 2>&1|falkon-installer.sh|"
+  "epiphany|GNOME Web|GNOME's clean WebKit browser — the WebKit option on Linux|command -v epiphany >/dev/null 2>&1|epiphany-installer.sh|"
+  "vscode|VS Code|Microsoft's code editor, from Microsoft's own apt repo|command -v code >/dev/null 2>&1|vscode-installer.sh|"
+  "vscodium|VSCodium|The community VS Code build — no Microsoft telemetry, from VSCodium's own apt repo|command -v codium >/dev/null 2>&1|vscodium-installer.sh|"
+  "sublime|Sublime Text|The fast, proprietary code editor, from Sublime's own apt repo|command -v subl >/dev/null 2>&1|sublime-installer.sh|"
+  "navivim|NaviVim|navi's default terminal IDE — reinstall or repair it|command -v nvim >/dev/null 2>&1|navivim-installer.sh|"
+  "helium|Helium|Minimal Chromium-based browser, from Helium's own apt repo|command -v helium >/dev/null 2>&1 || command -v helium-bin >/dev/null 2>&1|helium-installer.sh|"
   "ani-cli|ani-cli|Watch anime in the terminal|command -v ani-cli >/dev/null 2>&1 || [ -x /usr/local/bin/ani-cli ]|ani-cli-installer.sh|"
   "charm|Charm toolkit|gum, glow, mods — shell superpowers from charm.sh|command -v gum >/dev/null 2>&1|charm-installer.sh|"
   "cliamp|cliamp|Terminal music player|command -v cliamp >/dev/null 2>&1|cliamp-installer.sh|"
+  "telegram|Telegram|Fast, cloud-synced messaging — native desktop app|command -v telegram >/dev/null 2>&1|telegram-installer.sh|"
+  "element|Element|Decentralized chat over Matrix — native desktop app|command -v element-desktop >/dev/null 2>&1|element-installer.sh|"
+  "cyberia|cyberia|xvoidsx's nightshadeNeon Matrix client — terminal chat with inline images (friendly fork of pkulak's matui)|command -v cyberia >/dev/null 2>&1|cyberia-installer.sh|"
+  "navi-radio|navi radio|xvoidsx's Electron music app — internet radio + local music library, native filesystem access|dpkg -s navi-radio >/dev/null 2>&1|navi-radio-installer.sh|"
+  "sumi|sumi|xvoidsx's Electron writing app — 墨, distraction-free Markdown with native open/save dialogs|dpkg -s sumi >/dev/null 2>&1|sumi-installer.sh|"
+  "fossfit|FOSSfit|xvoidsx's Electron fitness app — workouts, weight charts, meditation|dpkg -s fossfit >/dev/null 2>&1|fossfit-installer.sh|"
+  "tailscale|Tailscale|Zero-config mesh VPN — your own private network across every device|command -v tailscale >/dev/null 2>&1|tailscale-installer.sh|"
+  "pi|pi|The pi agent — xvoidsx is testing it as an alternative Lain engine (interactive installer)|command -v pi >/dev/null 2>&1|pi-installer.sh|"
+  "songsnatch|SongSnatch|Snag audio from YouTube via yt-dlp — saves to ~/Music|command -v songsnatch >/dev/null 2>&1|songsnatch-installer.sh|"
 )
 
 # where do the installer scripts live?
@@ -38,7 +69,17 @@ done
 pink='\033[95m'; green='\033[92m'; dim='\033[2m'; bold='\033[1m'; reset='\033[0m'
 
 field() { # <entry> <n> — pull the nth | field
-  awk -F'|' -v n="$2" '{print $n}' <<<"$1"
+  # fields 1-3 (id, name, description) never contain '|', but the
+  # detect snippet (field 4) is shell and may contain '|' — '||' in
+  # particular. so the tail is parsed backwards: the installer script
+  # is always second-to-last, installer args last, and the snippet is
+  # everything between field 3 and the installer, re-joined with '|'.
+  case "$2" in
+    1|2|3) awk -F'|' -v n="$2" '{print $n}' <<<"$1" ;;
+    4) awk -F'|' '{s=$4; for (i=5; i<=NF-2; i++) s=s"|"$i; print s}' <<<"$1" ;;
+    5) awk -F'|' '{print $(NF-1)}' <<<"$1" ;;
+    *) awk -F'|' '{print $NF}' <<<"$1" ;;
+  esac
 }
 
 is_installed() { # <entry>
@@ -83,7 +124,7 @@ run_installer() { # <entry> — returns the installer's exit code
 }
 
 cmd_install() { # <id>
-  local e
+  local e rc
   e="$(find_extra "$1")" || { echo "unknown extra: $1 (try --list)" >&2; return 2; }
   local name
   name="$(field "$e" 2)"
@@ -93,9 +134,23 @@ cmd_install() { # <id>
   fi
   echo "  installing $name..."
   if run_installer "$e"; then
-    printf '  %b✓%b %s installed.\n' "$green" "$reset" "$name"
+    # never trust the exit code alone — re-run the detect snippet and
+    # only claim success if the thing is actually there now.
+    if is_installed "$e"; then
+      printf '  %b✓%b %s installed.\n' "$green" "$reset" "$name"
+    else
+      printf '  %b✗%b the installer finished, but %s is still not detected — check the output above.\n' "$pink" "$reset" "$name"
+      return 1
+    fi
   else
-    printf '  %b✗%b %s failed to install (exit %s) — nothing else was touched.\n' "$pink" "$reset" "$name" "$?"
+    # the installer failed — propagate its exit code. falling off the end
+    # here used to return the printf's 0, so navi-get reported "installed"
+    # for software that never installed (seen with Edge on low-memory
+    # machines: dpkg-deb's decompress got OOM-killed, apt failed, and the
+    # menu still claimed success).
+    rc=$?
+    printf '  %b✗%b %s failed to install (exit %s) — nothing else was touched.\n' "$pink" "$reset" "$name" "$rc"
+    return "$rc"
   fi
 }
 

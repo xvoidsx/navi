@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# navi-terminal — the right terminal for this session.
+#
+# alacritty everywhere (2026-10-03): kitty was tried for its lower RAM
+# (~50MB vs 80MB) and GPU acceleration, but its lack of cell-exact
+# window sizing made mod floating windows inconsistent. alacritty's
+# `-o window.dimensions` is load-bearing for the mod UX. Reliability
+# beats 30MB/terminal.
+#
+# Usage: navi-terminal [-e command ...]
+
+set -uo pipefail
+
+if command -v alacritty >/dev/null 2>&1; then
+    exec alacritty "$@"
+elif [ -n "${WAYLAND_DISPLAY:-}" ] && command -v foot >/dev/null 2>&1; then
+    exec foot "$@"
+else
+    echo "navi-terminal: no suitable terminal found (need alacritty or foot)" >&2
+    exit 1
+fi

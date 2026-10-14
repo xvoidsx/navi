@@ -1,0 +1,147 @@
+# publish-eiri — cut a PUBLIC eiri release from a built ISO artifact.
+#
+# Publish history:
+#   - build 19 (2026-10-11): Edge Dev, GRUB --removable fallback (navi#5),
+#     Electron apps (navi-radio/sumi/FOSSfit), cyberia v1.1.6, tailscale fix.
+#
+# eiri ISOs build as workflow artifacts (private — downloading needs a
+# GitHub login). This workflow promotes one to a public GitHub Release
+# asset under the rolling `eiri` tag. Dispatched manually with the
+# iso-eiri run ID: public cuts are deliberate ("when it feels right"),
+# never automatic.
+#
+# Why a workflow: the surrogate API credential is scoped to
+# api.github.com, and release-asset uploads go to uploads.github.com
+# (401 there). GITHUB_TOKEN has no such restriction.
+#
+# Division of labor: the rolling `eiri` tag is managed via the API
+# (git refs work fine with the surrogate credential) BEFORE dispatching.
+# The workflow verifies the tag, downloads the ISO, and creates the
+# public release on it.
+#
+# Usage (API; the Actions tab only lists default-branch workflows):
+#   gh-api POST /repos/xvoidsx/navi/actions/workflows/publish-eiri.yml/dispatches \
+#     --data '{"ref":"eiri","inputs":{"run_id":"<iso-eiri run id>","notes":"..."}}'
+
+name: publish eiri ISO (public rolling release)
+
+on:
+  # Push trigger: GitHub only registers workflow_dispatch for workflows on
+  # the default branch, so manual dispatch 404s while this file lives on
+  # eiri only. Push this file with [publish-eiri] in the commit message to
+  # cut a public release. (When eiri eventually merges, dispatch starts
+  # working as-is.)
+  push:
+    branches: [eiri]
+    paths:
+      - '.github/workflows/publish-eiri.yml'
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'iso-eiri.yml run ID whose ISO artifact to publish'
+        required: true
+        type: string
+      notes:
+        description: 'release notes (markdown, optional)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  actions: read   # download the ISO artifact from the iso-eiri run
+
+jobs:
+  publish:
+    # push path: only run when explicitly asked via the commit message.
+    # dispatch path: inputs.run_id is always set, so the condition passes.
+    if: contains(github.event.head_commit.message, '[publish-eiri]') || inputs.run_id != ''
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Resolve the built commit
+        id: meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          run_id="${{ inputs.run_id }}"
+          if [ -z "$run_id" ]; then
+            # push path: latest successful iso-eiri build (361240192).
+            # --status takes run statuses (completed), not conclusions;
+            # filter conclusion==success in jq and reject jq's "null".
+            run_id="$(gh run list --repo xvoidsx/navi \
+              --workflow 361240192 --status completed --limit 20 \
+              --json databaseId,conclusion \
+              -q '[.[] | select(.conclusion=="success")][0].databaseId')"
+          fi
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "no successful iso-eiri run to publish"; exit 1
+          fi
+          echo "run_id=$run_id" >>"$GITHUB_OUTPUT"
+          sha="$(gh api "repos/xvoidsx/navi/actions/runs/$run_id" -q .head_sha)"
+          [ -n "$sha" ] && [ "$sha" != "null" ] || { echo "no head_sha for run $run_id"; exit 1; }
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+          echo "publishing ISO from run $run_id (built from $sha)"
+          artifact="$(gh api "repos/xvoidsx/navi/actions/runs/$run_id/artifacts" \
+            -q '.artifacts[] | select(.name | endswith(".iso")) | .name' | head -n 1)"
+          [ -n "$artifact" ] || { echo "no ISO artifact on run $run_id"; exit 1; }
+          echo "artifact=$artifact" >>"$GITHUB_OUTPUT"
+          echo "artifact: $artifact"
+
+      - name: Download the ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact }}
+          path: iso-out
+          run-id: ${{ steps.meta.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Locate the ISO
+        run: |
+          set -euo pipefail
+          iso="$(ls iso-out/*.iso | head -n 1)"
+          [ -n "$iso" ] || { echo "no ISO in the run's artifacts"; exit 1; }
+          echo "iso=$iso" >>"$GITHUB_ENV"
+          ls -lh "$iso"
+
+      - name: Verify the rolling eiri tag
+        # Tag management happens via API (the surrogate credential handles
+        # git refs fine); the workflow just verifies it's in place.
+        # The tag must point at the commit the ISO was built from.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          want='${{ steps.meta.outputs.sha }}'
+          got="$(gh api repos/xvoidsx/navi/git/refs/tags/eiri -q .object.sha)"
+          echo "tag eiri -> [$got], want [$want]"
+          [ -n "$got" ] || { echo "eiri tag missing"; exit 1; }
+          [ "$got" = "$want" ] || { echo "tag points elsewhere"; exit 1; }
+
+      - name: Create the public release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          notes="${{ inputs.notes }}"
+          if [ -z "$notes" ]; then
+            notes="navi 2.0 \"eiri\" — rolling snapshot, built $(date -u +%Y-%m-%d).
+          Experimental: bench it before trusting it."
+          fi
+          if gh release view eiri --repo xvoidsx/navi >/dev/null 2>&1; then
+            # Rolling release exists — replace the ISO asset.
+            # Delete old ISOs first (keep the release itself).
+            for _a in $(gh release view eiri --repo xvoidsx/navi --json assets -q '.assets[].name | select(endswith(".iso"))'); do
+              gh release delete-asset eiri "$_a" --repo xvoidsx/navi --yes
+            done
+            unset _a
+            gh release upload eiri "$iso" --repo xvoidsx/navi --clobber
+            # Update the release notes.
+            gh release edit eiri --repo xvoidsx/navi --notes "$notes"
+          else
+            gh release create eiri "$iso" --repo xvoidsx/navi \
+              --title "navi 2.0 \"eiri\" (rolling)" \
+              --notes "$notes"
+          fi
+          gh release view eiri --repo xvoidsx/navi --json url,assets -q \
+            '"published: \(.url)\nassets:" + (.assets[] | "  \(.name) (\(.size) bytes)")'

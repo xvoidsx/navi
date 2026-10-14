@@ -23,14 +23,16 @@
         "clock#3"
     ],
     "modules-right": [
-        //"custom/media",
+	"custom/weather",
 	"custom/update",
-	"pulseaudio",
+	"custom/volume",
+	"custom/bluetooth",
         "network",
         "battery",
         "backlight",
         "idle_inhibitor",
-        "power-profiles-daemon",
+        "custom/tailscale",
+	"custom/agent",
 	"custom/bell",
 	"tray",
 	"custom/power"
@@ -55,6 +57,14 @@
 		}
     },
 
+    // Cap the window title length: without this, a long title (browser tab,
+    // terminal with a deep path) grows modules-left unbounded and pushes
+    // modules-right off the right edge of the screen. 50 chars keeps the
+    // left section bounded no matter what's focused.
+    "sway/window": {
+        "max-length": 50
+    },
+
     "clock#1": {
         "format": "{:%A}",
         "tooltip": false,
@@ -63,29 +73,78 @@
     "clock#2": {
         "format": "{:%H:%M}",
         "tooltip": false,
-        "on-click": "alacritty -e tty-clock"
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-reminders\" navi-reminders"
     },
     "clock#3": {
         //"format": "{:%Y/%m/%d}",
         "format": "{:%d %B}",
 	"tooltip": false,
-        "on-click": "gsimplecal"
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-calendar\" navi-calendar"
     },
 
-    "pulseaudio": {
-        "format": "🔊 {volume:2}%",  // Added volume character
-        "format-bluetooth": "🔊 Volume {volume}% ",
-        "format-muted": "🔇 mute",  // Added mute character
-        "format-icons": {
-            "headphones": "🎧",
-            "default": [
-                "🔊",
-                "🔈"
-            ]
-        },
-        "scroll-step": 5,
+    "custom/volume": {
+        // navi-audio volume module: live volume ("🔊 74%"). the device
+        // label ("Line Out", "HDMI", …) lives in the tooltip so the module
+        // stays compact. audio-status.sh is long-running and re-emits on
+        // `pactl subscribe` events — no polling.
+        "format": "{}",
+        "return-type": "json",
+        "exec": "/usr/share/navi/wired/waybar/audio-status.sh",
         "on-click": "pamixer -t",
-        "on-click-right": "pavucontrol"
+        "on-scroll-up": "pamixer -i 5",
+        "on-scroll-down": "pamixer -d 5",
+        "on-click-right": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-audio\" navi-audio",
+        "on-click-middle": "/usr/share/navi/wired/waybar/audio-switch.sh",
+        "tooltip": true
+    },
+
+    // Bluetooth — the bar's Bluetooth indicator, replacing blueman-applet.
+    //
+    // blueman-tray was a legacy X11 XEmbed tray host. On this pure-Wayland
+    // session it has no X display to reparent icons onto, so it never mapped
+    // a window and held ~77 MB while showing nothing.
+    //
+    // This is custom/bluetooth (a script), NOT waybar's built-in
+    // `bluetooth` module. The built-in renders NOTHING on waybar 0.12.0 here:
+    // it instantiates (the debug log shows label#bluetooth.module) but emits
+    // an empty label for every format tried — a literal string, {status},
+    // {icon} — with or without controller-alias. That is what "on-click never
+    // worked" meant on 2026-10-02: there was nothing on screen to click.
+    // Do not switch back without proving it renders.
+    //
+    // Click goes through mod-open.sh (floating, logged to mod-open.log);
+    // right-click is the power menu; scroll is power. All the mod conventions.
+    //
+    // The glyph is ᛒ (U+16D2, runic) — the bind-rune the Bluetooth logo is
+    // literally derived from, and it fits navi's rune theme. Only Noto Sans
+    // Runic carries it; fontconfig falls back to it, so there is no tofu.
+    // It stands alone: an earlier version trailed a Nerd Font state glyph,
+    // but 󰃧 reads as a bus, so state is carried by colour and tooltip
+    // instead. Colours live in style.css (#custom-bluetooth .off /
+    // .connected), mirroring the #bluetooth rules already in every theme.
+    "custom/bluetooth": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 5,
+        "exec": "/usr/share/navi/wired/waybar/bluetooth-mod.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi bluetooth\" navi-bluetooth",
+        "on-click-right": "/usr/share/navi/wired/waybar/bluetooth-menu.sh",
+        "on-scroll-up": "bluetoothctl power on",
+        "on-scroll-down": "bluetoothctl power off",
+        "tooltip": true
+    },
+
+    // Tailscale — mesh VPN status. Script module: emits nothing when the
+    // tailscale binary is missing, so the pill hides itself on machines
+    // without it. Click opens navi-tailscale, right-click toggles up/down.
+    "custom/tailscale": {
+        "format": "{}",
+        "return-type": "json",
+        "interval": 10,
+        "exec": "/usr/share/navi/wired/waybar/tailscale-mod.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi tailscale\" navi-tailscale",
+        "on-click-right": "tailscale up || tailscale down"
     },
     // - - - XXX testing section XXX - - -
     // this is a 'testing' network module. if it doesn't work out right, we'll remove it
@@ -95,21 +154,22 @@
             "format-disconnected": "⚠ Disconnected",
             "tooltip-format": "Wireless status -  {ifname}: {ipaddr}/{cidr}",
 	    "tooltip-format-wifi": "{essid}",
-            "on-click": "st -e nmtui",
+            "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-networking\" navi-networking",
             "interval": 30
         },
-    // this is a 'testing' audioplayer module. shows currently playing audio and is interactive.
-    "custom/media": {
-	    "format": "{}",
-	    "return-type": "json",
-	    "max-length": 20,
-	    "fixed-width": true,
-	    "escape": true,
-	    "exec": "/usr/local/bin/mediaplayer.sh",
-	    "on-click": "playerctl play-pause",
-	    "interval": 1
+    // now playing: fixed-width slot showing what's on the MPRIS bus.
+    // click opens the full navi-nowplaying mod.
+    "custom/nowplaying": {
+        "format": "{}",
+        "return-type": "json",
+        "max-length": 22,
+        "fixed-width": true,
+        "escape": true,
+        "exec": "/usr/share/navi/wired/waybar/waybar-nowplaying.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi now playing\" navi-nowplaying",
+        "interval": 2,
+        "tooltip": true
     },
-    // - - - XXX end testing section XXX - - -
     "memory": {
         "interval": 5,
         "format": "Mem {}%"
@@ -131,7 +191,8 @@
             "",
             "",
             ""
-        ]
+        ],
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-power\" navi-power"
     },
     "disk": {
         "interval": 5,
@@ -162,24 +223,22 @@
 		"tooltip-format": "Brightness control",
         "format-icons": ["", "", "", "", "", "", "", "", ""]
     },
-    "power-profiles-daemon": {
-        "format": "{icon}",
-        "tooltip-format": "Power profile: {profile}\nDriver: {driver}",
-        "tooltip": true,
-        "format-icons": {
-            "default": "",
-            "performance": "",
-            "balanced": "",
-            "power-saver": ""
-        }
-    },
     "custom/update": {
         "format": "{}",
         "return-type": "json",
         "escape": true,
         "interval": 300,
         "exec": "/usr/share/navi/wired/waybar/update-check.sh",
-        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-update\" navi-update",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-update\" /usr/share/navi/wired/waybar/navi-update-click.sh",
+        "tooltip": true
+    },
+    "custom/weather": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 600,
+        "exec": "/usr/share/navi/wired/waybar/weather.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi weather\" navi-weather",
         "tooltip": true
     },
     "custom/bell": {
@@ -189,6 +248,17 @@
         "interval": 10,
         "exec": "/usr/share/navi/wired/waybar/notif-bell.sh",
         "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-notifs\" navi-notifs",
+        "tooltip": true
+    },
+    "custom/agent": {
+        "format": "{}",
+        "return-type": "json",
+        "escape": true,
+        "interval": 5,
+        "exec": "/usr/share/navi/wired/waybar/agent-mod.sh",
+        "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-agents-config\" navi-agents-config",
+        "on-click-right": "/usr/share/navi/wired/waybar/agent-menu.sh",
+        "on-click-middle": "/usr/share/navi/wired/waybar/mod-open.sh \"herdr\" herdr",
         "tooltip": true
     },
     "custom/power": {

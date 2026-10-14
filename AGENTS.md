@@ -8,8 +8,11 @@
 ## What navi is
 
 navi is xvoidsx's Linux distro: a complete, opinionated, **agent-native**
-desktop OS on a dependable **Debian (trixie) base**. Wayland-first
-(**sway**, our "wired" session), X11 fallback (**i3**). Deep blacks, neon
+desktop OS on a dependable **Debian (trixie) base**. **Wayland-only**
+(**sway**, our "wired" session) since 2026-10-08 — the X11 session (i3)
+was retired; even the 2008 ThinkPad x200 renders sway fine, so the
+compat argument was dead. XWayland covers X11 apps. The i3/picom/polybar
+configs stay in the repo as the port-back kit. Deep blacks, neon
 pink, phosphor green — the **nightshadeNeon** design language across the
 whole desktop.
 
@@ -22,7 +25,7 @@ Guiding ideas:
 - **Additive, not purist.** We add our stack alongside upstream tools; we
   don't purge theirs. doas is the navi-native way up, sudo stays as the
   compatibility layer. GTK3 stays as long as possible; choice is preserved.
-- **Agent-native.** ollama, opencode, omp, goose, and herdr ship out of the
+- **Agent-native.** ollama, wisp, opencode, omp, goose, and herdr ship out of the
   box. The OS is a window to the smallweb (amfora for Gemini, glyyph for
   Nostr, neighborli fediverse instance, navi radio).
 - **Customized configs are sacred.** The updater *preserves* user-customized
@@ -99,6 +102,72 @@ human-facing is derived from it at deploy time:
 section). Follow it every release. It exists because every item on it was
 once a shipped bug.
 
+## Browser strategy (Raven's call, 2026-09-29)
+
+**Brave is navi's default browser** — full Brave, not Origin. Stock
+Chromium stays installed out of the box as the vanilla alternative.
+Firefox ESR ships too. The OS suggests, the user decides.
+
+- `install.sh`'s `setup_brave` adds Brave's official apt repo, installs
+  `brave-browser`, and seeds navi's appearance defaults: **ultradark
+  theme** (`brave.darker_mode`), **dark color scheme**
+  (`browser.theme.color_scheme2: 2`), **wide address bar**
+  (`brave.location_bar_is_wide`) in `Default/Preferences`, and
+  **compact horizontal tabs** (`brave.tabs.compact_horizontal_tabs`) in
+  `Local State`. Compact tabs is a Local State pref — seeding it in
+  Preferences silently does nothing. Both files land in `/etc/skel`
+  (future users) and the invoking user's `$HOME`; existing files are
+  never overwritten, and seeding is skipped while Brave is running (it
+  rewrites Preferences on exit). **Every installed Brave variant gets
+  the same vision** (2026-10-08): release, nightly
+  (`Brave-Browser-Nightly`), origin (`Brave-Origin` — verified from the
+  binary; origin nightly shares it). install.sh seeds installed variants;
+  the variant installers (`nightly-browsers.sh`, `brave-origin*.sh`)
+  seed via `scripts/installers/brave-seed-lib.sh` right after install.
+- **Brave gets the light touch, always:** no managed policy, no
+  force-installed extensions. Shields covers ad/tracker blocking, so
+  **blackice stays Chromium-only**. **Proton Pass was removed 2026-09-29**;
+  no password manager is imposed anywhere, users bring their own (Proton
+  Pass remains a one-click webapp in naviApps).
+- **Chromium's extensions are per-user, not policy** (2026-10-08): the old
+  `ExtensionInstallForcelist` at `/etc/chromium/policies/managed/navi.json`
+  leaked into Helium (Chromium forks share that policy dir), so it was
+  retired — install.sh removes it on existing machines. The nightshadeNeon
+  theme + blackice now install via Chromium's External Extensions
+  mechanism, scoped to `~/.config/chromium` (`wired/chromium/
+  external-extensions/*.json`, deployed to `$HOME` and `/etc/skel`), so
+  forks never see them. Unlike force-install, the user can remove them.
+- The **navi-browser** picker (`mods/navi-browser`, prebuilt binary
+  committed) is how users switch the default browser *and* the webapp
+  runtime: it writes `~/.config/navi/default-browser`, offers the xdg
+  system default, and deploys navi's managed policy to the chosen
+  browser — except Brave/brave-origin/**chromium**/**helium**, which are
+  `SkipPolicy` and never get the policy offer (chromium's extensions are
+  handled per-user by install.sh; helium shares chromium's policy dir,
+  so policy there would pollute both). `navi-browser-run` (what webapp launchers Exec)
+  resolves `navi-browser --print-binary`: configured default, then brave,
+  then chromium, then first installed.
+- This arrangement is **experimental**: Raven is bench-testing it on new
+  installs first, and it reverts in one commit if they don't like it.
+
+## Out-of-the-box apps: balenaEtcher (Raven's call, 2026-09-30)
+
+**balenaEtcher** ships by default — flash OS images to SD cards/USB drives,
+safely and easily, no terminal required. This removes the need to reach for
+GNOME Disks for flashing. Long-term, Raven wants a native nightshadeNeon
+**navi-disks** for this; Etcher holds the fort until then.
+
+- `install.sh`'s `setup_etcher` adds balena's official Cloudsmith apt repo
+  (keyring + sources file, replicated manually — never piped-to-bash) and
+  installs `balena-etcher-electron`. The old Bintray `deb.etcher.io` repo
+  is long dead; Cloudsmith is the current official channel.
+- **DISABLED 2026-10-01:** balena-etcher-electron hard-depends on gconf2,
+  which Debian removed from trixie entirely — apt refuses the install.
+  Both `setup_etcher` call sites in install.sh are commented out. Re-enable
+  if balena fixes their packaging, or retire when navi-imprint lands.
+- Listed in the manual (disks & images) and naviApps (`native-etcher`).
+- The .deb ships its own .desktop file, so it appears in rofi automatically.
+
 ## install.sh — installer and deployer
 
 `install.sh` does double duty: fresh installs *and* redeploys onto a live
@@ -106,6 +175,13 @@ system via `--deploy-only` (this is what `navi-update` runs after pulling).
 
 - Writes a deploy manifest to `/var/lib/navi/deploy-manifest.tsv`
   (`sha256/version/relpath/dest/mode`) so drift can be detected later.
+- **All `deploy_config` calls must live in `deploy_configs()`** (2026-10-08):
+  `manifest_write` clears `MANIFEST_TMP` when it finishes, and `setup_*`
+  functions run *after* it — a `deploy_config` in a `setup_*` function
+  hits `>> ""` and dies with `: No such file or directory` (caught live
+  on a navi-update when setup_chromium grew deploy_config calls).
+  `setup_*` may do direct `$DOAS install` writes, but never
+  `deploy_config`.
 - Sets `install -m 0755` on `/usr/bin` copies and `chmod 0755` on every
   `*.sh` under `/usr/share/navi` — scripts run no matter how the repo was
   fetched (clone, zip, tarball).
@@ -119,12 +195,10 @@ system via `--deploy-only` (this is what `navi-update` runs after pulling).
   membership needs a re-login; a sudoers rule doesn't).
 - Third-party installers (`scripts/installers/`: nightly browsers, ani-cli,
   charm, cliamp) are **not** run by the installer — one failure there used
-  to abort the whole install under `set -e`, and `--yes`/`ASSUME_YES`
-  auto-ran all of them silently. They're deployed to
+  to abort the whole install under `set -e`. They're deployed to
   `/usr/share/navi/installers/` and offered through the **`navi-extras`**
-  post-install menu instead (`/usr/bin/navi-extras`, rofi-visible,
-  `alacritty -e navi-extras`).
-- **Hey Lain**: `setup_heylain` deploys `mods/hey-lain/` to
+  post-install menu instead (`/usr/bin/navi-extras`, rofi-visible).
+- **Hey Lain** (eiri): `setup_heylain` deploys `mods/hey-lain/` to
   `/usr/share/navi/hey-lain` and builds its STT/TTS venv in place
   (faster-whisper + piper + whisper model). The venv survives redeploys —
   the `.venv-ready` marker stores a hash of `requirements.txt`, so
@@ -174,6 +248,48 @@ The convention is `wired/waybar/mod-open.sh <title> <cmd…>`:
    misbehavior must leave footprints.
 5. If there's no compositor at all, just run the command (plain-open path).
 
+## The agent mod (`custom/agent`)
+
+The little robot face on the panel — navi's agent-status integration.
+`wired/waybar/agent-mod.sh` polls every 5s and emits waybar JSON with one of
+five classes; `wired/waybar/agent-menu.sh` is the right-click rofi dispatcher.
+
+State priority (first match wins): `agent-blocked` (a herdr agent waits on the
+user) → `agent-listening` (Hey Lain mic hot via
+`$XDG_RUNTIME_DIR/hey-lain/rec.pid`, or thinking via `processing.lock`) →
+`agent-working` → `agent-ready` (agents idle, or ollama reachable) →
+`agent-asleep`. Herdr states come from `herdr agent list`
+(`idle`/`working`/`blocked`/`done`/`unknown`); the server-down shape is JSON
+with an `error` key and exit code 0, so parse the body, don't trust the exit.
+
+Click contract: left → the agent center (`navi-agents-config`, floating),
+middle → `herdr` attach (floating), right → the rofi menu, which leads
+with blocked agents ("⚠ <agent> needs you — jump to herdr") when any are
+blocked.
+
+The center's tabs: status (live herdr agents with waybar-style faces,
+enter jumps to one via `herdr agent attach` addressed at the pane id —
+herdr doesn't resolve bare agent labels, so the label is display-only;
+r reads recent output the same way),
+models (ollama service on/off via doas, pull/delete models),
+harnesses (installed harnesses, default agent — also what navi-Q opens),
+autonomy (opencode permission profiles - ask me / balanced / yolo -
+written to `~/.config/opencode/opencode.json`, preserving other keys;
+other harnesses keep their own settings for now),
+evals (model compare: an 8-prompt built-in set run against selected pulled
+ollama models, each response scored 1-5 by a local judge model,
+scoreboard with averages and a winner),
+providers (API keys). The default agent is stored in
+`~/.config/navi/default-agent` (whitelisted to known harness binaries);
+`navi-Q`/`navi-Qx` read it, falling back to opencode.
+
+Scope is honest by design: herdr only sees its own panes, so bare-terminal
+agents are invisible — tooltips say "in herdr" and never claim global
+awareness. CSS lives in `wired/waybar/style.css` (`#custom-agent` + state
+classes; GTK CSS rules apply). Customized waybar configs are preserved by
+navi-update, so users on customized configs need `navi-wired-adopt` (or a
+manual module add) to see new modules.
+
 ## Release process, end to end
 
 1. Bump `wired/VERSION`; run the **iso.yml RELEASE CHECKLIST** (every
@@ -194,16 +310,7 @@ The convention is `wired/waybar/mod-open.sh <title> <cmd…>`:
 
 **Release naming:** 1.x = **"mika"**, 2.x = **"eiri"**. Tags look like
 `v1.4.6-mika`. The updater discovers "newer" via `sort -V` over tags
-matching `^v1\.[0-9]+`, so patch versions sort correctly. **Eiri is never
-tagged** — it has no `v2.x` tags by design; the rolling channel is the
-`eiri` branch head, full stop. Don't create one.
-
-**Channel / artifact policy (standing):** stable ships as **GitHub
-releases** from tags; eiri ships as **branch-scoped workflow artifacts**
-only and **never touches the releases page**. `/releases/latest` always
-resolves to stable (currently 1.5 "mika"). The site's download buttons
-track `/releases/latest` for exactly this reason — never pin them to a
-tag, and never point them at an eiri artifact.
+matching `^v1\.[0-9]+`, so patch versions sort correctly.
 
 **Never claim** publication, updater success, hardware validation, or public
 deployment without verifying it. The ping/announcement is a contract — keep
@@ -240,6 +347,14 @@ it, and only for what's actually done.
 - **Field failures get field-grade diagnostics.** When a launcher misbehaves
   on hardware, it must leave logs (`mod-open.log`); diagnose the live
   output, not the mocks.
+- **`gaps` has two forms; runtime changes must use the 4-arg one.** sway/i3's
+  2-arg form (`gaps inner 0`) is the *config-directive* path — it only sets the
+  default for future workspaces and never re-arranges the live ones. Anything
+  that changes gaps at runtime (keybinds, scripts) must use the 4-arg form
+  (`gaps inner all set 0`), which applies per-workspace and re-arranges
+  immediately. The old Super+G/Super+Shift+G bindings silently did nothing
+  until windows moved to a fresh workspace — which initializes from the new
+  defaults.
 
 ## naviApps catalog rule
 
@@ -248,6 +363,14 @@ Chromium ignoring CLI flags when already running breaks it. The catalog
 ships **inlined** as `wired/naviApps/catalog.js`, generated from
 `apps.json` by `wired/naviApps/build-catalog.sh`. **Re-run the script and
 push BOTH files whenever `apps.json` changes.**
+
+- **Pass the app object to every card helper.** A bare `${badgeFor()}`
+  threw on `a.source` and stuck the whole store on "loading curated apps"
+  — one uncaught TypeError kills the first render.
+- **Attribute third-party agents honestly.** omp is Can Bölük's fork of
+  pi, hermes is Nous Research's, herdr is Can Celik's, Muse Code is Meta's
+  harness for Muse models. navi ships and themes them; it doesn't own
+  them. Never claim others' work as xvoidsx's.
 
 ## Seamless GIF loops
 
@@ -269,11 +392,15 @@ file limit so they can ship in the repo.)
 - This repo's `AGENTS.md` is mirrored to the website as `agents.html`. After
   changing this file, re-run `build-agents-page.sh` in the site repo and push
   — the repo copy stays the source of truth.
-- NaviVim (xvoidsx/navivim, navi's default editor from 1.5) has its own site
+- NaviVim (xvoidsx/navivim, navi's default terminal editor from 1.5) has its own site
   section: `navivim.html` (hand-written product page), `navivim-handbook.html`
   (mirror of its HANDBOOK.md), `navivim-agents.html` (mirror of its AGENTS.md)
   — all built by `build-navivim-pages.sh` in the site repo. The NaviVim repo
   copies stay the source of truth.
+- naviCode (xvoidsx/naviCode, navi's graphical editor from eiri) is VScodium
+  with the nightshadeNeon theme and Rina Hermes ACP pre-installed —
+  installed by `setup_navicode` in install.sh (official apt repo, package
+  `codium`). The in-editor agent is Lain via `hermes acp`.
 - Doc-mirror build scripts need the Python `markdown` package. Make sure it's
   installed somewhere that survives your environment rebuilds — a plain system
   pip install may not be.

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-tailscale
+Comment=Tailscale mesh VPN: status, peers, ping, SSH — navi's native client
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-tailscale" navi-tailscale
+Icon=network-vpn
+Terminal=false
+Categories=System;Settings;Network;
+NoDisplay=false

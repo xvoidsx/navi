@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-imprint
+Comment=Flash OS images to USB/SD — navi's native image writer
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-imprint" doas navi-imprint
+Icon=media-flash
+Terminal=false
+Categories=System;Settings;
+NoDisplay=false

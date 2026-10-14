@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Navi Agent Configuration
+Comment=Manage system-wide AI provider API keys for navi agents
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "Navi Agent Configuration" navi-agents-config
+Icon=dialog-password
+Terminal=false
+Categories=System;Settings;
+NoDisplay=false

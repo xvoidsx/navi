@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=cyberia
+Comment=cyberia — xvoidsx's nightshadeNeon Matrix client (terminal chat with inline images)
+Exec=kitty cyberia
+Terminal=false
+Icon=cyberia
+Categories=Network;Chat;
+NoDisplay=false

@@ -65,10 +65,13 @@
 		<li><b>nemo</b> is a GTK file manager, and is set as the default. It has many helpful features, such as split-pane so you can view different directories at once, customizable toolbar, bookmarking, archive handling, and more. Perfect for those who want to handle their file management using a GUI.</li>
 		<li><b>nnn</b> is a blazing-fast TUI file manager for those who want to handle their files from their terminal of choice.</li>
 	</ul>
+	<h3 style="color:#ff10f0">disks & images</h3>
+	<p>Need to flash an ISO to a USB drive or SD card? <b>balenaEtcher</b> ships out of the box — pick an image, pick a drive, flash. Safe and easy, no terminal required.</p>
 	<h3 style="color:#ff10f0">web browsers</h3>
 	<p>Browsing the web is something that everyone does these days, and in order to browse the web, you need a web browser, of course! We believe that web browsers should be free and open-source software so you can trust them, and as such, the web browsers we include inside of the distribution are all FOSS. Here are the ones we include:</p>
 	<ul>
-		<li><b>Chromium</b> is the FOSS codebase for Chrome and a multitude of other browsers, mostly maintained by Google.</li>
+		<li><b>Brave</b> is navi's default browser — the most private Chromium out of the box, with Shields ad/tracker blocking, Leo AI, Brave Wallet, and sync built in. It also runs navi's webapps. Switch the default browser (and the webapp runtime) anytime with <b>navi-browser</b> (Alt+Shift+B).</li>
+		<li><b>Chromium</b> is the FOSS codebase for Chrome and a multitude of other browsers, mostly maintained by Google. It ships alongside Brave as the vanilla alternative, with navi's nightshadeNeon theme and the blackice ad-blocker.</li>
 		<li><b>Firefox ESR</b> is the Extended Support Release of the independent, FOSS web browser from the Mozilla nonprofit.</li>
 		<li><b>elinks</b> is a terminal-based web browser, allowing you to browse the web from the comfort of your favorite terminal emulator.</li>
 		<li><b>amfora</b> is a terminal-based Gemini browser, allowing you to explore Geminispace.</li>
@@ -76,18 +79,28 @@
 	<h3 style="color:#ff10f0">development</h3>
 	<p>As developers ourselves, we want Navi to be an inviting environment for other developers to fire up their machines and get to work in a great environment. To that end, we include development tools for everyone to use the tools they're comfortable with.</p>
 	<ul>
-		<li><b>vim</b> is the top-tier terminal-based text editor. Navi ships with our custom vim config, allowing you to open up your code in the terminal and get right to programming.</li>
+		<li><b>NaviVim</b> is navi's default terminal editor — a full Neovim distribution with a dashboard, file tree, fuzzy finding, and the nightshadeNeon theme, ready the moment you open it.</li>
+		<li><b>naviCode</b> is navi's graphical editor — VScodium with the nightshadeNeon theme and the Rina Hermes ACP extension, putting Lain right in your sidebar. Same soul, new window.</li>
+		<li><b>vim</b> is the top-tier terminal-based text editor underneath it all, with navi's custom vim config for when you want the classics.</li>
+	</ul>
+	<h3 style="color:#ff10f0">messaging</h3>
+	<p>Staying in touch comes in the box:</p>
+	<ul>
+		<li><b>Telegram</b> ships as a native desktop app, installed by default.</li>
+		<li><b>Element</b> (Matrix chat) and other messaging apps are one pick away in the <b>navi-extras</b> menu.</li>
 	</ul>
 	<h3 style="color:#ff10f0">agents</h3>
 	<p>Navi is an <b>agent-native</b> distro — AI agents are baked in from the first boot, not bolted on. Press <b>Alt+A</b> anywhere to pop up <b>navi-Q</b> with an agent ready to help, or <b>Alt+Shift+A</b> for a pop-up terminal. The agent lineup includes:</p>
 	<ul>
 		<li><b>ollama</b> runs large language models locally on your machine.</li>
+		<li><b>wisp</b> is xvoidsx's navi-native coding agent — an opencode fork with nightshadeNeon theme, katakana rain, Ollama-first providers, and herdr integration.</li>
 		<li><b>opencode</b> is an agentic coding assistant for the terminal.</li>
 		<li><b>omp</b> (oh my pi) is a standalone agent harness.</li>
-		<li><b>goose</b> is an open-source AI agent for automating engineering tasks.</li>
+		<li><b>goose</b> is an open-source AI agent for automating engineering tasks, and the default agent harness as of 1.2.</li>
 		<li><b>herdr</b> is an agent multiplexer for running multiple agents at once.</li>
+		<li><b>hermes</b>, <b>codex</b>, <b>kimi code</b>, <b>aider</b>, <b>openclaw</b>, <b>kilo code</b>, and <b>muse code</b> round out the bench.</li>
 	</ul>
-	<p><b>pi</b> and <b>crush</b> shipped in earlier release candidates; <b>goose</b> is the default agent harness as of 1.2.</p>
+	<p><b>pi</b> and <b>crush</b> shipped in earlier release candidates; both now live in the agents shelf of the <b>naviApps</b> store rather than the default install.</p>
 	<h3 style="color:#ff10f0">music players</h3>
 	<p>Who doesn't love listening to their favorite music? We include a terminal-based music player and visualizer so you can get your jam on:</p>
 	<ul>
@@ -102,7 +115,7 @@
 	<h3 style="color:#ff10f0">nightshade software</h3>
 	<p>The <b>nightshade</b> suite of software is our own set of tools available for you. Here are some of the pieces of <b>nightshade</b> software packed into the box with Navi:</p>
 	<ul>
-		<li><b>naviApps</b> is our nightshadeNeon app store — a curated catalog of webapps, ready to launch from your desktop.</li>
+		<li><b>naviApps</b> is our nightshadeNeon app store — a curated catalog of 134 apps across four shelves: <b>from xvoidsx</b> (our own software), <b>native apps</b> (everything <code>navi-extras</code> can install), <b>agents</b> (a 17-strong agent shelf), and <b>webapps</b>.</li>
 		<li><b>navi radio</b> is our music webapp for streaming tunes.</li>
 		<li><b>neighborli</b> is our Fediverse instance based on Mastodon, and our webapp is included so you can join the Fediverse if you'd like to see what free and open-source social media is all about.</li>
 		<li><b>glyyph</b> is our Nostr client. You can use it to explore Nostr, the distributed social protocol currently powering a swath of web applications.</li>

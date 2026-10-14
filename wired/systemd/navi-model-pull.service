@@ -1,0 +1,23 @@
+# navi first-boot model pull — Hey Lain's local brain (gemma3:270m).
+#
+# `ollama pull` needs the daemon listening, and during ISO chroot
+# provisioning there is no daemon to talk to — so the installer-time pull
+# in ensure_heylain_model can never succeed on a fresh install. This unit
+# runs at first login instead: it waits for ollama.service, pulls the
+# model once, then disables itself. ExecCondition makes it a no-op on
+# every later boot once the model is present; if the pull fails (no
+# network), the unit stays enabled and retries next login.
+
+[Unit]
+Description=navi first-boot: pull the default ollama model for Hey Lain
+After=ollama.service
+Wants=ollama.service
+
+[Service]
+Type=oneshot
+ExecCondition=/bin/sh -c '! /usr/bin/ollama list 2>/dev/null | grep -q "^gemma3:270m"'
+ExecStart=/bin/sh -c 'for i in $(seq 1 30); do /usr/bin/ollama list >/dev/null 2>&1 && break; sleep 10; done; /usr/bin/ollama pull gemma3:270m && /usr/bin/systemctl --user disable navi-model-pull.service'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

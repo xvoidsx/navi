@@ -56,23 +56,27 @@ MANIFEST_TMP=""
 # Every apt package, audited against Debian 13 "trixie" (2026-09-10).
 # Corrections baked in: opendoas (doas is a transitional dummy), no slock
 # (virtual, provided by suckless-tools), imagemagick-7.q16 (imagemagick is
-# virtual). i3status + i3blocks were dropped: navi uses polybar, not i3bar,
-# on the X11 session.
+# virtual). Wayland-only since 2026-10-08: the X11 session (i3/picom/polybar)
+# is retired, so its packages are gone from this list. XWayland stays for
+# X11 apps (dmenu, lxpolkit) under sway.
 PKGS=(
   # sudo rides along for compatibility: third-party install scripts
   # (scripts/installers/*) and random upstream tooling expect it.
   # doas stays the navi-native way up; see setup_sudo.
-  i3 i3lock-fancy nitrogen pamixer wget curl git htop opendoas sudo lsd
-  nsxiv pulseaudio-utils xcompmgr picom waybar alacritty fonts-inter xterm
-  arandr nemo rofi xss-lock feh pandoc volumeicon-alsa polybar blueman dunst
-  flameshot meteo-qt pasystray ffmpeg mpv kitty stterm surf conky-all suckless-tools zathura zathura-pdf-poppler
+  pamixer wget curl git htop opendoas sudo lsd
+  nsxiv pulseaudio-utils waybar alacritty fonts-inter
+  # navi-bluetooth (eiri): BlueZ for bluetoothctl, upower for the headset
+  # battery fallback when a device doesn't report Battery Percentage itself.
+  bluez upower
+  nemo rofi pandoc dunst
+  flameshot meteo-qt ffmpeg mpv kitty conky-all suckless-tools zathura zathura-pdf-poppler
   lxpolkit lxappearance vim nnn cmus cava amfora sway swaylock
   swayidle swaybg grimshot xdg-desktop-portal-wlr qt5ct tty-clock wf-recorder
-  brightnessctl sakura foot gsimplecal calcurse pavucontrol yaru-theme-gtk yaru-theme-icon
+  brightnessctl sakura foot gsimplecal calcurse pavucontrol playerctl yaru-theme-gtk yaru-theme-icon bibata-cursor-theme
   # sddm-theme-maldives is installed alongside sddm on purpose: it satisfies
   # sddm's "sddm-theme" requirement with a 1.3 MB theme, so apt never reaches
   # for sddm-theme-debian-breeze — which would drag in plasma-workspace.
-  glow pipx wl-clipboard wlr-randr jq imagemagick-7.q16 tmux shotman nwg-look fastfetch sddm-theme-maldives sddm qml6-module-qtmultimedia xwayland zenity
+  glow pipx wl-clipboard wlr-randr jq imagemagick-7.q16 tmux shotman fastfetch sddm-theme-maldives sddm qml6-module-qtmultimedia xwayland zenity
   # SDDM navi theme imports these QML modules explicitly (Main.qml lines 2-3);
   # minimal installs don't pull them in on their own, and without them the
   # greeter falls back to the default theme with a module-not-installed error.
@@ -80,7 +84,7 @@ PKGS=(
   fonts-jetbrains-mono fonts-firacode fonts-noto fonts-cascadia-code wdisplays papirus-icon-theme moka-icon-theme
   fonts-font-awesome fonts-material-design-icons-iconfont bibata-cursor-theme
   cmatrix lynx elinks w3m libnotify-bin flatpak gnome-software-plugin-flatpak dconf-cli
-  chromium firefox-esr
+  chromium firefox-esr qutebrowser
   # zstd: the ollama installer needs it to unpack its payload.
   zstd
   # wifi firmware bundle: every common wireless chipset, so networking is
@@ -94,10 +98,33 @@ PKGS=(
   # Hey Lain voice assistant (eiri): venv tooling + audio capture libs.
   # The venv itself (faster-whisper, piper) is built by setup_heylain.
   python3-venv python3-pip pipewire-audio-client-libraries alsa-utils
+  # libspa-0.2-bluetooth: BlueZ audio backend for PipeWire/WirePlumber.
+  # WirePlumber builds its module graph at boot, so this must be installed
+  # before first boot — installing it mid-session needs a wireplumber restart.
+  libspa-0.2-bluetooth
   # NaviVim (default terminal IDE): telescope needs ripgrep + fd
   # (Debian calls it fd-find), treesitter parsers and fzf-native compile
   # at first launch (build-essential), shellcheck for config linting.
-  ripgrep fd-find shellcheck build-essential
+  # fzf also ships system-wide: ani-cli needs it, and it's handy
+  # everywhere else too.
+  ripgrep fd-find fzf shellcheck build-essential
+  # eiri QoL prototypes: Alt+Tab switcher (screenshot/crop/thumbnail) and
+  # the bottom-center volume OSD (GTK3 popup).
+  grim python3-pil python3-gi gir1.2-gtk-3.0
+  # zram-tools: compressed swap for low-memory machines (setup_zram
+  # enables it only when RAM <= 2 GiB). the cloudbook bench proved big
+  # deb unpacks OOM without it.
+  zram-tools
+  # navi-power mod (eiri): power-profiles-daemon provides
+  # powerprofilesctl; upower gives honest time-to-empty/full estimates.
+  power-profiles-daemon upower
+  # gnome-keyring: secret store for Element, Signal, Chromium, etc.
+  # libpam-gnome-keyring auto-unlocks the login keyring via SDDM.
+  gnome-keyring libpam-gnome-keyring
+  # wlsunset: night light for Wayland (used by navi-displays)
+  wlsunset
+  # libfuse2: AppImages mount via FUSE 2 — without it they refuse to run.
+  libfuse2
 )
 
 # Commands deploy to /usr/bin (not /usr/local/bin) so every user on the
@@ -107,9 +134,21 @@ PKGS=(
 # `navi-webapp install`. Names must match .desktop filenames in
 # wired/naviApps/webapps/ exactly. Tweak freely — users can always
 # add/remove more from the naviApps store.
+# (telegram and element graduated to native apps — both install via
+# setup_telegram/setup_element below.)
 DEFAULT_WEBAPPS=(
-  navi-radio neighborli glyyph telegram element pandora
+  neighborli glyyph pandora
   github youtube yomi twitch discord perplexity dropbox
+  xbox-cloud geforce-now
+  # Workspace Stack — installed out of the box on every fresh install
+  # (Raven, 2026-09-30). Users can remove any of them from the naviApps store.
+  gmail googledrive fizzy notion airtable linear
+  # Full Google suite curated in naviApps (Raven, 2026-09-30; Sheets/Slides/
+  # Calendar/Meet/Keep added 2026-10-07, install by default with the rest)
+  googlechat googledocs googlemessages googlephotos
+  googlesheets googleslides googlecalendar googlemeet googlekeep
+  # Full Proton suite (Raven, 2026-09-30)
+  protonmail protoncalendar protondrive protonmeet protonpass
 )
 
 # ---------------------------------------------------------------- ui
@@ -239,8 +278,11 @@ install_packages() {
   # ydotool's daemon only works for users in the input group
   # (see /usr/share/doc/ydotool/README.Debian). group membership takes
   # effect on the next login — i.e. the first SDDM login after install.
-  $DOAS groupadd -f input
-  $DOAS usermod -aG input "$USER"
+  # NB: absolute /usr/sbin paths — doas keeps the caller's PATH, and
+  # launchers (waybar/rofi) don't have sbin on it. bare `groupadd`
+  # dies here with "doas: groupadd: command not found".
+  $DOAS /usr/sbin/groupadd -f input
+  $DOAS /usr/sbin/usermod -aG input "$USER"
   ok "$USER added to the input group for ydotool"
 }
 
@@ -269,7 +311,7 @@ build_mpvpaper() {
 
 # ---------------------------------------------------------------- agents
 
-# Agent-native from the first boot: ollama runtime, opencode, omp, goose.
+# Agent-native from the first boot: ollama runtime, opencode, omp, goose, hermes.
 # Binaries land in /usr/bin (or /usr/local/bin via npm) so every user on
 # the machine gets them.
 #
@@ -284,7 +326,10 @@ build_mpvpaper() {
 # The installer scripts themselves get the same treatment: every one runs
 # under `timeout -k 30 300` with stdin from /dev/null, so a hung installer
 # degrades to a warning instead of wedging the whole provision (seen on the
-# Cloudbook with the omp and pi installers). Third-party install scripts
+# Cloudbook with the omp and pi installers). Exception: hermes gets 20 minutes
+# (timeout -k 60 1200) — it downloads ~120MB of Python plus a full dep sync,
+# and 5 minutes isn't enough on slow hardware (killed mid-install on the Acer,
+# 2026-10-10). Third-party install scripts
 # additionally run under `setsid` (no controlling terminal): pi's official
 # installer waits for a keypress on /dev/tty when a terminal is present,
 # and detaching takes its designed non-interactive path instead.
@@ -298,7 +343,7 @@ host_up() { # host_up <url> -> 0 if the host answers a quick probe
 }
 
 setup_agents() {
-  step "agent runtime (ollama, opencode, omp, goose)"
+  step "agent runtime (ollama, opencode, omp, goose, hermes)"
 
   if command -v ollama >/dev/null 2>&1; then
     ok "ollama already installed"
@@ -351,6 +396,40 @@ setup_agents() {
     rm -f "$octmp"
   fi
 
+  # wisp (xvoidsx/wisp — navi's own coding agent, opencode fork with
+  # nightshadeNeon theme, Ollama-first, herdr integration). Installs from
+  # the GitHub releases via the install.sh script.
+  # wisp lives in /usr/bin (system install, via WISP_INSTALL_DIR).
+  # Check both the old user path and /usr/bin, and always try to update — the installer is idempotent and
+  # fetches the latest release. The old "[ -x /usr/bin/wisp ] → skip" logic
+  # meant navi-update never picked up new wisp releases.
+  local wisp_bin=""
+  for cand in "$HOME/.wisp/bin/wisp" /usr/bin/wisp; do
+    if [ -x "$cand" ]; then wisp_bin="$cand"; break; fi
+  done
+  if ! host_up https://raw.githubusercontent.com/xvoidsx/wisp/dev/install.sh; then
+    if [ -n "$wisp_bin" ]; then
+      ok "wisp already installed ($wisp_bin) — installer unreachable, keeping current"
+    else
+      warn "wisp installer unreachable — skipping wisp (re-run install.sh --yes later)"
+    fi
+  else
+    info "installing/updating wisp..."
+    local wisptmp
+    wisptmp="$(mktemp)"
+    # WISP_INSTALL_DIR=/usr/bin: the wisp installer defaults to $HOME/.wisp/bin,
+    # but under $DOAS (how we run it) HOME is /root — so without this the binary
+    # lands in /root/.wisp/bin, invisible to the user. Same pattern as omp's
+    # PI_INSTALL_DIR below.
+    if fetch https://raw.githubusercontent.com/xvoidsx/wisp/dev/install.sh -o "$wisptmp" \
+        && $DOAS setsid timeout -k 30 300 env WISP_INSTALL_DIR=/usr/bin bash "$wisptmp" </dev/null; then
+      ok "wisp installed/updated -> /usr/bin/wisp"
+    else
+      warn "wisp install failed — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$wisptmp"
+  fi
+
   # the omp installer honors PI_INSTALL_DIR — straight into /usr/bin.
   if [ -x /usr/bin/omp ]; then
     ok "omp already in /usr/bin"
@@ -368,6 +447,12 @@ setup_agents() {
     fi
     rm -f "$omptmp"
   fi
+
+  # pi (the pi agent) is intentionally NOT in the default install path:
+  # its official installer is interactive (waits for a keypress on /dev/tty),
+  # and the setsid workaround isn't reliable enough for the critical path.
+  # It's available opt-in via `navi-extras --install pi` instead, where
+  # interactivity is fine because the user explicitly chose to run it.
 
   # goose (aaif-goose/goose — ex-Block, now the Linux Foundation's Agentic
   # AI Foundation): open-source AI agent, CLI + desktop app. Its install
@@ -420,6 +505,162 @@ setup_agents() {
       warn "herdr install failed — skipping (re-run install.sh --yes later)"
     fi
     rm -f "$herdr_tmp"
+  fi
+
+  # hermes (Nous Research's open-source agent — navi's default agent, "Lain"):
+  # self-improving AI agent with persistent memory. MIT licensed.
+  # Install script is fetched first (never pipe-to-bash), then run with
+  # the standard timeout/setsid treatment. The Lain identity layer
+  # (persona, theme) deploys from wired/lain/ to ~/.config/hermes/lain.
+  if command -v hermes >/dev/null 2>&1; then
+    ok "hermes already installed"
+  elif ! host_up https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh; then
+    warn "hermes installer unreachable — skipping hermes (re-run install.sh --yes later)"
+  else
+    info "installing hermes (Nous Research)..."
+    local hermestmp
+    hermestmp="$(mktemp)"
+    if fetch https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh -o "$hermestmp" \
+        && setsid timeout -k 60 1200 bash "$hermestmp" --non-interactive </dev/null \
+        && command -v hermes >/dev/null 2>&1; then
+      ok "hermes -> $(command -v hermes)"
+    else
+      warn "hermes install failed — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$hermestmp"
+  fi
+
+  # Lain identity layer: the persona, theme, and knowledge scaffolding
+  # that makes Hermes "Lain" in navi. Hermes is the engine (Nous Research,
+  # MIT — honestly attributed, never claimed as ours); Lain is the
+  # navi-configured experience on top.
+  #
+  # TWO deployment targets:
+  #   ~/.hermes/SOUL.md + ~/.hermes/memories/{USER,MEMORY}.md — Hermes
+  #     NATIVELY injects these into every session (CLI, gateway, herdr,
+  #     subagents). This is what makes *every* hermes invocation Lain,
+  #     not just navi-lain.
+  #   ~/.config/hermes/lain/ — navi's theme/banner assets for the
+  #     navi-lain wrapper (ASCII art, THEME.md).
+  # The OS suggests: we seed the persona on fresh installs but never
+  # overwrite files the user has customized.
+  if [ -d "$REPO_DIR/wired/lain" ]; then
+    info "deploying lain identity layer..."
+    # 1. Hermes-native persona — every hermes invocation picks this up.
+    #    SOUL.md lives at ~/.hermes/; USER.md and MEMORY.md live at
+    #    ~/.hermes/memories/ (per Hermes docs).
+    #    On navi, Hermes IS Lain — so on fresh installs, if the existing
+    #    SOUL.md is the stock Hermes default (not Lain), we replace it.
+    #    On --deploy-only we never touch an existing SOUL.md without our
+    #    marker: that's a user customization, and the OS doesn't clobber
+    #    user space. Backups are timestamped, never single-generation.
+    mkdir -p "$HOME/.hermes" "$HOME/.hermes/memories"
+    if [ -f "$REPO_DIR/wired/lain/SOUL.md" ]; then
+      if [ ! -f "$HOME/.hermes/SOUL.md" ]; then
+        cp "$REPO_DIR/wired/lain/SOUL.md" "$HOME/.hermes/SOUL.md"
+        ok "Lain SOUL.md deployed"
+      elif ! grep -q "Lain, the navi assistant" "$HOME/.hermes/SOUL.md" \
+          && [ "$DEPLOY_ONLY" -eq 0 ]; then
+        # Fresh install: not Lain, so it's the Hermes stock default.
+        # Back it up (timestamped), then deploy Lain.
+        _bak="$HOME/.hermes/SOUL.md.pre-lain-backup-$(date +%Y%m%d-%H%M%S)"
+        cp "$HOME/.hermes/SOUL.md" "$_bak"
+        cp "$REPO_DIR/wired/lain/SOUL.md" "$HOME/.hermes/SOUL.md"
+        ok "Lain SOUL.md deployed (previous saved to $(basename "$_bak"))"
+        unset _bak
+      fi
+    fi
+    for _f in USER.md MEMORY.md; do
+      if [ -f "$REPO_DIR/wired/lain/$_f" ] && [ ! -f "$HOME/.hermes/memories/$_f" ]; then
+        cp "$REPO_DIR/wired/lain/$_f" "$HOME/.hermes/memories/$_f"
+      fi
+    done
+    unset _f
+    # also seed /etc/skel so future users get it
+    if [ -w /etc/skel ]; then
+      mkdir -p /etc/skel/.hermes /etc/skel/.hermes/memories
+      if [ -f "$REPO_DIR/wired/lain/SOUL.md" ] && [ ! -f "/etc/skel/.hermes/SOUL.md" ]; then
+        cp "$REPO_DIR/wired/lain/SOUL.md" "/etc/skel/.hermes/SOUL.md"
+      fi
+      for _f in USER.md MEMORY.md; do
+        if [ -f "$REPO_DIR/wired/lain/$_f" ] && [ ! -f "/etc/skel/.hermes/memories/$_f" ]; then
+          cp "$REPO_DIR/wired/lain/$_f" "/etc/skel/.hermes/memories/$_f"
+        fi
+      done
+      unset _f
+    fi
+    # 2. navi theme/banner assets for the wrapper
+    mkdir -p "$HOME/.config/hermes/lain"
+    cp -r "$REPO_DIR/wired/lain/." "$HOME/.config/hermes/lain/"
+    if [ -w /etc/skel ]; then
+      mkdir -p /etc/skel/.config/hermes/lain
+      cp -r "$REPO_DIR/wired/lain/." /etc/skel/.config/hermes/lain/
+    fi
+    # the navi-lain launcher goes to /usr/bin for every user
+    if [ -f "$REPO_DIR/wired/lain/navi-lain.sh" ]; then
+      $DOAS install -m 0755 "$REPO_DIR/wired/lain/navi-lain.sh" /usr/bin/navi-lain
+      ok "navi-lain -> /usr/bin/navi-lain"
+    fi
+    # nightshadeNeon skin for Hermes — the visual layer. Deployed to
+    # ~/.hermes/skins/ where Hermes natively loads it. Activated via
+    # display.skin in config.yaml (merged, not overwritten).
+    if [ -f "$REPO_DIR/wired/lain/skins/nightshadeNeon.yaml" ]; then
+      mkdir -p "$HOME/.hermes/skins"
+      cp "$REPO_DIR/wired/lain/skins/nightshadeNeon.yaml" "$HOME/.hermes/skins/"
+      # activate: merge display.skin into config.yaml. Fresh installs get
+      # nightshadeNeon even when hermes stamped its own default skin first
+      # (its installer runs before us); --deploy-only never overwrites an
+      # existing skin value — a user's deliberate choice wins on updates.
+      # When no skin: line exists but a display: section does, the key goes
+      # INSIDE it — appending a second top-level display: block would let
+      # PyYAML's last-wins silently discard the user's first section.
+      _cfg="$HOME/.hermes/config.yaml"
+      if [ -f "$_cfg" ]; then
+        if grep -qE "^[[:space:]]*skin:" "$_cfg"; then
+          if ! grep -qE "^[[:space:]]*skin:[[:space:]]*nightshadeNeon([[:space:]]|$)" "$_cfg" \
+              && [ "$DEPLOY_ONLY" -eq 0 ]; then
+            sed -i -E 's|^([[:space:]]*skin:).*|\1 nightshadeNeon|' "$_cfg"
+          fi
+        elif grep -qE "^display:" "$_cfg"; then
+          sed -i -E 's|^(display:[[:space:]]*)$|\1\n  skin: nightshadeNeon|' "$_cfg"
+        else
+          printf '
+display:
+  skin: nightshadeNeon
+' >> "$_cfg"
+        fi
+      else
+        printf 'display:
+  skin: nightshadeNeon
+' > "$_cfg"
+      fi
+      unset _cfg
+      ok "nightshadeNeon skin deployed and activated"
+    fi
+    ok "lain identity layer deployed (~/.hermes/ + ~/.config/hermes/lain)"
+  else
+    warn "wired/lain missing from repo — skipping lain identity layer"
+  fi
+
+  # goose <-> herdr awareness: user-scope goose plugin that reports goose's
+  # lifecycle state to the herdr pane hosting the session — herdr's official
+  # "custom socket integration" path (pane.report_agent + HERDR_PANE_ID),
+  # so no herdr fork is needed. The hook script no-ops unless HERDR_ENV=1
+  # and HERDR_PANE_ID are set, so this is harmless on machines without
+  # herdr. Goose auto-discovers plugins in ~/.agents/plugins/ at startup
+  # (enabled by default when present). This is navi's own shipped plugin
+  # (not user config), so deploy refreshes it wholesale like wired/.
+  if [ -d "$REPO_DIR/scripts/goose-herdr" ]; then
+    info "installing goose/herdr awareness plugin..."
+    plugin_dest="$HOME/.agents/plugins/navi-goose-herdr"
+    mkdir -p "$plugin_dest/hooks" "$plugin_dest/scripts"
+    cp -a "$REPO_DIR/scripts/goose-herdr/plugin.json" "$plugin_dest/plugin.json"
+    cp -a "$REPO_DIR/scripts/goose-herdr/hooks/hooks.json" "$plugin_dest/hooks/hooks.json"
+    cp -a "$REPO_DIR/scripts/goose-herdr/scripts/report-state.sh" "$plugin_dest/scripts/report-state.sh"
+    chmod 0755 "$plugin_dest/scripts/report-state.sh"
+    ok "goose reports state to herdr panes (~/.agents/plugins/navi-goose-herdr)"
+  else
+    warn "scripts/goose-herdr missing from repo — skipping goose/herdr awareness"
   fi
 }
 
@@ -538,6 +779,115 @@ setup_navivim() {
     ok "NaviVim theme default: nightshadeNeon"
   fi
 }
+setup_navicode() {
+  step "naviCode (VScodium + nightshadeNeon + Lain)"
+
+  # 1. VScodium apt repo (official). trixie uses the .sources format.
+  local keyring="/usr/share/keyrings/vscodium-archive-keyring.gpg"
+  if [ ! -f "$keyring" ]; then
+    if ! host_up https://download.vscodium.com; then
+      warn "vscodium repo unreachable — skipping naviCode (re-run install.sh --yes later)"
+      return 0
+    fi
+    info "adding VScodium apt repo..."
+    fetch https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg -o /tmp/vscodium.gpg \
+      && $DOAS gpg --dearmor -o "$keyring" /tmp/vscodium.gpg 2>/dev/null \
+      && rm -f /tmp/vscodium.gpg \
+      && printf 'Types: deb\nURIs: https://download.vscodium.com/debs\nSuites: vscodium\nComponents: main\nArchitectures: amd64 arm64\nSigned-by: %s\n' "$keyring" | $DOAS tee /etc/apt/sources.list.d/vscodium.sources >/dev/null \
+      && $DOAS apt-get update -qq 2>/dev/null
+    ok "VScodium repo added"
+  fi
+
+  # 2. Install codium (the package is called "codium", not "vscodium").
+  if ! command -v codium >/dev/null 2>&1; then
+    info "installing VScodium..."
+    if ! $DOAS apt-get install -y -qq codium 2>/dev/null; then
+      warn "codium install failed — skipping naviCode extensions/theme (re-run install.sh --yes later)"
+      return 0
+    fi
+    ok "codium installed"
+  else
+    ok "codium already installed"
+  fi
+
+  # 3. nightshadeNeon theme — from the naviCode repo if available,
+  #    else fetch the .vsix from GitHub.
+  local vsix="" tmpdir=""
+  for cand in "$REPO_DIR/../naviCode/nightshadeNeon-VSC/nightshade-neon-1.0.0.vsix" "/opt/navi-iso/naviCode.vsix"; do
+    if [ -f "$cand" ]; then vsix="$cand"; break; fi
+  done
+  if [ -z "$vsix" ] && host_up https://github.com; then
+    tmpdir="$(mktemp -d)"
+    if fetch "https://github.com/xvoidsx/naviCode/raw/main/nightshadeNeon-VSC/nightshade-neon-1.0.0.vsix" -o "$tmpdir/theme.vsix" 2>/dev/null; then
+      vsix="$tmpdir/theme.vsix"
+    fi
+  fi
+  if [ -n "$vsix" ] && [ -f "$vsix" ]; then
+    if ! codium --list-extensions 2>/dev/null | grep -qi "nightshade"; then
+      codium --install-extension "$vsix" 2>/dev/null && ok "nightshadeNeon theme installed"
+    else
+      ok "nightshadeNeon theme already installed"
+    fi
+  else
+    warn "nightshadeNeon .vsix not found — theme not installed (re-run install.sh --yes later)"
+  fi
+  [ -n "$tmpdir" ] && rm -rf "$tmpdir"
+
+  # 4. Rina Hermes ACP — the in-editor Lain. From Open VSX (VScodium's
+  #    native registry, no sideloading).
+  #    NOTE: a bad extension ID installs nothing and raises no error —
+  #    so we assert afterward. A miss must be loud, not silent.
+  if ! codium --list-extensions 2>/dev/null | grep -qi "rina-hermes-acp"; then
+    codium --install-extension "JoveRina.rina-hermes-acp" 2>/dev/null || true
+    if codium --list-extensions 2>/dev/null | grep -qi "rina-hermes-acp"; then
+      ok "Rina Hermes ACP installed (Lain in the editor)"
+    else
+      warn "Rina Hermes ACP install may have failed — check 'codium --list-extensions' (ID: JoveRina.rina-hermes-acp)"
+    fi
+  else
+    ok "Rina Hermes ACP already installed"
+  fi
+
+  # 5. Default settings — nightshadeNeon theme, no auto-detect fighting it.
+  #    The OS suggests: merge the theme key into existing settings.json
+  #    without clobbering user customizations. Only touch the two keys
+  #    we own; everything else stays as the user left it.
+  local settings_dir="$HOME/.config/VSCodium/User"
+  mkdir -p "$settings_dir"
+  python3 - "$settings_dir/settings.json" << 'PYEOF_MERGE' 2>/dev/null || true
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        data = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    data = {}
+changed = False
+if data.get("workbench.colorTheme") != "nightshadeNeon":
+    # Only set if the user hasn't chosen a different theme
+    if "workbench.colorTheme" not in data:
+        data["workbench.colorTheme"] = "nightshadeNeon"
+        changed = True
+if data.get("window.autoDetectColorScheme") is not False:
+    if "window.autoDetectColorScheme" not in data:
+        data["window.autoDetectColorScheme"] = False
+        changed = True
+if changed or not data:
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    print("naviCode defaults merged")
+PYEOF_MERGE
+  ok "naviCode settings ensured (nightshadeNeon)"
+  # /etc/skel so future users get it too
+  if [ -w /etc/skel ]; then
+    $DOAS mkdir -p /etc/skel/.config/VSCodium/User
+    if [ ! -f /etc/skel/.config/VSCodium/User/settings.json ]; then
+      printf '{\n  "workbench.colorTheme": "nightshadeNeon",\n  "window.autoDetectColorScheme": false\n}\n' | $DOAS tee /etc/skel/.config/VSCodium/User/settings.json >/dev/null
+    fi
+  fi
+}
+
 
 # ---------------------------------------------------------------- system: navi mods (eiri)
 # the Go/Bubble Tea panel mods — prebuilt binaries committed in the repo,
@@ -560,7 +910,123 @@ setup_mods() {
   install_mod "navi-networking" "navi-networking"
   install_mod "navi-calendar"   "navi-calendar"
   install_mod "navi-audio"      "navi-audio"
+  install_mod "navi-bluetooth"  "navi-bluetooth"
   install_mod "navi-lain-config" "navi-lain-config"
+  install_mod "navi-agents-config" "navi-agents-config"
+  install_mod "navi-weather"    "navi-weather"
+  install_mod "navi-get"        "navi-get"
+  install_mod "navi-browser"    "navi-browser"
+  install_mod "navi-power"      "navi-power"
+  install_mod "navi-display"    "navi-display"
+  install_mod "navi-reminders"  "navi-reminders"
+  install_mod "navi-reminders"  "navi-reminder-fire"
+  install_mod "navi-notifs"     "navi-notifs"
+  install_mod "navi-nowplaying" "navi-nowplaying"
+  install_mod "wiredrop"        "wiredrop"
+  install_mod "navi-tailscale"  "navi-tailscale"
+  install_mod "navi-imprint"    "navi-imprint"
+
+  # wiredrop: the receiver only receives while the daemon listens, so it
+  # runs as a per-user systemd service. Installed to the user's own
+  # systemd dir (no root needed — install.sh runs as the user); enabled
+  # so it starts on login, started now. linger (enabled below for the
+  # reminder timers) also keeps it alive from boot.
+  setup_wiredrop_service() {
+    local unit_dir="$HOME/.config/systemd/user"
+    local src="$REPO_DIR/mods/wiredrop/wiredrop.service"
+    [ -f "$src" ] || { warn "missing wiredrop.service — skipping daemon setup"; return 0; }
+    mkdir -p "$unit_dir"
+    install -m 0644 "$src" "$unit_dir/wiredrop.service"
+    # enable without D-Bus: during ISO chroot provisioning there is no user
+    # bus (env -i, no XDG_RUNTIME_DIR), so `systemctl --user enable` fails
+    # into the warn path and the symlink never gets made. the symlink is all
+    # `enable` does for a WantedBy=default.target unit, so make it directly.
+    mkdir -p "$unit_dir/default.target.wants"
+    ln -sf "../wiredrop.service" "$unit_dir/default.target.wants/wiredrop.service"
+    if ! command -v systemctl >/dev/null 2>&1; then
+      warn "systemctl not found — enable the wiredrop daemon by hand: systemctl --user enable --now wiredrop"
+      return 0
+    fi
+    # daemon-reload must not be fatal: in the ISO provisioner (running as
+    # root, no user D-Bus session) `systemctl --user` fails, and with
+    # `set -e` that would kill the entire install. the enable --now below
+    # is already guarded and warns gracefully.
+    systemctl --user daemon-reload >/dev/null 2>&1 || true
+    if systemctl --user enable --now wiredrop.service >/dev/null 2>&1; then
+      ok "wiredrop daemon enabled and started (systemctl --user status wiredrop)"
+    else
+      warn "wiredrop.service could not be enabled — run: systemctl --user enable --now wiredrop"
+    fi
+  }
+  setup_wiredrop_service
+
+  # navi-reminders runs on systemd user timers — they only fire from boot
+  # (before first login) with lingering enabled for the installing user.
+  # NOTE: `loginctl enable-linger` is just `touch /var/lib/systemd/linger/$USER`,
+  # so do that directly: during ISO chroot provisioning the system bus is the
+  # LIVE ISO's bus, and loginctl would linger the wrong user db (or fail) —
+  # while a direct touch lands on the target (we're chrooted).
+  if $DOAS mkdir -p /var/lib/systemd/linger \
+      && $DOAS touch "/var/lib/systemd/linger/$USER" 2>/dev/null; then
+    ok "linger enabled for $USER (reminder timers run from boot)"
+  else
+    warn "could not enable linger for $USER — reminders only fire while logged in"
+  fi
+}
+
+# Local brain model guard for Hey Lain. This runs on EVERY setup_heylain —
+# deliberately above the venv fast path — so a failed first model pull (or
+# a stopped ollama service, or a broken ollama install) is repaired or at
+# least warned about on later updates instead of being skipped forever.
+ensure_heylain_model() {
+  # A pulled model is useless if the daemon is down: make sure the service
+  # is actually running (field lesson 2026-09-20 — inactive service plus a
+  # missing llama-server binary made every off-list utterance die the
+  # same silent way).
+  if command -v ollama >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1; then
+    if ! systemctl is-active --quiet ollama 2>/dev/null; then
+      if $DOAS systemctl enable --now ollama >/dev/null 2>&1; then
+        ok "ollama service enabled and started"
+      else
+        warn "ollama service is not running and could not be started — Hey Lain's brain stays offline until you run: sudo systemctl enable --now ollama"
+      fi
+    fi
+  fi
+  # Local brain: gemma3:270m is the default voice model — tiny enough for
+  # low-end hardware, no key or cloud needed. `ollama pull` talks to the
+  # local daemon, so the model lands where the ollama service sees it.
+  # Skipped (with a warning) when ollama or the network isn't there yet.
+  if ! command -v ollama >/dev/null 2>&1; then
+    warn "ollama not found — skipping gemma3:270m pull"
+  elif ollama list 2>/dev/null | grep -q "^gemma3:270m"; then
+    ok "ollama model gemma3:270m already present"
+  elif ! host_up https://ollama.com; then
+    warn "ollama.com unreachable — skipping gemma3:270m pull (run: ollama pull gemma3:270m)"
+  else
+    info "pulling gemma3:270m (local voice brain, one time)..."
+    if ollama pull gemma3:270m >/dev/null 2>&1; then
+      ok "gemma3:270m ready"
+    else
+      warn "could not pull gemma3:270m — Hey Lain falls back to its offline line until you run: ollama pull gemma3:270m"
+    fi
+  fi
+}
+
+# First-boot model pull service. The installer-time pull above can never
+# succeed during ISO chroot provisioning (no ollama daemon to dial), so
+# this user unit does it at first login instead: waits for ollama.service,
+# pulls gemma3:270m once, then disables itself. Enabled via direct symlink
+# (the build-21 waybar/wiredrop pattern) because `systemctl --user enable`
+# has no user bus to talk to during provisioning.
+deploy_model_pull_service() {
+  local src="$REPO_DIR/wired/systemd/navi-model-pull.service"
+  [ -f "$src" ] || { warn "missing navi-model-pull.service — skipping first-boot model pull"; return 0; }
+  local unit_dir="$HOME/.config/systemd/user"
+  mkdir -p "$unit_dir"
+  install -m 0644 "$src" "$unit_dir/navi-model-pull.service"
+  mkdir -p "$unit_dir/default.target.wants"
+  ln -sf "../navi-model-pull.service" "$unit_dir/default.target.wants/navi-model-pull.service"
+  ok "navi-model-pull.service -> ~/.config/systemd/user/ (first-boot gemma3:270m pull)"
 }
 
 # Hey Lain voice assistant (eiri): deploys mods/hey-lain to
@@ -576,6 +1042,21 @@ setup_heylain() {
   if [ ! -d "$src" ]; then
     warn "mods/hey-lain missing — skipping voice assistant"
     return 0
+  fi
+  # Brain config lives in the user's config dir (0600 — it can hold an API
+  # key). Written exactly once: an existing config (hand-made or via
+  # navi-lain-config) is never overwritten by installs or updates.
+  # install.sh refuses root, so $HOME is the user's home here.
+  local bl_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hey-lain"
+  local bl_conf="$bl_dir/brain.json"
+  mkdir -p "$bl_dir" 2>/dev/null && chmod 0700 "$bl_dir" 2>/dev/null
+  if [ ! -f "$bl_conf" ]; then
+    if printf '{\n  "backend": "local",\n  "model": "gemma3:270m",\n  "api_url": "http://127.0.0.1:11434/api/chat"\n}\n' \
+        >"$bl_conf" 2>/dev/null && chmod 0600 "$bl_conf" 2>/dev/null; then
+      ok "hey-lain brain config initialized (local gemma3:270m)"
+    else
+      warn "could not write $bl_conf"
+    fi
   fi
   # The venv is the slow part (faster-whisper + piper + whisper model), so
   # it survives redeploys: the marker stores a hash of requirements.txt,
@@ -607,6 +1088,11 @@ setup_heylain() {
   else
     $DOAS rm -rf "$dest.voices-keep" 2>/dev/null || true
   fi
+  # Brain health runs on every deploy, even when the venv is kept as-is:
+  # a failed first model pull must be repaired by later updates, not
+  # skipped forever behind the fast path below.
+  ensure_heylain_model
+  deploy_model_pull_service
   if [ "$venv_ok" -eq 1 ]; then
     $DOAS mv "$dest.venv-keep" "$dest/venv"
     echo "$req_hash" | $DOAS tee "$dest/.venv-ready" >/dev/null
@@ -626,7 +1112,10 @@ setup_heylain() {
     fi
     return 0
   fi
-  rm -rf "$dest.venv-keep" 2>/dev/null
+  # the venv-keep dir is root-owned ($DOAS mv below) — an unprivileged rm
+  # fails, and under `set -e` that aborts the whole install silently
+  # (2>/dev/null hides the error, not the exit code).
+  $DOAS rm -rf "$dest.venv-keep" 2>/dev/null || true
   if ! host_up https://pypi.org/simple/; then
     warn "pypi unreachable — hey-lain voice backend skipped (re-run install.sh --yes later)"
     return 0
@@ -637,24 +1126,6 @@ setup_heylain() {
     ok "hey-lain ready — tap Alt+V to talk"
   else
     warn "hey-lain venv build failed — Alt+V will not work until install.sh is re-run"
-  fi
-  # Local brain: gemma3:270m is the default voice model — tiny enough for
-  # low-end hardware, no key or cloud needed. `ollama pull` talks to the
-  # local daemon, so the model lands where the ollama service sees it.
-  # Skipped (with a warning) when ollama or the network isn't there yet.
-  if ! command -v ollama >/dev/null 2>&1; then
-    warn "ollama not found — skipping gemma3:270m pull"
-  elif ollama list 2>/dev/null | grep -q "^gemma3:270m"; then
-    ok "ollama model gemma3:270m already present"
-  elif ! host_up https://ollama.com; then
-    warn "ollama.com unreachable — skipping gemma3:270m pull (run: ollama pull gemma3:270m)"
-  else
-    info "pulling gemma3:270m (local voice brain, one time)..."
-    if ollama pull gemma3:270m >/dev/null 2>&1; then
-      ok "gemma3:270m ready"
-    else
-      warn "could not pull gemma3:270m — Hey Lain falls back to its offline line until you run: ollama pull gemma3:270m"
-    fi
   fi
 }
 
@@ -787,6 +1258,119 @@ deploy_config() {
   ok "${dest#$HOME/} deployed"
 }
 
+deploy_waybar_themes() {
+  # deploy_waybar_themes — the waybar theme store.
+  # system: /usr/share/navi/waybar/themes/<name>/{theme.css,meta}
+  # user:   ~/.local/share/navi/waybar/themes/<name>/{theme.css,meta} (wins)
+  # navi-theme resolves user-first, so a user theme of the same name shadows
+  # the distro one. in update mode, user themes are only overwritten if
+  # untouched (same manifest logic as deploy_config).
+  local src_dir="$WIRED_SHARE/waybar/themes"
+  [ -d "$src_dir" ] || { warn "missing waybar themes in wired/ — skipping"; return 0; }
+  local sys_dir="$SHARE_DIR/waybar/themes"
+  $DOAS mkdir -p "$sys_dir"
+  $DOAS cp -a "$src_dir/." "$sys_dir/"
+  $DOAS chmod -R a+rX "$sys_dir"
+  ok "waybar themes -> $sys_dir"
+
+  local user_dir="$HOME/.local/share/navi/waybar/themes"
+  mkdir -p "$user_dir"
+  local theme
+  for theme in "$src_dir"/*/; do
+    theme="$(basename "$theme")"
+    local dest="$user_dir/$theme"
+    if [ "$NAVI_UPDATE_MODE" -eq 1 ] && [ -d "$dest" ]; then
+      # update mode: only overwrite untouched user themes
+      local baseline live_sha
+      baseline="$(manifest_lookup "$dest/theme.css")"
+      if [ -n "$baseline" ]; then
+        live_sha="$(sha256sum "$dest/theme.css" 2>/dev/null | cut -d' ' -f1 || true)"
+        if [ "$live_sha" != "$baseline" ]; then
+          info "kept your modified waybar theme: $theme"
+          continue
+        fi
+      fi
+    fi
+    backup_if_changed "$src_dir/$theme/theme.css" "$dest/theme.css"
+    mkdir -p "$dest"
+    cp -a "$src_dir/$theme/." "$dest/"
+    manifest_record "$src_dir/$theme/theme.css" "waybar/themes/$theme/theme.css" "$dest/theme.css" "644"
+  done
+  ok "waybar themes -> ~/.local/share/navi/waybar/themes"
+}
+
+deploy_polybar_themes() {
+  # deploy_polybar_themes — the polybar theme store (X11 session).
+  # system: /usr/share/navi/polybar/themes/<name>/{config.ini,meta}
+  # user:   ~/.local/share/navi/polybar/themes/<name>/{config.ini,meta} (wins)
+  # navi-theme resolves user-first and applies the winner live via
+  # `polybar-msg cmd restart`. Same untouched-only overwrite rule as waybar.
+  local src_dir="$WIRED_SHARE/polybar/themes"
+  [ -d "$src_dir" ] || { warn "missing polybar themes in wired/ — skipping"; return 0; }
+  local sys_dir="$SHARE_DIR/polybar/themes"
+  $DOAS mkdir -p "$sys_dir"
+  $DOAS cp -a "$src_dir/." "$sys_dir/"
+  $DOAS chmod -R a+rX "$sys_dir"
+  ok "polybar themes -> $sys_dir"
+
+  local user_dir="$HOME/.local/share/navi/polybar/themes"
+  mkdir -p "$user_dir"
+  local theme
+  for theme in "$src_dir"/*/; do
+    theme="$(basename "$theme")"
+    local dest="$user_dir/$theme"
+    if [ "$NAVI_UPDATE_MODE" -eq 1 ] && [ -d "$dest" ]; then
+      local baseline live_sha
+      baseline="$(manifest_lookup "$dest/config.ini")"
+      if [ -n "$baseline" ]; then
+        live_sha="$(sha256sum "$dest/config.ini" 2>/dev/null | cut -d' ' -f1 || true)"
+        if [ "$live_sha" != "$baseline" ]; then
+          info "kept your modified polybar theme: $theme"
+          continue
+        fi
+      fi
+    fi
+    backup_if_changed "$src_dir/$theme/config.ini" "$dest/config.ini"
+    mkdir -p "$dest"
+    cp -a "$src_dir/$theme/." "$dest/"
+    manifest_record "$src_dir/$theme/config.ini" "polybar/themes/$theme/config.ini" "$dest/config.ini" "644"
+  done
+  ok "polybar themes -> ~/.local/share/navi/polybar/themes"
+}
+
+deploy_waybar_service() {
+  # deploy_waybar_service — the waybar systemd user unit.
+  # replaces the packaged /usr/lib/systemd/user/waybar.service outright:
+  # the packaged unit carries Requisite=graphical-session.target, which is
+  # never activated in a plain sddm-launched Wayland session, so it fails
+  # silently. a drop-in cannot remove dependencies, only add them — hence
+  # a full replacement unit hooked into default.target.
+  local src="$WIRED_SHARE/systemd/waybar.service"
+  [ -f "$src" ] || { warn "missing waybar.service — skipping autostart setup"; return 0; }
+  local unit_dir="$HOME/.config/systemd/user"
+  mkdir -p "$unit_dir"
+  backup_if_changed "$src" "$unit_dir/waybar.service"
+  install -m 0644 "$src" "$unit_dir/waybar.service"
+  manifest_record "$src" "systemd/waybar.service" "$unit_dir/waybar.service" "644"
+  ok "waybar.service -> ~/.config/systemd/user/"
+  # enable without D-Bus (same chroot problem as wiredrop above):
+  # `systemctl --user enable` cannot reach a user manager during ISO
+  # provisioning, so do the symlink directly. waybar never started on
+  # first boot until this existed.
+  mkdir -p "$unit_dir/default.target.wants"
+  ln -sf "../waybar.service" "$unit_dir/default.target.wants/waybar.service"
+  if ! command -v systemctl >/dev/null 2>&1; then
+    warn "systemctl not found — enable waybar by hand: systemctl --user enable --now waybar"
+    return 0
+  fi
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
+  if systemctl --user enable --now waybar.service >/dev/null 2>&1; then
+    ok "waybar enabled and started (systemctl --user status waybar)"
+  else
+    warn "waybar.service could not be enabled — run: systemctl --user enable --now waybar"
+  fi
+}
+
 deploy_configs() {
   step "deploying user configs (backups -> $BACKUP_DIR)"
 
@@ -794,12 +1378,22 @@ deploy_configs() {
   deploy_config "i3/config"                   "$HOME/.config/i3/config"
   deploy_config "waybar/config.jsonc"         "$HOME/.config/waybar/config.jsonc"
   deploy_config "waybar/style.css"            "$HOME/.config/waybar/style.css"
+  # waybar theme store (eiri): five themes, one dir each so a theme can grow
+  # its own config.json later. system copy lands under /usr/share/navi (what
+  # navi-theme reads as SYS_THEMES); user copy goes to ~/.local/share/navi
+  # (USER_THEMES, wins). style.css IS the patchbay theme, byte-identical —
+  # that's the whole default-persistence mechanism (no state file to drift).
+  deploy_waybar_themes
+  deploy_config "rofi/navi-theme.rasi"       "$HOME/.config/rofi/navi-theme.rasi"
+  deploy_waybar_service
   deploy_config "polybar/config.ini"          "$HOME/.config/polybar/config.ini"
+  deploy_polybar_themes
   deploy_config "polybar/battery-combined-shell.sh" "$HOME/.config/polybar/battery-combined-shell.sh" 755
   deploy_config "rofi/config.rasi"            "$HOME/.config/rofi/config.rasi"
   deploy_config "picom/picom.conf"            "$HOME/.config/picom/picom.conf"
   deploy_config "terminals/alacritty.toml"    "$HOME/.config/alacritty/alacritty.toml"
   deploy_config "terminals/foot.ini"          "$HOME/.config/foot/foot.ini"
+  deploy_config "terminals/kitty.conf"        "$HOME/.config/kitty/kitty.conf"
   deploy_config "cliamp/config.toml"         "$HOME/.config/cliamp/config.toml"
   deploy_config "herdr/config.toml"          "$HOME/.config/herdr/config.toml"
   # cmus + cava: the nightshadeNeon music setup. the cmus rc selects the
@@ -814,6 +1408,12 @@ deploy_configs() {
   deploy_config "gtk-2.0/gtkrc"              "$HOME/.gtkrc-2.0"
   deploy_config "gtk-3.0/settings.ini"        "$HOME/.config/gtk-3.0/settings.ini"
   deploy_config "gtk-4.0/settings.ini"        "$HOME/.config/gtk-4.0/settings.ini"
+  # default cursor theme, file-based so it needs no xrdb: Xcursor falls back
+  # to ~/.icons/default/index.theme, covering the X11 session's root cursor
+  # and any client that doesn't read the GTK/Wayland settings.
+  mkdir -p "$HOME/.icons/default"
+  printf '[Icon Theme]\nInherits=Bibata-Modern-Ice\n' > "$HOME/.icons/default/index.theme"
+  ok "default cursor theme: Bibata-Modern-Ice"
   # tmux reads ~/.config/tmux/tmux.conf first (since 3.1) — the XDG path
   # is the real config. the old ~/.tmux.conf target is retired below so a
   # stale copy can never shadow it.
@@ -833,6 +1433,20 @@ deploy_configs() {
   deploy_config "elinks/elinks.conf"          "$HOME/.config/elinks/elinks.conf"
   deploy_config "lynx/lynx.cfg"               "/etc/lynx.cfg"
   deploy_config "lynx/lynxrc"                 "$HOME/.lynxrc"
+  # qutebrowser: navi's keyboard-driven browser. the nightshadeNeon config
+  # and startpage ship together — config.py locates startpage.html beside
+  # itself, so both land in ~/.config/qutebrowser/.
+  deploy_config "qutebrowser/config.py"       "$HOME/.config/qutebrowser/config.py"
+  deploy_config "qutebrowser/startpage.html"  "$HOME/.config/qutebrowser/startpage.html"
+  # chromium extensions per-user (deliberately NOT managed policy — that
+  # dir is shared with forks like Helium): nightshadeNeon theme + blackice
+  # as External Extensions, scoped to ~/.config/chromium so forks never
+  # see them. /etc/skel for future users is handled in setup_chromium.
+  local ext
+  for ext in lllmaajdpjgggpijpcaholegiejdoihk nncobpmjfngafidkngebojkabaabbkhm; do
+    deploy_config "chromium/external-extensions/$ext.json" \
+      "$HOME/.config/chromium/External Extensions/$ext.json"
+  done
   # best-effort agent configs; paths to be confirmed against the apps
   deploy_config "ai/opencode/tui.json"        "$HOME/.config/opencode/tui.json"
   deploy_config "ai/pi/agent/themes/nightshadeNeon.json" \
@@ -867,7 +1481,7 @@ deploy_configs() {
 verify_wallpaper_wiring() {
   # the canonical sway config execs /usr/bin/navi-wallpaper, which paints the
   # animated wallpaper first (mpvpaper) and falls back to the static swaybg
-  # image at /usr/share/navi/wired/wp/navi-lain-rgbsplit.jpg.
+  # image at /usr/share/navi/wired/wp/lain-hairclip-neon.png.
   local cfg="$HOME/.config/sway/config"
   if grep -q "navi-wallpaper" "$cfg" 2>/dev/null; then
     ok "sway config wires navi-wallpaper (mpvpaper + swaybg fallback)"
@@ -893,6 +1507,7 @@ install_commands() {
   install_bin "gifpaperslain.sh"    "gifpaperslain"
   install_bin "navi-wallpaper.sh"   "navi-wallpaper"
   install_bin "navi-fetch.sh"      "navi-fetch"
+  install_bin "navi-dmenu-run.sh"  "navi-dmenu-run"
   install_bin "navi-logo.sh"       "navi-logo"
   install_bin "wired_power_menu.sh" "power_menu"
   install_bin "remoji.sh"           "remoji"
@@ -900,11 +1515,13 @@ install_commands() {
   install_bin "navi-Q.sh"           "navi-Q"
   install_bin "navi-Qx.sh"          "navi-Qx"
   install_bin "navi-webapp.sh"      "navi-webapp"
+  install_bin "navi-browser-run.sh" "navi-browser-run"
   install_bin "navi-notifs.sh"       "navi-notifs"
+  install_bin "navishot.sh"          "navishot"
 
   # distro-level tools live in scripts/ (repo root), outside the /wired
   # desktop layer — same /usr/bin destination, same rofi visibility.
-  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore" "navi-wired-adopt.sh:navi-wired-adopt" "navi-extras.sh:navi-extras"; do
+  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore" "navi-wired-adopt.sh:navi-wired-adopt" "navi-extras.sh:navi-extras" "navi-theme:navi-theme" "navi-terminal:navi-terminal" "navi-bt-agent:navi-bt-agent"; do
     local src="$REPO_DIR/scripts/${pair%%:*}" name="${pair##*:}"
     if [ -e "$src" ]; then
       $DOAS install -m 0755 "$src" "/usr/bin/$name"
@@ -973,7 +1590,7 @@ setup_sudo() {
   if id -nG "$USER" | tr ' ' '\n' | grep -qx sudo; then
     ok "$USER already in the sudo group"
   else
-    $DOAS usermod -aG sudo "$USER" \
+    $DOAS /usr/sbin/usermod -aG sudo "$USER" \
       && ok "$USER added to the sudo group (next login)" \
       || warn "could not add $USER to the sudo group"
   fi
@@ -985,7 +1602,7 @@ setup_sudo() {
   # after navi-update, in the same session.
   printf '%s ALL=(ALL:ALL) ALL\n' "$USER" | $DOAS tee /etc/sudoers.d/10-navi-user >/dev/null
   $DOAS chmod 440 /etc/sudoers.d/10-navi-user
-  if $DOAS visudo -c -q 2>/dev/null; then
+  if $DOAS /usr/sbin/visudo -c -q 2>/dev/null; then
     ok "sudoers rule in place for $USER (effective immediately)"
   else
     warn "/etc/sudoers.d/10-navi-user failed visudo check — removing it"
@@ -999,7 +1616,7 @@ setup_sudo() {
     # sorts after 10-navi-user, so its NOPASSWD wins while it exists.)
     printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$USER" | $DOAS tee /etc/sudoers.d/navi-provision >/dev/null
     $DOAS chmod 440 /etc/sudoers.d/navi-provision
-    $DOAS visudo -c -q 2>/dev/null \
+    $DOAS /usr/sbin/visudo -c -q 2>/dev/null \
       || warn "/etc/sudoers.d/navi-provision failed visudo check"
     ok "sudo passwordless during provisioning (tightened at end of install)"
   fi
@@ -1014,6 +1631,43 @@ tighten_sudo() {
   step "sudo lockdown"
   $DOAS rm -f /etc/sudoers.d/navi-provision
   ok "provisioning NOPASSWD removed; sudo now asks for the login password"
+}
+
+setup_zram() {
+  step "zram (compressed swap)"
+  # shellcheck disable=SC1091
+  source "$REPO_DIR/scripts/lib/hardware.sh"
+  if ! navi_is_lowmem; then
+    ok "plenty of RAM — zram left alone"
+    return 0
+  fi
+  # low-memory machine (the cloudbook bench, old thinkpads, little pis):
+  # a compressed swap device in RAM, so big deb unpacks and heavy
+  # browser tabs stop getting OOM-killed. permanent and system-wide —
+  # this is why the per-installer memory warnings are gone.
+  if [ ! -f /etc/default/zramswap ] \
+    || ! grep -q "^ALGO=zstd" /etc/default/zramswap 2>/dev/null; then
+    $DOAS tee /etc/default/zramswap >/dev/null <<'EOF'
+# managed by navi (setup_zram) — compressed swap for low-memory machines
+ALGO=zstd
+PERCENT=50
+PRIORITY=100
+EOF
+    ok "zram configured (zstd, 50% of RAM)"
+  else
+    ok "zram already configured"
+  fi
+  if ! $DOAS systemctl is-enabled -q zramswap.service 2>/dev/null; then
+    $DOAS systemctl enable zramswap.service >/dev/null \
+      || warn "could not enable zramswap.service"
+  fi
+  if navi_zram_active; then
+    ok "zram swap already active"
+  elif $DOAS systemctl start zramswap.service 2>/dev/null; then
+    ok "zram swap active"
+  else
+    warn "zram configured but could not be started — it will come up on next boot"
+  fi
 }
 
 setup_environment() {
@@ -1108,9 +1762,8 @@ setup_dirs() {
 # ---------------------------------------------------------------- optional extras
 # The third-party installers (scripts/installers/*) used to run with prompts
 # at the tail of the installer — one failure there aborted the whole install
-# (set -e), and --yes/ASSUME_YES auto-ran all of them silently. Now they
-# ship deployed to /usr/share/navi/installers and the user picks them from
-# the navi-extras menu whenever they want them.
+# (set -e). Now they ship deployed to /usr/share/navi/installers and the
+# user picks them from the navi-extras menu whenever they want them.
 deploy_installers() {
   step "optional extras -> $SHARE_DIR/installers"
   local dir="$REPO_DIR/scripts/installers"
@@ -1135,9 +1788,271 @@ setup_webapps() {
   step "default webapps (${#DEFAULT_WEBAPPS[@]} launchers)"
   if command -v navi-webapp >/dev/null 2>&1; then
     navi-webapp install "${DEFAULT_WEBAPPS[@]}"
+    # refresh launchers + icons for webapps the user installed themselves
+    # (icons/launchers that shipped after first install otherwise never land)
+    navi-webapp repair
     ok "default webapps installed for $USER"
   else
     warn "navi-webapp not on PATH — skipping default webapp install"
+  fi
+}
+
+# ---------------------------------------------------------------- telegram (native)
+# Telegram ships as a native app out of the box — its webapp left the
+# catalog, so this runs scripts/installers/telegram-installer.sh once per
+# machine. Afterwards the official binary self-updates, so re-runs are a
+# cheap no-op (the guard below). Non-fatal by design: a failed download
+# must never wedge an install or an update.
+setup_telegram() {
+  step "telegram (native)"
+  if command -v telegram >/dev/null 2>&1; then
+    ok "telegram already installed — skipping"
+    return 0
+  fi
+  local installer="$REPO_DIR/scripts/installers/telegram-installer.sh"
+  [ -x "$installer" ] || installer="/usr/share/navi/installers/telegram-installer.sh"
+  if [ ! -x "$installer" ]; then
+    warn "telegram installer not found — skipping (later: navi-extras --install telegram)"
+    return 0
+  fi
+  if bash "$installer"; then
+    ok "telegram installed natively"
+  else
+    warn "telegram installer failed — retry later with: navi-extras --install telegram"
+  fi
+}
+
+setup_element() {
+  step "element (native)"
+  if command -v element-desktop >/dev/null 2>&1; then
+    ok "element already installed — skipping"
+    return 0
+  fi
+  local installer="$REPO_DIR/scripts/installers/element-installer.sh"
+  [ -x "$installer" ] || installer="/usr/share/navi/installers/element-installer.sh"
+  if [ ! -x "$installer" ]; then
+    warn "element installer not found — skipping (later: navi-extras --install element)"
+    return 0
+  fi
+  if bash "$installer"; then
+    ok "element installed natively"
+    # Electron can't auto-detect the secret store on sway/wayland — force
+    # gnome-libsecret so safeStorage uses the keyring instead of falling
+    # back to plaintext (which users correctly reject).
+    for d in /usr/share/applications ~/.local/share/applications; do
+      if [ -f "$d/element-desktop.desktop" ]; then
+        $DOAS sed -i 's|^Exec=element-desktop|Exec=element-desktop --password-store=gnome-libsecret|' "$d/element-desktop.desktop" 2>/dev/null ||           sed -i 's|^Exec=element-desktop|Exec=element-desktop --password-store=gnome-libsecret|' "$d/element-desktop.desktop"
+      fi
+    done
+  else
+    warn "element installer failed — retry later with: navi-extras --install element"
+  fi
+}
+
+setup_cyberia() {
+  step "cyberia (xvoidsx's nightshadeNeon Matrix client)"
+  # Friendly fork of pkulak's matui — pinned release, one static binary.
+  # x86_64 only for now; aarch64 warns and skips until an ARM build lands.
+  # Version-stamped so navi-update upgrades it when the pin moves
+  # (previously: binary-exists check meant updates never landed).
+  local want="cyberia-v1.1.6"
+  local stamp="/var/lib/navi/cyberia-version"
+  local have=""
+  [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
+  if [ -x /usr/bin/cyberia ] && [ "$have" = "$want" ]; then
+    ok "cyberia $want already in /usr/bin"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping cyberia (re-run install.sh --yes later)"
+  else
+    info "installing cyberia $want..."
+    local cyberia_tmp
+    cyberia_tmp="$(mktemp)"
+    if fetch "https://github.com/xvoidsx/cyberia/releases/download/${want}/cyberia" -o "$cyberia_tmp" \
+        && [ "$(uname -m)" = "x86_64" ] \
+        && $DOAS install -m 0755 "$cyberia_tmp" /usr/bin/cyberia; then
+      $DOAS mkdir -p "$(dirname "$stamp")"
+      echo "$want" | $DOAS tee "$stamp" >/dev/null
+      ok "cyberia $want -> /usr/bin/cyberia"
+    else
+      warn "cyberia install failed or unsupported arch — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$cyberia_tmp"
+  fi
+  # icon: katakana placeholder (Ryoko owns the final design) — Icon=cyberia
+  # in navi-cyberia.desktop resolves via hicolor
+  local icon_src="$REPO_DIR/wired/icons/cyberia.svg"
+  if [ -f "$icon_src" ]; then
+    $DOAS install -m 0644 "$icon_src" /usr/share/icons/hicolor/scalable/apps/cyberia.svg \
+      && ok "cyberia icon -> hicolor/scalable/apps" \
+      || warn "cyberia icon install failed"
+    # refresh the icon cache so rofi/panels pick it up without a relog
+    $DOAS gtk-update-icon-cache -q /usr/share/icons/hicolor 2>/dev/null || true
+  else
+    warn "cyberia icon not in repo (wired/icons/cyberia.svg) — skipping"
+  fi
+}
+
+setup_navi_radio() {
+  step "navi-radio (xvoidsx's Electron music app)"
+  # Pinned release .deb — native filesystem access for the local music library.
+  # (The webapp is retired: Brave disables the File System Access API by default.)
+  # Version-stamped so navi-update upgrades it when the pin moves.
+  local want="v1.0.0"
+  local ver="${want#v}"
+  local stamp="/var/lib/navi/navi-radio-version"
+  local have=""
+  [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
+  if [ "$have" = "$want" ] && dpkg -s navi-radio >/dev/null 2>&1; then
+    ok "navi-radio $want already installed"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping navi-radio (re-run install.sh --yes later)"
+  else
+    info "installing navi-radio $want..."
+    local deb_tmp
+    deb_tmp="$(mktemp --suffix=.deb)"
+    if fetch "https://github.com/xvoidsx/navi-radio/releases/download/${want}/navi-radio_${ver}_amd64.deb" -o "$deb_tmp" \
+        && [ "$(uname -m)" = "x86_64" ] \
+        && $DOAS dpkg -i "$deb_tmp"; then
+      $DOAS mkdir -p "$(dirname "$stamp")"
+      echo "$want" | $DOAS tee "$stamp" >/dev/null
+      ok "navi-radio $want installed"
+    else
+      warn "navi-radio install failed or unsupported arch — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$deb_tmp"
+  fi
+  # Retire the old webapp launcher — the native app replaces it.
+  # (navi-webapp can't uninstall it: the .desktop left the repo.)
+  if [ -f "$HOME/.local/share/applications/navi-radio.desktop" ]; then
+    rm -f "$HOME/.local/share/applications/navi-radio.desktop"
+    ok "retired navi-radio webapp launcher (native app replaces it)"
+  fi
+}
+
+setup_sumi() {
+  step "sumi (xvoidsx's Electron writing app)"
+  # Pinned release .deb — native open/save file dialogs.
+  # (The webapp is retired: Brave disables the File System Access API by default.)
+  # Version-stamped so navi-update upgrades it when the pin moves.
+  local want="v1.0.0"
+  local ver="${want#v}"
+  local stamp="/var/lib/navi/sumi-version"
+  local have=""
+  [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
+  if [ "$have" = "$want" ] && dpkg -s sumi >/dev/null 2>&1; then
+    ok "sumi $want already installed"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping sumi (re-run install.sh --yes later)"
+  else
+    info "installing sumi $want..."
+    local deb_tmp
+    deb_tmp="$(mktemp --suffix=.deb)"
+    if fetch "https://github.com/xvoidsx/sumi/releases/download/${want}/sumi_${ver}_amd64.deb" -o "$deb_tmp" \
+        && [ "$(uname -m)" = "x86_64" ] \
+        && $DOAS dpkg -i "$deb_tmp"; then
+      $DOAS mkdir -p "$(dirname "$stamp")"
+      echo "$want" | $DOAS tee "$stamp" >/dev/null
+      ok "sumi $want installed"
+    else
+      warn "sumi install failed or unsupported arch — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$deb_tmp"
+  fi
+  # Retire the old webapp launcher — the native app replaces it.
+  # (navi-webapp can't uninstall it: the .desktop left the repo.)
+  if [ -f "$HOME/.local/share/applications/sumi.desktop" ]; then
+    rm -f "$HOME/.local/share/applications/sumi.desktop"
+    ok "retired sumi webapp launcher (native app replaces it)"
+  fi
+}
+
+setup_copland() {
+  step "copland (xvoidsx's Electron terminal)"
+  # Pinned release .deb — dogfooding build, NOT the default terminal yet.
+  # (Alacritty remains default until copland earns it via navi mods integration.)
+  # Version-stamped so navi-update upgrades it when the pin moves.
+  local want="v0.9.1"
+  local ver="${want#v}"
+  local stamp="/var/lib/navi/copland-version"
+  local have=""
+  [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
+  if [ "$have" = "$want" ] && dpkg -s copland >/dev/null 2>&1; then
+    ok "copland $want already installed"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping copland (re-run install.sh --yes later)"
+  else
+    info "installing copland $want (dogfood build)..."
+    local deb_tmp
+    deb_tmp="$(mktemp --suffix=.deb)"
+    if fetch "https://github.com/xvoidsx/copland/releases/download/${want}/copland_${ver}_amd64.deb" -o "$deb_tmp" \
+        && [ "$(uname -m)" = "x86_64" ] \
+        && $DOAS dpkg -i "$deb_tmp"; then
+      $DOAS mkdir -p "$(dirname "$stamp")"
+      echo "$want" | $DOAS tee "$stamp" >/dev/null
+      ok "copland $want installed (dogfood — alacritty remains default)"
+    else
+      warn "copland install failed or unsupported arch — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$deb_tmp"
+  fi
+}
+
+setup_fossfit() {
+  step "FOSSfit (xvoidsx's Electron fitness app)"
+  # Pinned release .deb.
+  # Version-stamped so navi-update upgrades it when the pin moves.
+  local want="v2.4.0"
+  local ver="${want#v}"
+  local stamp="/var/lib/navi/fossfit-version"
+  local have=""
+  [ -f "$stamp" ] && have="$(cat "$stamp" 2>/dev/null || true)"
+  if [ "$have" = "$want" ] && dpkg -s fossfit >/dev/null 2>&1; then
+    ok "FOSSfit $want already installed"
+  elif ! host_up https://github.com; then
+    warn "github unreachable — skipping FOSSfit (re-run install.sh --yes later)"
+  else
+    info "installing FOSSfit $want..."
+    local deb_tmp
+    deb_tmp="$(mktemp --suffix=.deb)"
+    if fetch "https://github.com/xvoidsx/FOSSfit/releases/download/${want}/fossfit_${ver}_amd64.deb" -o "$deb_tmp" \
+        && [ "$(uname -m)" = "x86_64" ] \
+        && $DOAS dpkg -i "$deb_tmp"; then
+      $DOAS mkdir -p "$(dirname "$stamp")"
+      echo "$want" | $DOAS tee "$stamp" >/dev/null
+      ok "FOSSfit $want installed"
+    else
+      warn "FOSSfit install failed or unsupported arch — skipping (re-run install.sh --yes later)"
+    fi
+    rm -f "$deb_tmp"
+  fi
+}
+
+setup_tailscale() {
+  step "tailscale (mesh VPN)"
+  if command -v tailscale >/dev/null 2>&1; then
+    ok "tailscale already installed"
+  else
+    local installer="$REPO_DIR/scripts/installers/tailscale-installer.sh"
+    [ -x "$installer" ] || installer="/usr/share/navi/installers/tailscale-installer.sh"
+    if [ ! -x "$installer" ]; then
+      warn "tailscale installer not found — skipping (later: navi-extras --install tailscale)"
+      return 0
+    fi
+    if bash "$installer"; then
+      ok "tailscale installed — run 'tailscale up' to join your tailnet"
+    else
+      warn "tailscale installer failed — retry later with: navi-extras --install tailscale"
+      return 0
+    fi
+  fi
+  # let the user run tailscale commands without root: one-time operator grant
+  # so navi-tailscale (and `tailscale file get` for taildrop) just works.
+  # doas is used because `tailscale set` needs root; $USER is the real user
+  # here since install.sh doesn't run as root itself.
+  if doas tailscale set --operator="$USER" 2>/dev/null; then
+    ok "tailscale operator set to $USER — no root needed for tailscale commands"
+  else
+    warn "could not set tailscale operator — run: doas tailscale set --operator=\$USER"
   fi
 }
 
@@ -1167,6 +2082,7 @@ setup_gtk_theme() {
 [org/gnome/desktop/interface]
 gtk-theme='nightshadeNeon'
 icon-theme='Moka'
+cursor-theme='Bibata-Modern-Ice'
 color-scheme='prefer-dark'
 EOF
   # The profile is the piece RC20.x was missing: without
@@ -1199,8 +2115,33 @@ setup_sddm() {
   done
   $DOAS install -m 644 "$WIRED_DIR/sessions/navi.desktop" \
     /usr/share/wayland-sessions/navi.desktop
-  $DOAS install -m 644 "$WIRED_DIR/sessions/navi-x11.desktop" \
-    /usr/share/xsessions/navi.desktop
+  # Wayland-only (2026-10-08): the X11 session is retired. Remove the
+  # session file on existing machines so SDDM stops offering it. The
+  # i3/picom/polybar configs stay in the repo as the port-back kit.
+  $DOAS rm -f /usr/share/xsessions/navi.desktop
+  # stamp the session names from wired/VERSION (single source of truth) so
+  # SDDM shows the channel — "navi 2.0 "eiri"" vs "navi 1.6 "mika"" — instead
+  # of a stale hardcoded release. every deploy and every navi-update
+  # refreshes these, so mika updates re-stamp automatically.
+  local sver sname
+  sver="$(printf '%s' "$NAVI_VERSION" | awk '{print $1}')"
+  sname="$(printf '%s' "$NAVI_VERSION" | awk '{print $2}' | tr -d '"')"
+  $DOAS sed -i -e "s/^Name=.*/Name=navi $sver \"$sname\" (Wayland)/" \
+    /usr/share/wayland-sessions/navi.desktop
+  # stamp the theme footer too — Main.qml hardcodes a release string and
+  # would otherwise show a stale version on the login screen itself.
+  $DOAS sed -i -e "s/text: \"navi .*/text: \"navi $sver \\\\\"$sname\\\\\"\"/" \
+    /usr/share/sddm/themes/navi/Main.qml
+  # auto-unlock the login keyring on SDDM login so Element, Signal,
+  # Chromium etc. get encryption without a separate keyring password.
+  # libpam-gnome-keyring must be installed (see PKGS above).
+  if [ -f /etc/pam.d/sddm ]; then
+    grep -q "pam_gnome_keyring.so" /etc/pam.d/sddm 2>/dev/null || {
+      $DOAS sh -c 'printf "%s\n" "auth optional pam_gnome_keyring.so" >> /etc/pam.d/sddm'
+      $DOAS sh -c 'printf "%s\n" "session optional pam_gnome_keyring.so auto_start" >> /etc/pam.d/sddm'
+      ok "sddm unlocks the login keyring on sign-in"
+    }
+  fi
   $DOAS systemctl enable sddm
   ok "sddm serves the navi login; pick Wayland or X11 at the prompt"
 }
@@ -1208,22 +2149,47 @@ setup_sddm() {
 # ---------------------------------------------------------------- chromium
 
 # Chromium ships navi-flavored: the nightshadeNeon theme (by rav3ndust, on
-# the Chrome Web Store) installs itself via managed enterprise policy on
-# first launch — no clicks, no profile surgery. Force-install means the
-# theme stays put while the policy is in place; that's the price of a
-# curated default. Dark mode is forced explicitly too: Chromium's
-# system-theme auto-detection is unreliable on sway (it needs
+# the Chrome Web Store) plus blackice install on first launch — no clicks,
+# no profile surgery. They arrive per-user via Chromium's External
+# Extensions mechanism, scoped to Chromium's own config dir
+# (~/.config/chromium) — deliberately NOT via managed enterprise policy:
+# /etc/chromium/policies/managed is shared with Chromium forks (Helium
+# reads it too), so the old force-install policy leaked into Helium with
+# its "managed by your organization" banner, making Helium unusable as a
+# default. Per-user install also means the user can remove them — the OS
+# suggests, the user decides. Dark mode is forced explicitly too:
+# Chromium's system-theme auto-detection is unreliable on sway (it needs
 # xdg-desktop-portal's Settings portal to see the prefer-dark dconf key,
 # and silently falls back to light without it), so a tiny wrapper in
 # /usr/local/bin injects --force-dark-mode on every launch. That covers
 # the stock launcher, the webapp launchers, xdg-open, and the terminal —
 # and an explicit `chromium --force-light-mode` still wins.
 setup_chromium() {
-  step "chromium (nightshadeNeon theme via managed policy)"
-  $DOAS install -d -m 755 /etc/chromium/policies/managed
-  $DOAS install -m 644 "$WIRED_DIR/chromium/policies/managed/navi.json" \
-    /etc/chromium/policies/managed/navi.json
-  ok "nightshadeNeon theme installs on first Chromium launch"
+  step "chromium (nightshadeNeon theme + blackice, per-user)"
+  # Retire the managed policy (migration for existing installs): it was
+  # the thing leaking into Helium. rmdir only removes empty dirs, so
+  # anyone else's policies are left alone.
+  if [ -f /etc/chromium/policies/managed/navi.json ]; then
+    $DOAS rm -f /etc/chromium/policies/managed/navi.json
+    $DOAS rmdir /etc/chromium/policies/managed 2>/dev/null || true
+    $DOAS rmdir /etc/chromium/policies 2>/dev/null || true
+    ok "retired /etc/chromium managed policy (was leaking into Helium)"
+  fi
+  # nightshadeNeon theme + blackice as External Extensions, installed on
+  # first Chromium launch and scoped to Chromium's own config dir so forks
+  # (Helium) never see them. $HOME side is deployed in deploy_configs
+  # (customized configs stay sacred); /etc/skel here covers future users.
+  local ext skel_ext
+  for ext in lllmaajdpjgggpijpcaholegiejdoihk nncobpmjfngafidkngebojkabaabbkhm; do
+    skel_ext="/etc/skel/.config/chromium/External Extensions/$ext.json"
+    if [ ! -f "$skel_ext" ]; then
+      $DOAS install -d -m 755 "/etc/skel/.config/chromium/External Extensions"
+      $DOAS install -m 644 "$WIRED_DIR/chromium/external-extensions/$ext.json" "$skel_ext"
+      ok "skel: chromium external extension $ext"
+    else
+      info "skel: chromium external extension $ext already present"
+    fi
+  done
   if [[ -x /usr/bin/chromium ]]; then
     $DOAS install -m 755 "$WIRED_DIR/chromium/usr-local-bin/chromium" \
       /usr/local/bin/chromium
@@ -1246,6 +2212,239 @@ setup_chromium() {
     fi
   else
     warn "chromium not found at /usr/bin/chromium; skipping dark-mode wrapper"
+  fi
+}
+
+# ---------------------------------------------------------------- brave
+
+# Brave is navi's default browser (Raven's call, 2026-09-29): the most
+# private Chromium out of the box, with Leo AI, Brave Wallet, sync, and
+# Shields built in. Stock Chromium stays installed as the vanilla
+# alternative; the user can switch the default browser + webapp runtime
+# anytime with navi-browser. We experiment with this setup on bench
+# installs first — reverting is one commit.
+#
+# navi's touch is deliberately light: Brave's own ultradark look is
+# beautiful as-is, so we seed two config files with user-overridable
+# defaults and stop there. No managed policy (no "Managed by your
+# organization" banner), no force-installed extensions, no imposed
+# password manager — Shields covers ad/tracker blocking, so blackice
+# stays Chromium-only. The OS suggests, the user decides.
+#
+# Seeded keys (verified against brave-core source, 2026-09-30):
+#   Default/Preferences: browser.theme.color_scheme2=2 (dark),
+#     brave.darker_mode=true (ultradark), brave.location_bar_is_wide=true
+#   Local State: brave.tabs.compact_horizontal_tabs=true
+#     (compact tabs is a Local State pref — seeding it in Preferences
+#     silently does nothing)
+# Both land in /etc/skel (future users) and the invoking user's $HOME
+# (this install). Existing files are never overwritten, and Brave must
+# not be running while seeding — it rewrites Preferences on exit. Every
+# installed Brave variant (release, nightly, origin, origin-nightly —
+# origin nightly shares origin's profile dir) gets the same treatment:
+# the navi vision follows the browser that is installed.
+setup_brave() {
+  step "brave (navi's default browser)"
+  # Brave's official apt repo — same keyring/sources pattern as
+  # scripts/installers/brave-origin-installer.sh.
+  # Guarded like every third-party fetch in setup_agents: Brave's S3 host
+  # flaking must degrade to a warning, never abort the whole provision
+  # under `set -e` (Brave is the default browser — losing it silently is
+  # bad, killing a multi-hour install over it is worse).
+  if [ ! -f /etc/apt/sources.list.d/brave-browser-release.sources ]; then
+    if ! host_up https://brave-browser-apt-release.s3.brave.com; then
+      warn "Brave S3 unreachable — skipping brave-browser (re-run install.sh --yes later)"
+      return 0
+    fi
+    if $DOAS curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
+        https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg \
+      && $DOAS curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources \
+        https://brave-browser-apt-release.s3.brave.com/brave-browser.sources \
+      && $DOAS apt-get update; then
+      ok "Brave apt repository added"
+    else
+      warn "Brave repo setup failed — skipping brave-browser (re-run install.sh --yes later)"
+      return 0
+    fi
+  else
+    info "Brave apt repository already present"
+  fi
+  if ! command -v brave-browser >/dev/null 2>&1; then
+    if $DOAS apt-get install -y brave-browser; then
+      ok "brave-browser installed"
+    else
+      warn "brave-browser install failed — skipping (re-run install.sh --yes later)"
+    fi
+  else
+    info "brave-browser already installed"
+  fi
+
+  seed_brave_profile /etc/skel "Brave-Browser" doas
+  seed_brave_profile "$HOME" "Brave-Browser"
+  # The navi vision follows every installed Brave variant — not just
+  # release. Origin nightly shares release Origin's profile dir
+  # (Brave-Origin), so it needs no separate seed.
+  if command -v brave-browser-nightly >/dev/null 2>&1; then
+    seed_brave_profile /etc/skel "Brave-Browser-Nightly" doas
+    seed_brave_profile "$HOME" "Brave-Browser-Nightly"
+  fi
+  if command -v brave-origin-stable >/dev/null 2>&1 \
+    || command -v brave-origin >/dev/null 2>&1 \
+    || command -v brave-origin-nightly >/dev/null 2>&1; then
+    seed_brave_profile /etc/skel "Brave-Origin" doas
+    seed_brave_profile "$HOME" "Brave-Origin"
+  fi
+
+  # navi's browser runtime defaults to Brave: ~/.config/navi/default-browser
+  # drives navi-browser-run (webapps). Only write when absent or still
+  # holding the old chromium default — an explicit user choice is sacred.
+  seed_default_browser /etc/skel doas
+  seed_default_browser "$HOME"
+
+  # system default browser (xdg): Brave. Same rule — only flip when unset
+  # or still on the old chromium default. Runs as the user; harmless if it
+  # fails (e.g. no session during install).
+  local xdg_cur=""
+  xdg_cur="$(xdg-settings get default-web-browser 2>/dev/null || true)"
+  if [ -z "$xdg_cur" ] || [ "$xdg_cur" = "chromium.desktop" ]; then
+    if xdg-settings set default-web-browser brave-browser.desktop 2>/dev/null; then
+      ok "system default browser: Brave"
+    else
+      warn "could not set xdg default browser (no session?)"
+    fi
+  else
+    info "xdg default browser already '$xdg_cur' — left alone"
+  fi
+}
+
+# seed_brave_profile <base> <BraveSoftware-subdir> [doas] — write navi's
+# Brave defaults under <base>/.config/BraveSoftware/<subdir>/. Existing
+# files are left alone. Pass "doas" to elevate (for /etc/skel).
+seed_brave_profile() {
+  local base="$1" subdir="$2" priv="${3:-}"
+  local dir="$base/.config/BraveSoftware/$subdir"
+  if pgrep -x brave >/dev/null 2>&1 || pgrep -x brave-browser >/dev/null 2>&1; then
+    warn "Brave is running — skipping config seed (it rewrites Preferences on exit)"
+    return 0
+  fi
+  if [ -n "$priv" ]; then
+    $DOAS install -d -m 755 "$dir/Default"
+  else
+    install -d -m 755 "$dir/Default"
+  fi
+  if [ ! -f "$dir/Default/Preferences" ]; then
+    if [ -n "$priv" ]; then
+      $DOAS tee "$dir/Default/Preferences" >/dev/null <<'EOF'
+{
+  "browser": {
+    "theme": {
+      "color_scheme2": 2
+    }
+  },
+  "brave": {
+    "darker_mode": true,
+    "location_bar_is_wide": true
+  }
+}
+EOF
+    else
+      tee "$dir/Default/Preferences" >/dev/null <<'EOF'
+{
+  "browser": {
+    "theme": {
+      "color_scheme2": 2
+    }
+  },
+  "brave": {
+    "darker_mode": true,
+    "location_bar_is_wide": true
+  }
+}
+EOF
+    fi
+    ok "Brave Preferences seeded ($dir/Default/Preferences)"
+  else
+    info "Brave Preferences already exists — left alone"
+  fi
+  if [ ! -f "$dir/Local State" ]; then
+    if [ -n "$priv" ]; then
+      $DOAS tee "$dir/Local State" >/dev/null <<'EOF'
+{
+  "brave": {
+    "tabs": {
+      "compact_horizontal_tabs": true
+    }
+  }
+}
+EOF
+    else
+      tee "$dir/Local State" >/dev/null <<'EOF'
+{
+  "brave": {
+    "tabs": {
+      "compact_horizontal_tabs": true
+    }
+  }
+}
+EOF
+    fi
+    ok "Brave Local State seeded ($dir/Local State)"
+  else
+    info "Brave Local State already exists — left alone"
+  fi
+}
+
+# seed_default_browser <base> [doas] — default the navi browser runtime to
+# Brave. Writes only when absent or still on the old chromium default.
+seed_default_browser() {
+  local base="$1" priv="${2:-}"
+  local cfg="$base/.config/navi/default-browser"
+  local cur=""
+  if [ -f "$cfg" ]; then
+    cur="$(cat "$cfg" 2>/dev/null || true)"
+  fi
+  if [ -z "$cur" ] || [ "$cur" = "chromium" ]; then
+    if [ -n "$priv" ]; then
+      $DOAS install -d -m 755 "$base/.config/navi"
+      printf 'brave\n' | $DOAS tee "$cfg" >/dev/null
+    else
+      install -d -m 755 "$base/.config/navi"
+      printf 'brave\n' >"$cfg"
+    fi
+    ok "navi browser runtime default: brave ($cfg)"
+  else
+    info "navi browser runtime already '$cur' — left alone"
+  fi
+}
+
+# ---------------------------------------------------------------- etcher
+
+# balenaEtcher (Raven's call, 2026-09-30): flash OS images to SD cards and
+# USB drives, safely and easily. Ships out of the box so nobody needs to
+# reach for GNOME Disks to flash an ISO. Long-term, Raven wants a native
+# nightshadeNeon navi-disks for this; Etcher holds the fort until then.
+#
+# Distribution: balena's official Cloudsmith apt repo (the old Bintray
+# deb.etcher.io is long dead). We replicate their setup.deb.sh manually —
+# keyring + sources file, no piped-to-bash.
+setup_etcher() {
+  step "balenaEtcher (USB/SD image flasher)"
+  if [ ! -f /etc/apt/sources.list.d/balena-etcher.list ]; then
+    $DOAS curl -fsSL https://dl.cloudsmith.io/public/balena/etcher/gpg.70528471AFF9A051.key \
+      | $DOAS gpg --dearmor -o /usr/share/keyrings/balena-etcher-archive-keyring.gpg
+    $DOAS chmod 644 /usr/share/keyrings/balena-etcher-archive-keyring.gpg
+    printf '%s\n' "deb [signed-by=/usr/share/keyrings/balena-etcher-archive-keyring.gpg] https://dl.cloudsmith.io/public/balena/etcher/deb/debian trixie main" \
+      | $DOAS tee /etc/apt/sources.list.d/balena-etcher.list >/dev/null
+    $DOAS apt-get update
+    ok "balenaEtcher apt repository added"
+  else
+    info "balenaEtcher apt repository already present"
+  fi
+  if ! dpkg -l balena-etcher-electron 2>/dev/null | grep -q "^ii"; then
+    $DOAS apt-get install -y balena-etcher-electron
+    ok "balena-etcher-electron installed"
+  else
+    info "balena-etcher-electron already installed"
   fi
 }
 
@@ -1382,8 +2581,10 @@ main() {
     install_commands
     setup_doas
     setup_sudo
+    setup_zram
     setup_agents
     setup_navivim
+    setup_navicode
     setup_mods
     setup_heylain
     setup_environment
@@ -1393,8 +2594,21 @@ main() {
     setup_dirs
     setup_sddm
     setup_chromium
+    setup_brave
+    # setup_etcher — DISABLED 2026-10-01: balena-etcher-electron hard-depends
+    # on gconf2, which was removed from Debian trixie entirely. apt refuses
+    # to install it. Re-enable if balena fixes their packaging, or retire
+    # when navi-imprint (native flasher) lands.
     setup_fonts
     setup_webapps
+    setup_telegram
+    setup_element
+    setup_cyberia
+    setup_navi_radio
+    setup_sumi
+    setup_copland
+    setup_fossfit
+    setup_tailscale
     ok "deploy-only refresh complete (navi $NAVI_VERSION)"
     exit 0
   fi
@@ -1417,8 +2631,10 @@ main() {
   install_commands
   setup_doas
   setup_sudo
+  setup_zram
   setup_agents
   setup_navivim
+  setup_navicode
   setup_mods
   setup_heylain
   setup_environment
@@ -1428,10 +2644,21 @@ main() {
   setup_dirs
   setup_sddm
   setup_chromium
+  setup_brave
+  # setup_etcher — DISABLED 2026-10-01: gconf2 gone from trixie (see above)
   setup_fonts
   setup_webapps
+  setup_telegram
+  setup_element
+  setup_cyberia
+  setup_navi_radio
+  setup_sumi
+  setup_copland
+  setup_fossfit
+  setup_tailscale
   tighten_sudo
   done_banner
 }
 
 main "$@"
+

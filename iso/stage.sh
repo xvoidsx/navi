@@ -44,7 +44,7 @@ cp -a "$HERE/config" "$BUILD/config"
 mkdir -p "$BUILD/config/includes.chroot/opt/navi-iso"
 cp -a "$REPO/install.sh" "$REPO/wired" "$REPO/scripts" "$REPO/mods" "$REPO/iso/installer" \
   "$BUILD/config/includes.chroot/opt/navi-iso/"
-for m in navi-networking/navi-networking navi-calendar/navi-calendar navi-audio/navi-audio; do
+for m in navi-networking/navi-networking navi-calendar/navi-calendar navi-audio/navi-audio navi-weather/navi-weather navi-power/navi-power navi-display/navi-display navi-bluetooth/navi-bluetooth navi-reminders/navi-reminders navi-reminders/navi-reminder-fire navi-lain-config/navi-lain-config navi-agents-config/navi-agents-config navi-get/navi-get navi-browser/navi-browser navi-notifs/navi-notifs navi-nowplaying/navi-nowplaying wiredrop/wiredrop; do
   # the payload must carry EXECUTABLE binaries. git doesn't always preserve
   # the +x bit (gh-push-mika stored these as 100644 once and red-lit an ISO
   # build), so enforce it here instead of trusting the checkout mode.
@@ -77,6 +77,16 @@ cp -a "$NAVIVIM_STAGE/navivim" "$BUILD/config/includes.chroot/opt/navi-iso/naviv
 [ -f "$BUILD/config/includes.chroot/opt/navi-iso/navivim/nvim-linux-x86_64.tar.gz" ] \
   || { echo "stage.sh: neovim tarball staging failed" >&2; exit 1; }
 echo "staged NaviVim $NAVIVIM_PIN + neovim $NAVIVIM_NVIM_VERSION (x86_64)"
+
+# naviCode: stage the nightshadeNeon .vsix so fresh ISOs don't need
+# network to install the theme. The installer falls back to GitHub
+# fetch if staging is missing, but staged is preferred.
+NAVICODE_VSIX_URL="https://github.com/xvoidsx/naviCode/raw/main/nightshadeNeon-VSC/nightshade-neon-1.0.0.vsix"
+if ! curl -fsSL -o "$BUILD/config/includes.chroot/opt/navi-iso/naviCode.vsix" "$NAVICODE_VSIX_URL" 2>/dev/null; then
+  echo "stage.sh: WARNING: naviCode .vsix fetch failed — ISO will fall back to GitHub" >&2
+else
+  echo "staged naviCode nightshadeNeon .vsix"
+fi
 
 # live-build only runs hooks when they are executable —
 # make that true no matter how the repo was fetched.

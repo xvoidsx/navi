@@ -1,0 +1,290 @@
+/* ============================================================================
+ * GLASS
+ * ----------------------------------------------------------------------------
+ * The bar as frosted glass. Translucent, light, airy — the wallpaper shows
+ * through everywhere, softened like looking through ice. Where refined
+ * obsidian is a heavy dark slab, glass is its weightless sibling: thin
+ * bright edges where light catches, soft diffusion everywhere else.
+ *
+ * The whole trick is the top highlight: a 1px inset light line on every
+ * surface is what sells "glass" to the eye. No backdrop blur exists here,
+ * so translucency plus that highlight does all the work.
+ *
+ * Color stays cool and neutral — silver-blue frost — with nightshadeNeon
+ * hues reserved for state: pink for attention, cyan for signal, green for
+ * the machine well. Frost is the canvas; color is the weather on it.
+ *
+ * Motion budget: a single slow sheen sweeping the bar's edge (~1 change per
+ * 14s). Glass catches light; it doesn't chase it.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ * ========================================================================== */
+
+@define-color np #ff10f0;
+@define-color ng #39ff14;
+@define-color nc #00ffff;
+@define-color nr #ff3131;
+@define-color frost rgba(225, 235, 245, 0.92);
+@define-color frost-dim rgba(225, 235, 245, 0.6);
+@define-color frost-faint rgba(225, 235, 245, 0.32);
+@define-color edge rgba(255, 255, 255, 0.20);
+@define-color edge-bright rgba(255, 255, 255, 0.38);
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", monospace;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* Frosted pane: the wallpaper diffuses through, light catches the top edge. */
+window#waybar {
+    color: @frost;
+    background-color: rgba(16, 20, 28, 0.42);
+    border: 1px solid @edge;
+    border-radius: 10px;
+    box-shadow:
+        inset 0 1px 0 @edge-bright,
+        inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+        0 4px 24px rgba(0, 0, 0, 0.35);
+    animation: sheen 14s ease-in-out infinite;
+}
+
+@keyframes sheen {
+    0%   { border-top-color: rgba(255, 255, 255, 0.20); }
+    50%  { border-top-color: rgba(255, 255, 255, 0.42); }
+    100% { border-top-color: rgba(255, 255, 255, 0.20); }
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Modules are frosted cells. Same glass treatment, smaller.
+ *
+ * SPACING CONTRACT: every module gets the same margin/padding and the same
+ * cell. No per-module exceptions.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#power-profiles-daemon,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 3px 3px;
+    padding: 2px 9px;
+    color: @frost-dim;
+    background-color: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 7px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        0 1px 4px rgba(0, 0, 0, 0.2);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    transition: color 200ms ease-out, background-color 200ms ease-out;
+}
+
+#clock {
+    color: @frost;
+    background-color: rgba(255, 255, 255, 0.12);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
+#custom-wired-launcher,
+#custom-power {
+    color: @np;
+    font-size: 12px;
+    text-shadow:
+        0 0 8px rgba(255, 16, 240, 0.7),
+        0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* Workspaces: frosted cells; the active one goes clear and bright. */
+#workspaces button {
+    min-width: 20px;
+    margin: 0 1px;
+    padding: 1px 7px;
+    color: @frost-faint;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 5px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+#workspaces button.empty {
+    color: @frost-faint;
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: #fff;
+    background-color: rgba(255, 16, 240, 0.28);
+    border-color: rgba(255, 16, 240, 0.55);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        0 0 14px rgba(255, 16, 240, 0.4);
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.8);
+}
+
+#workspaces button.urgent {
+    color: #fff;
+    background-color: rgba(255, 49, 49, 0.3);
+    border-color: rgba(255, 49, 49, 0.6);
+}
+
+#window {
+    color: @frost-faint;
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+#custom-weather { font-size: 9px; }
+
+/* ----------------------------------------------------------------------------
+ * State. Frost is the canvas; color is the weather on it.
+ * -------------------------------------------------------------------------- */
+#network.disconnected,
+#battery.critical {
+    color: #ffb3b3;
+    border-color: rgba(255, 49, 49, 0.55);
+    background-color: rgba(255, 49, 49, 0.16);
+    text-shadow: 0 0 8px rgba(255, 49, 49, 0.7);
+}
+
+#battery.warning {
+    color: #ffc7f5;
+    border-color: rgba(255, 16, 240, 0.45);
+}
+
+#battery.charging { color: #c9ffb8; }
+
+#bluetooth.off,
+#custom-bluetooth.off,
+#custom-tailscale.off,
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep,
+#custom-nowplaying.idle {
+    color: @frost-faint;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+#bluetooth.connected,
+#custom-bluetooth.connected,
+#custom-tailscale.connected {
+    color: #c9fbff;
+    border-color: rgba(0, 255, 255, 0.4);
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.7);
+}
+
+#custom-update.updates-available,
+#custom-bell.has-notifs,
+#custom-agent.agent-ready,
+#custom-agent.agent-working {
+    color: #ffc7f5;
+    border-color: rgba(255, 16, 240, 0.45);
+    background-color: rgba(255, 16, 240, 0.12);
+    text-shadow: 0 0 10px rgba(255, 16, 240, 0.8);
+}
+
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: #fff;
+    border-color: rgba(255, 16, 240, 0.65);
+    background-color: rgba(255, 16, 240, 0.2);
+    text-shadow: 0 0 12px rgba(255, 16, 240, 1);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        0 0 16px rgba(255, 16, 240, 0.45);
+}
+
+#custom-nowplaying.playing {
+    color: #ffc7f5;
+    border-color: rgba(255, 16, 240, 0.4);
+}
+
+#custom-nowplaying.paused { color: @frost-dim; }
+
+#custom-volume.muted {
+    color: @frost-faint;
+}
+
+#idle_inhibitor.activated { color: #fff; }
+
+#tray > .passive { opacity: 0.45; }
+#tray > .needs-attention {
+    background-color: rgba(255, 49, 49, 0.2);
+    border-radius: 5px;
+}
+
+/* Hover: the frost clears and the cell brightens. */
+#workspaces button:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover,
+#custom-tailscale:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        0 0 12px rgba(255, 255, 255, 0.15);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
+#custom-power:hover {
+    color: #ffb3b3;
+    border-color: rgba(255, 49, 49, 0.5);
+    background-color: rgba(255, 49, 49, 0.14);
+}
+
+tooltip {
+    color: @frost;
+    background-color: rgba(16, 20, 28, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+tooltip label { color: @frost; }

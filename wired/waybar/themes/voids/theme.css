@@ -1,0 +1,398 @@
+/* ============================================================================
+ * VOIDS
+ * ----------------------------------------------------------------------------
+ * The signature theme. Everything beautiful about nightshadeNeon, all in one
+ * bar: deep black like the space between, neon pink leading, phosphor green
+ * breathing, cyan flowing. The ∅ made into a waybar theme.
+ *
+ * Each hue owns a domain, the way it does across the whole distro:
+ *   PINK   identity and time — the launcher, the clock, the active workspace,
+ *          anything that wants your eyes right now.
+ *   GREEN  the machine alive — cpu, memory, battery, the agent at work.
+ *   CYAN   signal and flow — volume, network, bluetooth, tailscale, the sea
+ *          everything swims in.
+ * White is what things are when they're at rest. Red is the only intruder,
+ * and it only appears when something is actually wrong.
+ *
+ * The signature is the aurora: a slow, low-amplitude drift of all three hues
+ * across the bar's wash (~1 change per 15s). Deep space does not hurry, and
+ * ~15ms per repaint means motion is priced per visible change — so the bar
+ * holds almost still and lets the glow do the work.
+ *
+ * This is the maximal-beauty theme. Bloom is not rationed here.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ * ========================================================================== */
+
+@define-color np #ff10f0;
+@define-color ng #39ff14;
+@define-color nc #00ffff;
+@define-color np-dim rgba(255, 16, 240, 0.55);
+@define-color ng-dim rgba(57, 255, 20, 0.55);
+@define-color nc-dim rgba(0, 255, 255, 0.55);
+@define-color void #030305;
+@define-color bone rgba(240, 235, 245, 0.88);
+@define-color bone-dim rgba(240, 235, 245, 0.5);
+@define-color bone-faint rgba(240, 235, 245, 0.28);
+@define-color nr #ff3131;
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", monospace;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* Deep space with an aurora of all three hues, drifting almost imperceptibly. */
+window#waybar {
+    color: @bone;
+    background-color: @void;
+    background-image:
+        radial-gradient(ellipse 60% 120% at 15% 0%,
+            rgba(255, 16, 240, 0.07) 0%,
+            rgba(255, 16, 240, 0) 70%),
+        radial-gradient(ellipse 60% 120% at 85% 0%,
+            rgba(0, 255, 255, 0.06) 0%,
+            rgba(0, 255, 255, 0) 70%),
+        radial-gradient(ellipse 80% 100% at 50% 100%,
+            rgba(57, 255, 20, 0.04) 0%,
+            rgba(57, 255, 20, 0) 70%);
+    background-size: 220% 100%, 220% 100%, 220% 100%;
+    border: 1px solid rgba(255, 16, 240, 0.22);
+    border-radius: 8px;
+    box-shadow:
+        0 0 24px rgba(255, 16, 240, 0.14),
+        0 0 60px rgba(0, 255, 255, 0.06),
+        inset 0 1px 0 rgba(240, 235, 245, 0.07),
+        inset 0 0 40px rgba(0, 0, 0, 0.6);
+    animation: aurora 15s ease-in-out infinite alternate;
+}
+
+@keyframes aurora {
+    from { background-position: 0% 0, 100% 0, 50% 0; }
+    to   { background-position: 100% 0, 0% 0, 50% 0; }
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Modules are glass cells floating in the void, each glowing in its domain's
+ * hue. Resting state is bone white; the hues speak when there's something to
+ * say.
+ *
+ * SPACING CONTRACT: every module gets the same margin/padding and the same
+ * cell treatment. No per-module exceptions.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#power-profiles-daemon,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 3px 3px;
+    padding: 2px 9px;
+    color: @bone-dim;
+    background-color: rgba(10, 10, 16, 0.55);
+    border: 1px solid rgba(240, 235, 245, 0.10);
+    border-radius: 6px;
+    box-shadow: inset 0 1px 0 rgba(240, 235, 245, 0.05);
+    text-shadow: 0 0 8px rgba(240, 235, 245, 0.25);
+    transition: color 200ms ease-out, border-color 200ms ease-out, box-shadow 200ms ease-out;
+}
+
+/* PINK: identity and time. The launcher is the ∅ — it burns pink. */
+#custom-wired-launcher {
+    color: @np;
+    font-size: 13px;
+    border-color: rgba(255, 16, 240, 0.4);
+    text-shadow:
+        0 0 8px rgba(255, 16, 240, 0.9),
+        0 0 20px rgba(255, 16, 240, 0.5);
+    box-shadow:
+        inset 0 1px 0 rgba(240, 235, 245, 0.05),
+        0 0 14px rgba(255, 16, 240, 0.35);
+}
+
+#clock {
+    color: @np;
+    border-color: rgba(255, 16, 240, 0.35);
+    background-color: rgba(255, 16, 240, 0.08);
+    text-shadow:
+        0 0 8px rgba(255, 16, 240, 0.9),
+        0 0 22px rgba(255, 16, 240, 0.45);
+    box-shadow:
+        inset 0 1px 0 rgba(240, 235, 245, 0.05),
+        0 0 16px rgba(255, 16, 240, 0.3);
+}
+
+#custom-power {
+    color: @np-dim;
+    font-size: 12px;
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.6);
+}
+
+/* GREEN: the machine alive. */
+#memory,
+#cpu,
+#disk,
+#battery {
+    color: @ng-dim;
+    text-shadow: 0 0 8px rgba(57, 255, 20, 0.5);
+}
+
+/* CYAN: signal and flow. */
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#custom-tailscale,
+#backlight {
+    color: @nc-dim;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+}
+
+/* Workspaces: dark cells; the active one is a burning pink pill. */
+#workspaces button {
+    min-width: 22px;
+    margin: 0 1px;
+    padding: 1px 7px;
+    color: @bone-faint;
+    background-color: rgba(10, 10, 16, 0.4);
+    border: 1px solid rgba(240, 235, 245, 0.08);
+    border-radius: 5px;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.empty {
+    color: @bone-faint;
+    border-color: rgba(240, 235, 245, 0.05);
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @void;
+    background-color: @np;
+    border-color: @np;
+    box-shadow:
+        0 0 18px rgba(255, 16, 240, 0.8),
+        0 0 40px rgba(255, 16, 240, 0.35);
+    text-shadow: none;
+}
+
+#workspaces button.urgent {
+    color: @nr;
+    background-color: rgba(255, 49, 49, 0.14);
+    border-color: @nr;
+    box-shadow: 0 0 14px rgba(255, 49, 49, 0.6);
+}
+
+#window {
+    color: @bone-faint;
+    text-shadow: none;
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+#custom-weather {
+    font-size: 9px;
+    color: @bone-faint;
+}
+
+/* ----------------------------------------------------------------------------
+ * State. Each domain lights up in its own hue; red only intrudes on real
+ * trouble. The agent is special: it burns pink when it needs you, glows
+ * green while it works, breathes cyan when it's ready.
+ * -------------------------------------------------------------------------- */
+#network.disconnected,
+#battery.critical {
+    color: @nr;
+    border-color: @nr;
+    text-shadow: 0 0 12px rgba(255, 49, 49, 0.9);
+    box-shadow: 0 0 16px rgba(255, 49, 49, 0.5);
+}
+
+#battery.warning {
+    color: @np;
+    border-color: rgba(255, 16, 240, 0.4);
+    text-shadow: 0 0 10px rgba(255, 16, 240, 0.8);
+}
+
+#battery.charging {
+    color: @ng;
+    border-color: rgba(57, 255, 20, 0.4);
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.8);
+}
+
+#bluetooth.off,
+#custom-bluetooth.off,
+#custom-tailscale.off {
+    color: @bone-faint;
+    text-shadow: none;
+}
+
+#bluetooth.connected,
+#custom-bluetooth.connected,
+#custom-tailscale.connected {
+    color: @nc;
+    border-color: rgba(0, 255, 255, 0.4);
+    text-shadow: 0 0 12px rgba(0, 255, 255, 0.9);
+    box-shadow: 0 0 14px rgba(0, 255, 255, 0.3);
+}
+
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep,
+#custom-nowplaying.idle {
+    color: @bone-faint;
+    text-shadow: none;
+}
+
+#custom-update.updates-available,
+#custom-bell.has-notifs {
+    color: @np;
+    border-color: rgba(255, 16, 240, 0.45);
+    text-shadow: 0 0 12px rgba(255, 16, 240, 0.9);
+    box-shadow: 0 0 16px rgba(255, 16, 240, 0.35);
+}
+
+#custom-agent.agent-ready {
+    color: @nc;
+    border-color: rgba(0, 255, 255, 0.4);
+    text-shadow: 0 0 12px rgba(0, 255, 255, 0.9);
+}
+
+#custom-agent.agent-working {
+    color: @ng;
+    border-color: rgba(57, 255, 20, 0.4);
+    text-shadow: 0 0 12px rgba(57, 255, 20, 0.9);
+    box-shadow: 0 0 16px rgba(57, 255, 20, 0.3);
+}
+
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: @np;
+    border-color: rgba(255, 16, 240, 0.5);
+    text-shadow:
+        0 0 12px rgba(255, 16, 240, 1),
+        0 0 30px rgba(255, 16, 240, 0.5);
+    box-shadow: 0 0 18px rgba(255, 16, 240, 0.45);
+}
+
+#custom-nowplaying.playing {
+    color: @np;
+    border-color: rgba(255, 16, 240, 0.4);
+    text-shadow: 0 0 12px rgba(255, 16, 240, 0.9);
+}
+
+#custom-nowplaying.paused { color: @nc-dim; }
+
+#custom-volume.muted {
+    color: @bone-faint;
+    text-shadow: none;
+}
+
+#idle_inhibitor.activated {
+    color: @np;
+    text-shadow: 0 0 10px rgba(255, 16, 240, 0.8);
+}
+
+#tray > .passive { opacity: 0.45; }
+#tray > .needs-attention {
+    background-color: rgba(255, 49, 49, 0.16);
+    border-radius: 5px;
+}
+
+/* Hover: the cell ignites in its domain's light. */
+#workspaces button:hover,
+#clock:hover,
+#custom-wired-launcher:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover {
+    color: #fff;
+    border-color: rgba(255, 16, 240, 0.6);
+    background-color: rgba(255, 16, 240, 0.14);
+    text-shadow: 0 0 14px rgba(255, 16, 240, 1);
+    box-shadow: 0 0 18px rgba(255, 16, 240, 0.4);
+}
+
+#custom-volume:hover,
+#network:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover,
+#custom-tailscale:hover,
+#backlight:hover {
+    color: #fff;
+    border-color: rgba(0, 255, 255, 0.6);
+    background-color: rgba(0, 255, 255, 0.10);
+    text-shadow: 0 0 14px rgba(0, 255, 255, 1);
+    box-shadow: 0 0 18px rgba(0, 255, 255, 0.35);
+}
+
+#memory:hover,
+#cpu:hover,
+#disk:hover,
+#battery:hover {
+    color: #fff;
+    border-color: rgba(57, 255, 20, 0.6);
+    background-color: rgba(57, 255, 20, 0.10);
+    text-shadow: 0 0 14px rgba(57, 255, 20, 1);
+    box-shadow: 0 0 18px rgba(57, 255, 20, 0.35);
+}
+
+#custom-weather:hover,
+#window:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-agent:hover {
+    color: #fff;
+    border-color: rgba(240, 235, 245, 0.35);
+    text-shadow: 0 0 12px rgba(240, 235, 245, 0.9);
+}
+
+#custom-power:hover {
+    color: @nr;
+    border-color: @nr;
+    background-color: rgba(255, 49, 49, 0.12);
+    text-shadow: 0 0 14px rgba(255, 49, 49, 1);
+    box-shadow: 0 0 18px rgba(255, 49, 49, 0.4);
+}
+
+tooltip {
+    color: @bone;
+    background-color: rgba(3, 3, 5, 0.97);
+    border: 1px solid rgba(255, 16, 240, 0.35);
+    border-radius: 6px;
+    box-shadow:
+        0 0 20px rgba(255, 16, 240, 0.25),
+        0 0 50px rgba(0, 255, 255, 0.08);
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.5);
+}
+
+tooltip label { color: @bone; }

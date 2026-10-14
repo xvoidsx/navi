@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Instagram
-Exec=chromium --force-dark-mode --app=https://www.instagram.com
+Exec=navi-browser-run --force-dark-mode --app=https://www.instagram.com
 Comment=Instagram as a navi webapp
 Terminal=false
 Type=Application

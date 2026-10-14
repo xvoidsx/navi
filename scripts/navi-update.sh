@@ -249,6 +249,9 @@ navi_layer() {
 
   mkdir -p "$UPSTREAM_DIR"
   if [ -d "$UPSTREAM_DIR/.git" ]; then
+    # the rolling eiri tag moves; drop the local copy so fetch doesn't
+    # fail with "would clobber existing tag"
+    git -C "$UPSTREAM_DIR" tag -d eiri 2>/dev/null || true
     git -C "$UPSTREAM_DIR" fetch --tags --prune --filter=blob:none -q 2>/dev/null \
       || die "could not fetch tags from $REPO_URL"
   else
@@ -387,6 +390,7 @@ check_updates() {
   ch="$(channel)"; major="$(channel_major "$ch")"; installed="$(installed_version)"
   mkdir -p "$UPSTREAM_DIR"
   if [ -d "$UPSTREAM_DIR/.git" ]; then
+    git -C "$UPSTREAM_DIR" tag -d eiri 2>/dev/null || true
     git -C "$UPSTREAM_DIR" fetch --tags --prune --filter=blob:none -q 2>/dev/null || true
   else
     git clone --filter=blob:none -q "$REPO_URL" "$UPSTREAM_DIR" 2>/dev/null || true

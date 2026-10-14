@@ -48,7 +48,7 @@ exec_always --no-startup-id systemctl --user set-environment PATH="/usr/games:$H
 
 # Secret store
 # A GUI for inspecting the keyring is available through `seahorse`.
-exec --no-startup-id "gnome-keyring-daemon --components=secrets"
+exec --no-startup-id gnome-keyring-daemon --start --components=pkcs11,secrets,ssh
 
 
 ################################################################
@@ -59,8 +59,10 @@ exec --no-startup-id "gnome-keyring-daemon --components=secrets"
 for_window [class="^.*"] border pixel 2
 
 # Gaps
-gaps inner 3
-gaps outer 3
+# inner 6 / outer 9 — the woodstock '69. gifpapers get their frame,
+# windows keep their breathing room.
+gaps inner 6
+gaps outer 9
 
 # nightshadeNeon
 client.focused          #ff10f0 #000000 #39ff14 #39ff14 #ff10f0
@@ -92,8 +94,8 @@ exec --no-startup-id dunst
 # Network management
 exec --no-startup-id nm-applet
 
-# Bluetooth
-exec --no-startup-id sh -c "sleep 1 && blueman-applet &"
+# Bluetooth: navi-bluetooth (native BlueZ D-Bus) replaces blueman-applet.
+# Removed 2026-10-04.
 
 # Weather
 exec --no-startup-id sh -c "sleep 1 && meteo-qt &"
@@ -105,7 +107,12 @@ exec --no-startup-id lxpolkit
 exec --no-startup-id nitrogen --restore
 
 # X11 compositor
-exec --no-startup-id "picom -f -e 0.9 --corner-radius 3"
+# The bonus round: frosted blur, rounded corners, dimming, soft shadows —
+# the stuff sway can't do. Toggle blur with $mod+Shift+b (weak GPUs).
+exec --no-startup-id "picom --config ~/.config/picom/picom.conf"
+
+# Compositor blur toggle (X11 only — sway has no blur to toggle)
+bindsym $mod+Shift+b exec --no-startup-id "navi-blur-toggle"
 
 # Desktop information
 exec --no-startup-id conky
@@ -167,9 +174,9 @@ bindsym $mod+Shift+q kill
 # GAPS
 ################################################################
 
-bindsym $mod+g exec --no-startup-id "i3-msg 'gaps inner 3; gaps outer 3' && notify-send 'wired helper' 'Gaps enabled.'"
+bindsym $mod+g exec --no-startup-id "i3-msg 'gaps inner all set 6; gaps outer all set 9' && notify-send 'wired helper' 'Gaps enabled.'"
 
-bindsym $mod+Shift+g exec --no-startup-id "i3-msg 'gaps inner 0; gaps outer 0' && notify-send 'wired helper' 'Gaps disabled.'"
+bindsym $mod+Shift+g exec --no-startup-id "i3-msg 'gaps inner all set 0; gaps outer all set 0' && notify-send 'wired helper' 'Gaps disabled.'"
 
 
 ################################################################
@@ -207,7 +214,8 @@ bindsym Caps_Lock exec --no-startup-id "notify-send 'wired helper' 'Caps Lock pr
 
 # Screenshot
 # X11-native screenshot implementation.
-bindsym $mod+p exec --no-startup-id "flameshot gui"
+bindsym $mod+p exec --no-startup-id "navishot"
+bindsym $mod+Shift+p exec --no-startup-id "navishot --area"
 
 # System monitor
 bindsym Mod1+h exec --no-startup-id "alacritty -e htop"
@@ -229,8 +237,8 @@ bindsym $mod+Shift+h exec --no-startup-id "learn"
 # firefox-esr
 bindsym Mod1+b exec --no-startup-id "firefox-esr"
 
-# chromium
-bindsym Mod1+Shift+b exec --no-startup-id "chromium"
+# default browser (follows navi-browser — Brave unless changed)
+bindsym Mod1+Shift+b exec --no-startup-id "navi-browser-run"
 
 
 ################################################################
@@ -242,6 +250,7 @@ bindsym Mod1+a exec --no-startup-id "navi-Qx agent"
 
 # Pop-up terminal
 bindsym Mod1+Shift+a exec --no-startup-id "navi-Qx terminal"
+bindsym $mod+Ctrl+h exec --no-startup-id "alacritty -e herdr"
 
 
 ################################################################
@@ -382,6 +391,9 @@ bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit command detected. Are y
 
 # polybar is the status bar we use in the X session
 exec --no-startup-id polybar
+
+# bar theme picker: live-switch the polybar theme (mirrors sway's Mod1+t)
+bindsym Mod1+t exec --no-startup-id "navi-theme"
 
 
 ################################################################

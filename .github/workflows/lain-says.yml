@@ -1,4 +1,4 @@
-# lain-says: let Lain comment on PRs as lainVII[bot].
+# lain-says: let Lain comment on PRs (and issues) as lainVII[bot].
 #
 # How it works:
 #   1. A markdown file is pushed to .github/lain-says/ on a branch with an
@@ -11,6 +11,9 @@
 #      The cleanup push re-triggers this workflow, finds nothing queued, and
 #      exits (it also skips when the actor is the bot itself).
 #
+# For plain issues (no PR), dispatch the workflow manually with the
+# `issue_number` input instead — it posts the queued files to that issue.
+#
 # The app's private key never leaves GitHub Secrets; no step here sees it.
 # Requires the lainVII app installed on the repo with
 # Contents: read/write and Pull requests: read/write.
@@ -21,6 +24,12 @@ on:
   push:
     paths:
       - '.github/lain-says/*.md'
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to post queued comments to (skips the open-PR lookup)'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -47,6 +56,7 @@ jobs:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -56,14 +66,19 @@ jobs:
             exit 0
           fi
 
-          pr_number="$(GH_TOKEN="$APP_TOKEN" gh api \
-            "repos/${REPO}/pulls?head=${REPO%%/*}:${BRANCH}&state=open" \
-            --jq '.[0].number // empty')"
-          if [ -z "$pr_number" ]; then
-            echo "no open PR for branch ${BRANCH}; leaving files queued."
-            exit 0
+          if [ -n "${ISSUE_NUMBER:-}" ]; then
+            pr_number="$ISSUE_NUMBER"
+            echo "targeting issue #${pr_number} via workflow_dispatch"
+          else
+            pr_number="$(GH_TOKEN="$APP_TOKEN" gh api \
+              "repos/${REPO}/pulls?head=${REPO%%/*}:${BRANCH}&state=open" \
+              --jq '.[0].number // empty')"
+            if [ -z "$pr_number" ]; then
+              echo "no open PR for branch ${BRANCH}; leaving files queued."
+              exit 0
+            fi
+            echo "found PR #${pr_number} for branch ${BRANCH}"
           fi
-          echo "found PR #${pr_number} for branch ${BRANCH}"
 
           git config user.name "lainVII[bot]"
           git config user.email "327406224+lainvii[bot]@users.noreply.github.com"
@@ -78,5 +93,8 @@ jobs:
           done
 
           git commit -qm "lainVII[bot]: posted queued PR comments"
-          git push -q origin "HEAD:${BRANCH}"
+          # Full refspec: the repo has both a branch AND a rolling tag named
+          # eiri, so a bare "HEAD:${BRANCH}" is ambiguous ("dst refspec
+          # matches more than one").
+          git push -q origin "HEAD:refs/heads/${BRANCH}"
           echo "done."

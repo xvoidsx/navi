@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+"""navi-bt-agent — minimal BlueZ agent for Apple keyboard pairing.
+
+Registers a DisplayOnly agent via D-Bus, which forces BlueZ to use
+Passkey Entry (type on keyboard) instead of Numeric Comparison (yes/no).
+
+Usage:
+  navi-bt-agent           Scan for keyboards, pick one interactively
+  navi-bt-agent <MAC>     Pair a specific device by MAC address
+
+Then type the displayed passkey on the keyboard and press Enter.
+"""
+
+import sys
+import time
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+from gi.repository import GLib
+
+AGENT_PATH = "/navi/bt_agent"
+CAPABILITY = "DisplayOnly"
+
+class Agent(dbus.service.Object):
+    @dbus.service.method("org.bluez.Agent1",
+                         in_signature="", out_signature="")
+    def Release(self):
+        print("Agent released")
+        mainloop.quit()
+
+    @dbus.service.method("org.bluez.Agent1",
+                         in_signature="os", out_signature="")
+    def AuthorizeService(self, device, uuid):
+        print(f"Authorize service {uuid} for {device}")
+        return
+
+    @dbus.service.method("org.bluez.Agent1",
+                         in_signature="o", out_signature="s")
+    def RequestPinCode(self, device):
+        print(f"RequestPinCode for {device} — rejecting (use passkey)")
+        raise dbus.DBusException("Rejected")
+
+    @dbus.service.method("org.bluez.Agent1",
+                         in_signature="o", out_signature="u")
+    def RequestPasskey(self, device):
+        print(f"RequestPasskey for {device} — not supported")
+        raise dbus.DBusException("Rejected")
+
+    @dbus.service.method("org.bluez.Agent1",
+                         in_signature="ouq", out_signature="")
+    def DisplayPasskey(self, device, passkey, entered):
+        print(f"\n{'='*50}")
+        print(f"  TYPE THIS ON THE KEYBOARD: {passkey:06d}")
+        if entered:
+            print(f"  ({entered}/6 digits entered so far)")
+        print(f"  Then press Enter on the keyboard.")
+        print(f"{'='*50}\n")
+        # Don't return anything special — BlueZ waits for the keyboard
+        # to send the passkey back over the air.
+
+    @dbus.service.method("org.bluez.Agent1",
+                         in_signature="os", out_signature="")
+    def DisplayPinCode(self, device, pincode):
+        print(f"DisplayPinCode {pincode} for {device}")
+
+    @dbus.service.method("org.bluez.Agent1",
+                         in_signature="ou", out_signature="")
+    def RequestConfirmation(self, device, passkey):
+        # Numeric Comparison: BlueZ negotiated this instead of Passkey
+        # Entry. The keyboard has no display, so it likely auto-confirms
+        # (or a keypress counts). Ask the user; don't auto-reject.
+        print(f"\n{'='*50}")
+        print(f"  CONFIRM THIS CODE: {passkey:06d}")
+        print(f"  Does it look right? Press Enter on the Magic Keyboard")
+        print(f"  too (that may be its confirmation).")
+        print(f"{'='*50}")
+        try:
+            ans = input("  Confirm? (y/n): ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            raise dbus.DBusException("org.bluez.Error.Canceled: user cancelled")
+        if ans in ("y", "yes", ""):
+            print("  Confirmed.")
+            return
+        raise dbus.DBusException("org.bluez.Error.Rejected: user rejected")
+
+    @dbus.service.method("org.bluez.Agent1",
+                         in_signature="", out_signature="")
+    def Cancel(self):
+        print("Pairing cancelled")
+
+
+def is_keyboard(props):
+    """Heuristic: is this Device1 property dict a keyboard?"""
+    icon = str(props.get("Icon", "") or "")
+    if "keyboard" in icon:
+        return True
+    name = str(props.get("Name", "") or props.get("Alias", "") or "")
+    nl = name.lower()
+    if "keyboard" in nl or "magic keyboard" in nl or "apple" in nl:
+        return True
+    try:
+        cls = int(props.get("Class", 0))
+        # Major class 0x05 (peripheral), minor 0x40 (keyboard)
+        if (cls & 0x1F00) == 0x0500 and (cls & 0xFF) & 0x40:
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+
+def device_label(props):
+    name = str(props.get("Name", "") or props.get("Alias", "") or "Unknown")
+    addr = str(props.get("Address", "?"))
+    paired = "paired" if props.get("Paired") else "new"
+    return f"{name} ({addr}) [{paired}]"
+
+
+def scan_for_keyboards(bus, adapter, manager, seconds=12):
+    """Start discovery, wait, return [(path, props)] of keyboard-like devices."""
+    try:
+        adapter.StartDiscovery()
+    except dbus.DBusException:
+        pass  # already discovering
+    print(f"Scanning for keyboards ({seconds}s)...")
+    # Pump the GLib loop briefly so InterfacesAdded events arrive
+    ctx = GLib.MainContext.default()
+    end = time.time() + seconds
+    while time.time() < end:
+        while ctx.pending():
+            ctx.iteration(False)
+        time.sleep(0.2)
+    try:
+        adapter.StopDiscovery()
+    except dbus.DBusException:
+        pass
+
+    found = []
+    for path, ifaces in manager.GetManagedObjects().items():
+        props = ifaces.get("org.bluez.Device1")
+        if not props:
+            continue
+        if is_keyboard(props):
+            found.append((path, props))
+    return found
+
+
+def pick_device(found):
+    if not found:
+        print("No keyboards found. Make sure it's powered on and discoverable,")
+        print("then try again.")
+        return None
+    if len(found) == 1:
+        path, props = found[0]
+        print(f"Found: {device_label(props)}")
+        return path
+    print("\nKeyboards found:")
+    for i, (path, props) in enumerate(found, 1):
+        print(f"  {i}. {device_label(props)}")
+    while True:
+        try:
+            choice = input("Pick one (number): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return None
+        if choice.isdigit() and 1 <= int(choice) <= len(found):
+            return found[int(choice) - 1][0]
+        print("Invalid choice, try again.")
+
+def main():
+    mac = None
+    if len(sys.argv) == 2:
+        mac = sys.argv[1].upper().replace("-", ":")
+    elif len(sys.argv) > 2:
+        print(f"Usage: {sys.argv[0]} [MAC]", file=sys.stderr)
+        sys.exit(1)
+
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    bus = dbus.SystemBus()
+
+    # Get adapter
+    manager = dbus.Interface(bus.get_object("org.bluez", "/"),
+                             "org.freedesktop.DBus.ObjectManager")
+    objects = manager.GetManagedObjects()
+    adapter_path = None
+    for path, interfaces in objects.items():
+        if "org.bluez.Adapter1" in interfaces:
+            adapter_path = path
+            break
+    if not adapter_path:
+        print("No Bluetooth adapter found", file=sys.stderr)
+        sys.exit(1)
+
+    adapter = dbus.Interface(bus.get_object("org.bluez", adapter_path),
+                             "org.bluez.Adapter1")
+
+    # Ensure powered and discovering
+    try:
+        adapter.Set("org.bluez.Adapter1", "Powered", dbus.Boolean(True))
+    except:
+        pass
+
+    # Register our agent
+    agent = Agent(bus, AGENT_PATH)
+    agent_manager = dbus.Interface(bus.get_object("org.bluez", "/org/bluez"),
+                                   "org.bluez.AgentManager1")
+    agent_manager.RegisterAgent(AGENT_PATH, CAPABILITY)
+    agent_manager.RequestDefaultAgent(AGENT_PATH)
+    print(f"Agent registered with capability: {CAPABILITY}")
+
+    # Find the device: by MAC, or interactive keyboard scan
+    device_path = None
+    if mac:
+        for path, interfaces in objects.items():
+            if "org.bluez.Device1" in interfaces:
+                addr = interfaces["org.bluez.Device1"].get("Address", "")
+                if str(addr).upper() == mac:
+                    device_path = path
+                    break
+        if not device_path:
+            print(f"Device {mac} not found. Make sure it's discoverable.", file=sys.stderr)
+            print("Run without arguments to scan for keyboards instead.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        found = scan_for_keyboards(bus, adapter, manager)
+        device_path = pick_device(found)
+        if not device_path:
+            sys.exit(1)
+        mac = "selected device"
+
+    device = dbus.Interface(bus.get_object("org.bluez", device_path),
+                            "org.bluez.Device1")
+    print(f"Pairing with {mac}...")
+    print("Tip: if the keyboard is asleep, tap a key on it now to wake it.")
+
+    global mainloop
+    mainloop = GLib.MainLoop()
+
+    def attempt_pair():
+        """Call Pair() asynchronously; the GLib loop stays up to dispatch
+        agent callbacks. No threads — dbus-python is not thread-safe
+        (heap corruption / tcache crashes)."""
+        result = {}
+
+        def on_reply():
+            result["ok"] = True
+            mainloop.quit()
+
+        def on_error(e):
+            result["error"] = e
+            mainloop.quit()
+
+        # timeout unit: safe either way — the GLib timeout below is the
+        # real guard (120s). If dbus unit is ms this is 120s; if seconds,
+        # effectively infinite and GLib still bounds us.
+        device.Pair(reply_handler=on_reply,
+                    error_handler=on_error,
+                    timeout=120000)
+
+        # Safety timeout so we never hang forever
+        GLib.timeout_add_seconds(
+            120, lambda: (print("Timed out waiting for pairing."),
+                          mainloop.quit(), False)[2])
+
+        try:
+            mainloop.run()
+        except KeyboardInterrupt:
+            pass
+        return result
+
+    pair_result = attempt_pair()
+    err = pair_result.get("error")
+    if err and "Page Timeout" in str(err):
+        print("\nThe keyboard didn't answer — it was probably asleep.")
+        try:
+            input("Tap a key on the keyboard to wake it, then press Enter here to retry... ")
+        except (EOFError, KeyboardInterrupt):
+            sys.exit(1)
+        print("Retrying...")
+        pair_result = attempt_pair()
+        err = pair_result.get("error")
+
+    if err:
+        print(f"Pair failed: {err}", file=sys.stderr)
+        sys.exit(1)
+
+    # Use the Properties interface for Get/Set (not Device1 directly)
+    props = dbus.Interface(bus.get_object("org.bluez", device_path),
+                           "org.freedesktop.DBus.Properties")
+
+    # Check if paired
+    try:
+        paired = props.Get("org.bluez.Device1", "Paired")
+        if paired:
+            print("Paired successfully!")
+            # Trust it so it auto-connects
+            props.Set("org.bluez.Device1", "Trusted", dbus.Boolean(True))
+            print("Trusted.")
+            # Connect the HID profile
+            print("Connecting...")
+            try:
+                device.Connect()
+                print("Connected! Try typing on the keyboard.")
+            except dbus.DBusException as e:
+                print(f"Connect: {e} (may already be connected)")
+        else:
+            print("Not paired.")
+    except Exception as e:
+        print(f"Error checking status: {e}")
+
+    agent_manager.UnregisterAgent(AGENT_PATH)
+
+if __name__ == "__main__":
+    main()

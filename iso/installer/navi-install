@@ -81,17 +81,30 @@ TIPS=(
   "your full name lands in the system — the login screen knows who you are."
   "the cli installer is intentional. it is indeed very navi."
   "hostname defaults to 'navi'. name it like you'd name a ship."
-  "sddm is the front door: pick wayland or x11, then your password."
+  "sddm is the front door: sign in and the wired is yours. wayland all the way down."
   "timezone is guessed from your network — type to overrule it."
   "∅ is the empty set. it is also the navi logo. both mean: nothing missing."
-  "the wired ships with agents — ollama, opencode, omp. everybody has already entered."
+  "the wired ships with agents — ollama, opencode, wisp, omp, goose. everybody has already entered."
+  "hermes is the default agent — your lain, in nightshadeNeon."
+  "click the waybar modules — each one opens a navi mod. the panel is the control room."
+  "navi-audio grew a PLAYING tab — every media player, one floating window."
+  "blackice ships in chromium — xvoidsx's adblocker. the web, minus the noise."
+  "navi-browser picks your chromium — brave, edge, helium, chrome, all welcome."
+  "navi-get is the software center — apt, flatpak, and webapps in one place."
+  "wiredrop flings files across the LAN — no cloud, no account, just the wire."
+  "alt+v wakes lain — the voice assistant. your voice never leaves the machine."
+  "super+ctrl+h opens herdr — your agents, tiled and ready."
+  "that wallpaper? lain, hairclip and all. gifpaperslain swaps the animation."
   "if a download host is down, the installer skips it and carries on. the wired provides. eventually."
   "thirteen phases. lucky number thirteen."
   "that stopwatch is timing your wifi, not you. probably."
-  "the ∅ breathes while it works. watch it. it's calming."
-  "experimental eiri build: the cohesion release. note what glows, report what breaks."
+  "the ∅ cycles magenta → cyan → green while it works. watch it. it's calming."
   "the wired will provide."
 )
+# eiri-only tip: the cohesion release is still in flight on this channel.
+if [ "$IS_EIRI" -eq 1 ]; then
+  TIPS+=( "experimental eiri build: the cohesion release. note what glows, report what breaks." )
+fi
 
 # log: everything the installer says, plus everything noisy commands say.
 # while the frame runs it stays in the log window; while paused (prompts)
@@ -167,15 +180,21 @@ _ui_draw() {
   el=$(tput el 2>/dev/null || true)
 
   # pinned header: wordmark + progress bar. never scrolls away.
-  # the empty set breathes: magenta/cyan pulse, one breath per second.
-  if [ $(( $(date +%s) % 2 )) -eq 0 ]; then empty_c="$N_MAGENTA"; else empty_c="$N_CYAN"; fi
-  printf '%s%s\n' "${empty_c}                       ∅${N_OFF}" "$el"
+  # the empty set breathes: cycles magenta → cyan → green, one color
+  # per two seconds. the NAVI wordmark rides the same cycle, synced —
+  # the whole header breathes as one neon organism.
+  case $(( $(date +%s) / 2 % 3 )) in
+    0) neon_c="$N_MAGENTA";;
+    1) neon_c="$N_CYAN";;
+    *) neon_c="$N_GREEN";;
+  esac
+  printf '%s%s\n' "${neon_c}                       ∅${N_OFF}" "$el"
   printf '%s\n' "$el"
-  printf '%s%s\n' "${N_GREEN}  █   █   ███   █   █  █████${N_OFF}" "$el"
-  printf '%s%s\n' "${N_GREEN}  ██  █  █   █  █   █    █${N_OFF}" "$el"
-  printf '%s%s\n' "${N_GREEN}  █ █ █  █████  █   █    █${N_OFF}" "$el"
-  printf '%s%s\n' "${N_GREEN}  █  ██  █   █   █ █     █${N_OFF}" "$el"
-  printf '%s%s\n' "${N_GREEN}  █   █  █   █    █    █████${N_OFF}" "$el"
+  printf '%s%s\n' "${neon_c}  █   █   ███   █   █  █████${N_OFF}" "$el"
+  printf '%s%s\n' "${neon_c}  ██  █  █   █  █   █    █${N_OFF}" "$el"
+  printf '%s%s\n' "${neon_c}  █ █ █  █████  █   █    █${N_OFF}" "$el"
+  printf '%s%s\n' "${neon_c}  █  ██  █   █   █ █     █${N_OFF}" "$el"
+  printf '%s%s\n' "${neon_c}  █   █  █   █    █    █████${N_OFF}" "$el"
   # live stopwatch: total elapsed since the installer started, ticking
   # once per second with the frame redraw.
   _t0=$(cat "$UI_DIR/t0" 2>/dev/null || echo 0)
@@ -374,6 +393,7 @@ wifi_connect() {
       read -r -p "    try a different password? [Y/n] " ans
       case "${ans:-Y}" in
         [Yy]*) read -r -s -p "    password for '$ssid': " pass; echo ;;
+        *) break ;;
       esac
     fi
   done
@@ -438,16 +458,35 @@ pick_disk() {
   mapfile -t DISKS < <(lsblk -dnp -o NAME,TYPE | awk '$2=="disk" {print $1}')
   [ "${#DISKS[@]}" -gt 0 ] || die "no disks found."
 
-  local i
+  # the installer booted from one of these disks (USB/ISO) — offering it
+  # as a target is a footgun: typing YES on it destroys the running
+  # installer mid-provision. resolve the boot device and tag it.
+  local boot_dev=""
+  boot_dev="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+  # SOURCE may be a partition (/dev/sdb1) — trim to the parent disk.
+  # On live ISO, findmnt returns "overlay" (not a device) — skip lsblk then.
+  if [[ "$boot_dev" == /dev/* ]]; then
+    boot_dev="$(lsblk -ndp -o NAME "$boot_dev" 2>/dev/null | head -1 || true)"
+  else
+    boot_dev=""
+  fi
+
+  local i tag
   for i in "${!DISKS[@]}"; do
-    printf '    [%d] %s %s\n' "$((i+1))" "${DISKS[$i]}" \
-      "$(lsblk -rn -o SIZE,MODEL "${DISKS[$i]}")"
+    tag=""
+    [ -n "$boot_dev" ] && [ "${DISKS[$i]}" = "$boot_dev" ] && tag="  [installer media — do not pick]"
+    printf '    [%d] %s %s%s\n' "$((i+1))" "${DISKS[$i]}" \
+      "$(lsblk -rn -o SIZE,MODEL "${DISKS[$i]}")" "$tag"
   done
 
   local choice
   while true; do
     read -r -p "    install navi to disk number: " choice
     if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#DISKS[@]}" ]; then
+      if [ -n "$boot_dev" ] && [ "${DISKS[$((choice-1))]}" = "$boot_dev" ]; then
+        echo "    that's the installer media itself — pick a different disk."
+        continue
+      fi
       DISK="${DISKS[$((choice-1))]}"
       break
     fi
@@ -537,9 +576,9 @@ _filter_pick() {
   done
 }
 
-# timezone (geolocated default), locale, and console keymap. the keymap
-# matters: the LUKS passphrase is typed at a bare console prompt, so a
-# wrong map can lock you out of your own disk.
+# timezone (geolocated default) and locale. the console keymap lives in
+# get_keymap (below) — it must be chosen BEFORE the LUKS passphrase is
+# typed, so it runs inside get_credentials ahead of the passphrase prompt.
 get_locale() {
   local tz_list geo_tz key_list
 
@@ -573,11 +612,22 @@ get_locale() {
     te_IN.UTF-8 th_TH.UTF-8 tr_TR.UTF-8 uk_UA.UTF-8 ur_PK.UTF-8 \
     vi_VN.UTF-8 zh_CN.UTF-8 zh_HK.UTF-8 zh_TW.UTF-8 zu_ZA.UTF-8)"
   ok "locale: $LOCALE_NAME"
+}
 
+# console keymap. chosen BEFORE the LUKS passphrase is typed: the passphrase
+# is entered at this live console, and the installed initramfs (via
+# console-setup) unlocks under the chosen keymap — typing it on the wrong
+# layout here means lockout at boot. loadkeys applies it to this console
+# immediately so what you type is what the disk gets.
+get_keymap() {
+  local key_list
   key_list="$(localectl list-keymaps 2>/dev/null || echo "us uk de fr es it")"
   # shellcheck disable=SC2207
   KEYMAP="$(_filter_pick "console keymap" "us" $key_list)"
   ok "keymap: $KEYMAP"
+  if command -v loadkeys >/dev/null 2>&1; then
+    loadkeys "$KEYMAP" 2>/dev/null || true
+  fi
 }
 
 get_credentials() {
@@ -604,7 +654,13 @@ get_credentials() {
     echo "    letters, spaces, . ' - ; may not contain ':'."
   done
 
-  read_secret_twice "password for $NAVI_USER" USER_PASS
+  # user password: same strength floor as the disk passphrase — a login
+  # password of "a" is a gift to anyone with physical access.
+  while true; do
+    read_secret_twice "password for $NAVI_USER (min 8 chars)" USER_PASS
+    if [ "${#USER_PASS}" -ge 8 ]; then break; fi
+    echo "    too short — pick at least 8 characters."
+  done
 
   # hostname: the machine gets a name. default is just "navi".
   while true; do
@@ -617,6 +673,10 @@ get_credentials() {
     echo "    lowercase letters, digits, hyphens; must start and end alphanumeric."
   done
 
+  # keymap before the passphrase: it must be typed on the layout the
+  # installed system will unlock with, or the disk won't open at boot.
+  get_keymap
+
   # LUKS passphrase: strength matters here, it guards the whole disk.
   while true; do
     read_secret_twice "disk encryption passphrase (min 8 chars)" LUKS_PASS
@@ -624,7 +684,7 @@ get_credentials() {
     echo "    too short — the passphrase guards the entire disk."
   done
 
-  # where and how: timezone, locale, console keymap.
+  # where and how: timezone and locale (keymap was chosen above).
   get_locale
   ok "$FULLNAME ($NAVI_USER) on $HOSTNAME + encryption passphrase set"
 }
@@ -863,6 +923,11 @@ grub-install --target=i386-pc --bootloader-id=navi --recheck "@DISK@"
 if [ -d /sys/firmware/efi ]; then
   grub-install --target=x86_64-efi --efi-directory=/boot/efi \
     --bootloader-id=navi --recheck
+  # Fallback/removable loader: some firmware (notably Lenovo) drops the
+  # named NVRAM entry, so also write EFI/BOOT/BOOTX64.EFI, which the
+  # firmware always probes. --no-nvram: no entry to register, nothing to lose.
+  grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+    --removable --no-nvram --recheck
 fi
 update-grub
 update-initramfs -u -k all
@@ -1009,6 +1074,42 @@ sync_clock() {
 
 # ---------------------------------------------------------------- main
 
+# last chance to fix a typo: every choice on one screen, redo any section
+# before anything destructive happens. Without this, a mistyped username
+# meant rebooting the whole installer.
+review_inputs() {
+  local ans redo
+  while true; do
+    echo ""
+    echo "──▶ review your choices"
+    echo ""
+    printf "    %-16s %s\n" \
+      "install disk:" "$DISK ($(lsblk -rn -o SIZE,MODEL "$DISK" 2>/dev/null | tr -s ' '))" \
+      "username:" "$NAVI_USER" \
+      "full name:" "$FULLNAME" \
+      "hostname:" "$HOSTNAME" \
+      "timezone:" "$TIMEZONE" \
+      "locale:" "$LOCALE_NAME" \
+      "keymap:" "$KEYMAP" \
+      "user password:" "(set)" \
+      "disk passphrase:" "(set)"
+    echo ""
+    read -r -p "    everything look right? [Y/n] " ans
+    case "${ans:-Y}" in
+      [Yy]*) ok "choices confirmed"; return 0 ;;
+    esac
+    echo "    change one: [d]isk  [u]ser + passwords + locale  [n]etwork  [a]bort install"
+    read -r -p "    redo: " redo
+    case "$redo" in
+      [Dd]*) pick_disk ;;
+      [Uu]*) get_credentials ;;
+      [Nn]*) setup_network ;;
+      [Aa]*) die "aborted — nothing was touched." ;;
+      *) echo "    keeping everything as-is." ;;
+    esac
+  done
+}
+
 main() {
   # Never let the machine sleep mid-install: a suspend/resume cycle drops the
   # network and can re-read a dead hardware clock (classic old-laptop
@@ -1031,6 +1132,7 @@ main() {
   ui_pause
   pick_disk
   get_credentials
+  review_inputs
   ui_resume
   partition_disk
   format_encrypt
@@ -1089,7 +1191,7 @@ EOF
   fi
   local ans
   read -r -p "    reboot now? [Y/n] " ans
-  case "${ans:-Y}" in [Yy]*) reboot ;; *) echo "    reboot when ready: reboot";; esac
+  case "${ans:-Y}" in [Yy]*) systemctl reboot ;; *) echo "    reboot when ready: systemctl reboot";; esac
 }
 
 main "$@"

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="65%">
+      <stop offset="0%" stop-color="#14141c"/>
+      <stop offset="100%" stop-color="#0a0a0f"/>
+    </radialGradient>
+    <filter id="neon" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.2" result="b1"/>
+      <feGaussianBlur stdDeviation="9" result="b2"/>
+      <feMerge>
+        <feMergeNode in="b2"/>
+        <feMergeNode in="b1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="128" height="128" rx="26" fill="url(#bg)"/>
+  <text x="64" y="92" text-anchor="middle"
+        font-family="Noto Sans CJK JP, Noto Sans, sans-serif"
+        font-size="76" font-weight="700" fill="#ff2e88"
+        filter="url(#neon)">墨</text>
+</svg>

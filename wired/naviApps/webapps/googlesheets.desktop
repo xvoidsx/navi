@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Google Sheets
+Exec=navi-browser-run --force-dark-mode --app=https://sheets.google.com
+Comment=Google Sheets as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-googlesheets
+StartupNotify=true
+Categories=Office;

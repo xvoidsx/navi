@@ -73,7 +73,8 @@ no auth, no accounts.
   weather queries (→fetch-weather, location extracted from transcript,
   ask-back if empty), news/headlines (→fetch-news, topic or top stories),
   volume up/down/mute, media play-pause/next/prev,
-  brightness up/down,   screenshot, lock, close-window, dismiss/thanks (→overlay-hide), with "hey lain /
+  brightness up/down,   screenshot, lock, close-window, dismiss/thanks (→overlay-hide),
+  "what can you do"/"help" (spoken capability summary), with "hey lain /
   please / could you" prefix stripping. Bare "move to workspace N" (no app
   named) means switch workspaces — the app-named form ("move firefox to
   workspace 2") moves a window; bare "go to/take me to workspace N" also
@@ -85,13 +86,19 @@ no auth, no accounts.
   Compound "X and Y" requests plan both halves recursively and only execute
   when BOTH halves produce action tags; anything else goes to the LLM —
   backend from `~/.config/hey-lain/brain.json` (`navi-lain-config` writes
-  it): `local` / `ollama-cloud` via Ollama `/api/chat`, or `openai` /
-  `openrouter` via OpenAI-compatible chat completions + Bearer key.
-  Default is local `gemma3:270m` (no key, no cloud — the low-end default).
-  Token cap is per-model (gpt-oss reasons: 400, else 150 — lowering gpt-oss
-  truncates replies). Cloud backends fall back to local `gemma3:270m`,
-  then to a spoken offline line. `BRAIN_MODEL`, `BRAIN_URL`,
-  `BRAIN_TIMEOUT`, `HEY_LAIN_API_KEY` env overrides win over the file.
+  it): `local` / `ollama-cloud` via Ollama `/api/chat`, `openai` /
+  `openrouter` via OpenAI-compatible chat completions + Bearer <redacted>,
+  or `custom` — any endpoint you supply (`api_url` = full chat endpoint,
+  `api_style` = `ollama`|`openai`, key optional and sent as Bearer only
+  when set). `api_style` is explicit in the file when the TUI writes it,
+  otherwise derived from the backend. Default is local `gemma3:270m` (no
+  key, no cloud — the low-end default). Token cap is per-model (gpt-oss
+  reasons: 400, else 150 — lowering gpt-oss truncates replies). Cloud
+  backends fall back to local `gemma3:270m`, then to a spoken offline
+  line. `BRAIN_MODEL`, `BRAIN_URL`, `BRAIN_TIMEOUT`, `HEY_LAIN_API_KEY`
+  env overrides win over the file. A rejected key (HTTP 401/403) gets
+  its own `auth` reason and a "check your API key" spoken line. The
+  key is never logged, echoed, or printed by `--doctor` ("set"/"not set" only).
   The LLM gets conversation history (last 8 exchanges, from
   `~/.local/share/hey-lain/conversation.json`, written by `hey-lain.sh`)
   plus local context (day/time, now-playing via playerctl) so small-model
@@ -258,7 +265,12 @@ no auth, no accounts.
   speech output — swaymsg's `[{"success": true}]` was once SPOKEN ALOUD.
   `hey-lain.sh` now also logs every brain REPLY for post-mortems.
 - Failure modes degrade to speech: no audio → "No audio captured";
-  empty transcript → "I didn't catch that"; LLM down → offline echo reply.
+  empty transcript → "I didn't catch that"; LLM failures speak a specific
+  line per cause (service unreachable / timeout / model missing / runner
+  error) and log the raw error to `~/.local/share/hey-lain/brain.log` —
+  the spoken line always notes the deterministic desktop commands still
+  work. `bin/hey-lain.sh --doctor` self-checks the whole pipeline (venv,
+  mic, TTS, ollama service/API/model, inference smoke test).
 
 ## Known limits / next steps
 

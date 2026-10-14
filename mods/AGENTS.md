@@ -116,6 +116,19 @@ navi interface.
 - Cloudflare-backed speed test (latency HEAD rounds, 50 MB download, 20 MB
   upload) with a progress bar driven by atomic counters + a tick cmd, plus a
   live throughput sparkline sampled once per tick.
+- Speed-test history: every completed test appends `{time, ping_ms,
+  down_mbps, up_mbps}` to `~/.local/share/navi/navi-networking/speed-history.json`
+  (cap 50, oldest dropped); `Y` opens a history screen with day-first 24h
+  rows, a download sparkline, and `x` clear-with-confirm.
+- One-key mobile hotspot (`H`): SSID defaults to the hostname, password to a
+  generated 12-char secret (ctrl+r regenerates); `nmcli device wifi hotspot`
+  start, `x` stops; if Wi-Fi is joined as a client, confirms the disconnect
+  first; while active, guests scan the same qrterminal QR share as the
+  network share screen.
+- WireGuard VPN switcher (`V`): lists `nmcli` wireguard profiles with active
+  state, `enter` toggles up/down (failures surface inline, never hang), `i`
+  imports a `.conf` via `nmcli connection import`, dashboard shows an
+  `▲ VPN <name>` badge while a tunnel is up.
 - Persistent keymap. Connection-only actions dim when there is no
   active link instead of disappearing, so the footer never shifts.
 - Esc while a background op is in flight cancels the context instead of

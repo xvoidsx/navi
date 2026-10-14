@@ -1,0 +1,1 @@
+{"description":"Report goose lifecycle state (working/idle) to the herdr pane hosting the session, so herdr — and navi's agent center / waybar agent mod — show goose correctly","name":"navi-goose-herdr","version":"1.0.0"}

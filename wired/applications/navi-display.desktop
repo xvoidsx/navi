@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-display
+Comment=Displays: arrange monitors, modes, rotation, night light
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-display" navi-display
+Icon=video-display
+Terminal=false
+Categories=Settings;HardwareSettings;
+NoDisplay=false

@@ -5,6 +5,7 @@ go 1.24.4
 require (
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
+	github.com/rav3ndust/navi-agentenv v0.0.0
 	github.com/rav3ndust/navi-theme v0.0.0
 )
 
@@ -35,3 +36,5 @@ require (
 )
 
 replace github.com/rav3ndust/navi-theme => ../theme
+
+replace github.com/rav3ndust/navi-agentenv => ../agentenv

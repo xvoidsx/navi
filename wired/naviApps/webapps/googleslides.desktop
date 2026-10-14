@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Google Slides
+Exec=navi-browser-run --force-dark-mode --app=https://slides.google.com
+Comment=Google Slides as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-googleslides
+StartupNotify=true
+Categories=Office;

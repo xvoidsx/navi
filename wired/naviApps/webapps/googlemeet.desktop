@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Google Meet
+Exec=navi-browser-run --force-dark-mode --app=https://meet.google.com
+Comment=Google Meet as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-googlemeet
+StartupNotify=true
+Categories=Network;VideoConference;

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Twitch
-Exec=chromium --force-dark-mode --app=https://www.twitch.tv
+Exec=navi-browser-run --force-dark-mode --app=https://www.twitch.tv
 Comment=Twitch as a navi webapp
 Terminal=false
 Type=Application

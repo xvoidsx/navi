@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Google Keep
+Exec=navi-browser-run --force-dark-mode --app=https://keep.google.com
+Comment=Google Keep as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-googlekeep
+StartupNotify=true
+Categories=Office;

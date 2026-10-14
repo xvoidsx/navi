@@ -1,0 +1,333 @@
+/* ============================================================================
+ * NEON TUBE
+ * ----------------------------------------------------------------------------
+ * The bar as bent glass signage: a heavy tube running the full width with a lit
+ * filament inside it, every glyph sitting on the glass with real bloom. Closer
+ * to pure eye-candy than the other themes here — the closest thing to an actual
+ * neon sign you can get out of GTK CSS on a compositor with no backdrop blur.
+ *
+ * The signature is the FLICKER. Every so often the tube stutters like a failing
+ * sign — a few rapid dropouts, then steady again. Because it fires rarely and
+ * briefly it costs almost nothing, and it does more for "this thing is powered"
+ * than any amount of constant shimmer.
+ *
+ * Cost model: ~15ms per repaint, so motion is priced per visible change. The
+ * flicker is a handful of changes every ~20s; the filament drifts slowly.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ *
+ * The white square the weather module used to show was NOT a missing font.
+ * weather.sh emitted each glyph followed by U+FE0F VARIATION SELECTOR-16, which
+ * forces emoji *presentation*. Pango honoured that and demanded a real colour
+ * emoji font, and the only one installed (Noto Color Emoji) is a fixed 109px
+ * strike that cannot be used at bar size — so GTK drew the .notdef box. The fix
+ * belongs in weather.sh, which now strips the selector in json_escape.
+ *
+ * Noto Color Emoji is deliberately NOT named in this stack for the same reason:
+ * it is a 109px bitmap strike and would downscale to mush at 10px.
+ * ========================================================================== */
+
+@define-color np #ff10f0;
+@define-color ng #39ff14;
+@define-color nc #00ffff;
+@define-color nr #ff3131;
+@define-color nw #ffffff;
+@define-color glass rgba(6, 2, 8, 0.82);
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", sans-serif;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* ----------------------------------------------------------------------------
+ * The tube. A thick rounded glass shell, a bright filament line just above the
+ * base, and a wide bloom that makes the sign appear to light the room.
+ * -------------------------------------------------------------------------- */
+window#waybar {
+    color: @nw;
+    background-color: rgba(4, 1, 6, 0.90);
+    background-image:
+        /* filament */
+        linear-gradient(to bottom,
+            rgba(0, 255, 255, 0) 26px,
+            rgba(255, 255, 255, 0.85) 27px,
+            rgba(0, 255, 255, 0) 28px),
+        /* the tube's own colour bleeding outward */
+        linear-gradient(to bottom,
+            rgba(255, 16, 240, 0.16) 8px,
+            rgba(255, 16, 240, 0.05) 24px,
+            rgba(255, 16, 240, 0) 30px);
+    border: 1px solid rgba(255, 16, 240, 0.42);
+    border-radius: 16px;
+    box-shadow:
+        0 0 18px rgba(255, 16, 240, 0.34),
+        0 0 44px rgba(255, 16, 240, 0.14),
+        inset 0 0 22px rgba(255, 16, 240, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    animation: tube-glow 11s steps(5, end) infinite;
+}
+
+/* Slow breath of the tube's colour. */
+@keyframes tube-glow {
+    0%   { border-color: rgba(255, 16, 240, 0.42); }
+    33%  { border-color: rgba(0, 255, 255, 0.42); }
+    66%  { border-color: rgba(57, 255, 20, 0.42); }
+    100% { border-color: rgba(255, 16, 240, 0.42); }
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * The flicker. Mostly steady; around the 88% mark it drops out three times in
+ * under a second and comes back. `steps` keeps each dropout a single discrete
+ * change rather than a fade, which is both cheaper and more like real glass.
+ * -------------------------------------------------------------------------- */
+/* GTK rejects comma selector lists inside @keyframes, so each stop gets its own
+ * block. steps(100) puts a sample on every whole percent, which is what lets the
+ * dropouts at 88/90/92% actually land on a step boundary — steps(1) would skip
+ * straight past them and never flicker at all. Outside the 87-93% window the
+ * value is constant, so those samples queue no repaint and the flicker is
+ * effectively free: six visible changes per twenty seconds. */
+@keyframes flicker {
+    0%   { text-shadow: 0 0 7px currentColor, 0 0 16px currentColor; }
+    87%  { text-shadow: 0 0 7px currentColor, 0 0 16px currentColor; }
+    88%  { text-shadow: none; }
+    89%  { text-shadow: 0 0 7px currentColor, 0 0 16px currentColor; }
+    90%  { text-shadow: none; }
+    92%  { text-shadow: 0 0 3px currentColor; }
+    93%  { text-shadow: 0 0 7px currentColor, 0 0 16px currentColor; }
+    100% { text-shadow: 0 0 7px currentColor, 0 0 16px currentColor; }
+}
+
+/* ----------------------------------------------------------------------------
+ * Modules ride on the glass. No boxes — a sign has no chrome, just lit letters.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#power-profiles-daemon,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 3px 9px;
+    padding: 2px 3px;
+    color: @nw;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    box-shadow: none;
+    text-shadow: 0 0 7px currentColor, 0 0 16px currentColor;
+    animation: flicker 20s steps(100, end) infinite;
+    transition: text-shadow 250ms ease-out;
+}
+
+#custom-wired-launcher,
+#custom-power,
+#clock,
+#power-profiles-daemon { color: #ff5cf5; }
+
+#network,
+#backlight,
+#memory,
+#cpu { color: #6bff4a; }
+
+#custom-volume,
+#idle_inhibitor { color: #4dffff; }
+
+#battery { color: #f0f0f4; }
+
+#custom-wired-launcher,
+#custom-power { font-size: 13px; }
+
+/* Workspaces: unlit tubes, lit ones filled with colour. */
+#workspaces button {
+    min-width: 20px;
+    margin: 0 2px;
+    padding: 1px 7px;
+    color: rgba(255, 255, 255, 0.42);
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 12px;
+    box-shadow: none;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.35);
+}
+
+#workspaces button.empty {
+    color: rgba(255, 255, 255, 0.20);
+    background-color: rgba(0, 0, 0, 0);
+    border-color: rgba(255, 255, 255, 0.07);
+    text-shadow: none;
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @nw;
+    background-color: rgba(255, 16, 240, 0.24);
+    border-color: rgba(255, 16, 240, 0.75);
+    box-shadow:
+        0 0 12px rgba(255, 16, 240, 0.70),
+        inset 0 0 8px rgba(255, 16, 240, 0.28);
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.95);
+}
+
+#workspaces button.urgent {
+    color: @nw;
+    background-color: rgba(255, 49, 49, 0.26);
+    border-color: @nr;
+    box-shadow: 0 0 14px rgba(255, 49, 49, 0.65);
+}
+
+/* Title recedes; the sign is the point. */
+#window {
+    color: rgba(255, 255, 255, 0.42);
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.20);
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+#custom-weather {
+    color: rgba(184, 184, 184, 0.82);
+    font-size: 8px;
+    text-shadow: 0 0 6px rgba(0, 255, 255, 0.45);
+}
+
+/* ----------------------------------------------------------------------------
+ * State. A sign that needs you gets brighter, not busier.
+ * -------------------------------------------------------------------------- */
+#network.disconnected,
+#battery.critical {
+    color: @nr;
+    text-shadow: 0 0 8px rgba(255, 49, 49, 0.90), 0 0 20px rgba(255, 49, 49, 0.55);
+    animation: tube-pulse 2.2s steps(5, end) infinite alternate;
+}
+
+@keyframes tube-pulse {
+    from { text-shadow: 0 0 6px rgba(255, 49, 49, 0.55); }
+    to   { text-shadow: 0 0 11px rgba(255, 49, 49, 1), 0 0 26px rgba(255, 49, 49, 0.70); }
+}
+
+#battery.warning { color: #ff5cf5; }
+
+/* Bluetooth: rune plus a link glyph. Never a dot — that is the bell's. */
+#bluetooth.off {
+    color: rgba(255, 255, 255, 0.38);
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.25);
+}
+
+#bluetooth.connected {
+    color: #4dffff;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.85), 0 0 20px rgba(0, 255, 255, 0.45);
+}
+
+#bluetooth.connecting {
+    color: #ff5cf5;
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.85);
+}
+
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep {
+    color: rgba(255, 255, 255, 0.34);
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.20);
+}
+
+#custom-update.updates-available {
+    color: #ff5cf5;
+    text-shadow: 0 0 9px rgba(255, 16, 240, 0.90), 0 0 22px rgba(255, 16, 240, 0.50);
+}
+
+#custom-bell.has-notifs,
+#custom-agent.agent-ready {
+    color: #4dffff;
+    text-shadow: 0 0 9px rgba(0, 255, 255, 0.85), 0 0 22px rgba(0, 255, 255, 0.45);
+}
+
+#custom-agent.agent-working {
+    color: #6bff4a;
+    text-shadow: 0 0 9px rgba(57, 255, 20, 0.85), 0 0 22px rgba(57, 255, 20, 0.45);
+}
+
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: #ff5cf5;
+    text-shadow: 0 0 9px rgba(255, 16, 240, 0.90), 0 0 22px rgba(255, 16, 240, 0.55);
+    animation: tube-pulse 1.4s steps(5, end) infinite alternate;
+}
+
+#custom-volume.muted {
+    color: rgba(255, 255, 255, 0.40);
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.20);
+}
+
+#idle_inhibitor.activated { color: #6bff4a; }
+
+#custom-nowplaying.idle { color: rgba(255, 255, 255, 0.34); }
+
+#custom-nowplaying.playing {
+    color: #ff5cf5;
+    text-shadow: 0 0 9px rgba(255, 16, 240, 0.85), 0 0 20px rgba(255, 16, 240, 0.45);
+}
+
+#custom-nowplaying.paused { color: #4dffff; }
+
+/* Hover: the tube under that letter warms up. */
+#workspaces:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#bluetooth:hover {
+    color: @nw;
+    text-shadow: 0 0 9px rgba(255, 255, 255, 0.95), 0 0 24px rgba(255, 16, 240, 0.65);
+    transition: text-shadow 300ms ease-out;
+}
+
+#custom-power:hover {
+    color: @nr;
+    text-shadow: 0 0 9px rgba(255, 49, 49, 0.95), 0 0 24px rgba(255, 49, 49, 0.60);
+}
+
+tooltip {
+    color: @nw;
+    background-color: rgba(4, 1, 6, 0.96);
+    border: 1px solid rgba(255, 16, 240, 0.55);
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(255, 16, 240, 0.45);
+    text-shadow: 0 0 7px rgba(255, 255, 255, 0.5);
+}
+
+tooltip label { color: @nw; }

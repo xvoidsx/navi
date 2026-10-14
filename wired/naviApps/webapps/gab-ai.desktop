@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Gab AI
+Exec=navi-browser-run --force-dark-mode --app=https://gab.ai
+Comment=uncensored AI chat from Gab
+Terminal=false
+Type=Application
+Icon=navi-gab-ai
+StartupNotify=true
+Categories=Network;

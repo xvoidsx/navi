@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="#0c0c11"/>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="none" stroke="#ff2d78" stroke-width="3" opacity="0.35"/>
+  <!-- katakana sa, terminal-prompt style -->
+  <text x="108" y="178" font-size="150" text-anchor="middle" fill="#ff2d78"
+        font-family="'Noto Sans JP','Hiragino Sans',sans-serif" font-weight="700">サ</text>
+  <!-- cursor block -->
+  <rect x="168" y="118" width="26" height="52" fill="#39ff6a"/>
+  <rect x="168" y="118" width="26" height="52" fill="#ffffff" opacity="0.2"/>
+</svg>

@@ -4,6 +4,13 @@
 #
 # usage: mod-open.sh <window-title> <command> [args...]
 #
+# fitted windows: every mod gets a terminal sized to its own frame
+# (COLSxLINES cells, via alacritty -o window.dimensions), so the rounded
+# frame isn't drowned in dead terminal space. the table below is the
+# family geometry — tweak a number here, never at the callers. commands
+# not listed (herdr, the update click script, anything future) fall back
+# to the old 640x760 pixel resize.
+#
 # standing rule: navi mods always float. a for_window rule in the shipped
 # sway config can't be relied on — customized configs are preserved by the
 # updater, by design — and sleep-then-float races slow machines (the
@@ -24,7 +31,58 @@ TITLE="${1:?usage: mod-open.sh <window-title> <command> [args...]}"
 shift
 [ "$#" -ge 1 ] || { echo "usage: mod-open.sh <window-title> <command> [args...]" >&2; exit 1; }
 
-FLOAT_CMDS="floating enable, resize set 640 760, move position center"
+# family geometry: COLSxLINES per mod, matched on the command's basename.
+# measured, not guessed: most mods ship a --dump sample renderer, so each
+# frame was rendered headless and sized exactly (all 62-wide mods are a
+# true 66 cells; get/browser are 72; agents-config is 68). height is the
+# tallest dumped screen plus one grace row; list-y mods get room for
+# real-world data (audio streams, calendar events). viewports (notifs)
+# and self-hugging frames (wiredrop: width-4) fill whatever they're given.
+# Dimensions are frame width+4 x frame height+1 (tight around the fixed frames).
+case "$(basename "$1")" in
+navi-agents-config) DIMS="87x27" ;;
+navi-audio) DIMS="69x20" ;;
+navi-bluetooth) DIMS="68x24" ;;
+navi-browser) DIMS="74x31" ;;
+navi-calendar) DIMS="69x30" ;;
+navi-display) DIMS="67x26" ;;
+navi-get) DIMS="75x39" ;;
+navi-extras) DIMS="70x30" ;;  # estimate, tune as needed
+navi-lain-config) DIMS="70x23" ;;
+navi-networking) DIMS="69x38" ;;
+navi-notifs) DIMS="68x29" ;;
+navi-power) DIMS="67x26" ;;
+navi-tailscale) DIMS="78x24" ;;  # estimate, tune as needed
+navi-fetch) DIMS="80x26" ;;  # estimate, tune as needed
+navi-imprint) DIMS="78x24" ;;  # match navi-tailscale
+navi-reminders) DIMS="69x24" ;;
+navi-weather) DIMS="68x24" ;;
+wiredrop) DIMS="66x23" ;;
+*) DIMS="" ;;
+esac
+# All mods use 10pt font (measured 2026-10-03 — denser layouts need it,
+# and it looks great across the board). navi-nowplaying removed — it
+# lives inside navi-audio now. wiredrop needs a rework, DIMS TBD.
+FONT_SIZE="10.0"
+
+FLOAT_CMDS="floating enable, move position center"
+ALACRITTY_OPTS=()
+if [ -n "$DIMS" ]; then
+  COLS="${DIMS%x*}"
+  LINES="${DIMS#*x}"
+  # cell-exact sizing via alacritty -o window.dimensions.
+  # kitty was tried (2026-10-03) but its pixel approximation was
+  # inconsistent. alacritty's cell-exact is load-bearing for mod UX.
+  ALACRITTY_OPTS=(-o "window.dimensions.columns=$COLS" -o "window.dimensions.lines=$LINES")
+  # 10pt font for denser layouts (measured 2026-10-03)
+  if [ -n "${FONT_SIZE:-}" ]; then
+    ALACRITTY_OPTS+=(-o "font.size=${FONT_SIZE}")
+  fi
+else
+  # unknown command: the old pixel resize, as before.
+  FLOAT_CMDS="floating enable, resize set 640 760, move position center"
+fi
+
 LOG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/navi"
 LOG_FILE="$LOG_DIR/mod-open.log"
 
@@ -48,7 +106,15 @@ elif [ "$COMPOSITOR" = "i3" ]; then
   i3-msg "for_window [title=\"$TITLE\"] floating enable" >/dev/null 2>&1
 fi
 
-alacritty --title "$TITLE" -e "$@" &
+# Agent keys: panel/rofi-launched apps never see ~/.bashrc, so inject the
+# system-wide key store here - every mod (and anything else opened through
+# this launcher) inherits it. Managed by Navi Agent Configuration.
+AGENTS_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/navi/agents.env"
+if [ -f "$AGENTS_ENV" ]; then
+  set -a; . "$AGENTS_ENV" 2>/dev/null; set +a
+fi
+
+alacritty --title "$TITLE" "${ALACRITTY_OPTS[@]}" -e "$@" &
 term_pid=$!
 
 if [ "$COMPOSITOR" = "sway" ]; then
@@ -65,11 +131,11 @@ if [ "$COMPOSITOR" = "sway" ]; then
     kill -0 "$term_pid" 2>/dev/null || break
     sleep 0.5
   done
-  log "title='$TITLE' compositor=sway pid=$term_pid floated=$floated"
+  log "title='$TITLE' dims='${DIMS:-640x760px}' compositor=sway pid=$term_pid floated=$floated"
 elif [ "$COMPOSITOR" = "i3" ]; then
   sleep 0.6
   i3-msg "[title=\"$TITLE\"] floating enable" >/dev/null 2>&1
-  log "title='$TITLE' compositor=i3 pid=$term_pid"
+  log "title='$TITLE' dims='${DIMS:-640x760px}' compositor=i3 pid=$term_pid"
 else
-  log "title='$TITLE' compositor=none pid=$term_pid (plain open)"
+  log "title='$TITLE' dims='${DIMS:-640x760px}' compositor=none pid=$term_pid (plain open)"
 fi

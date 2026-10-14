@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Yomi
-Exec=chromium --force-dark-mode --app=https://yomi.to
+Exec=navi-browser-run --force-dark-mode --app=https://yomi.to
 Comment=Free anime streaming.
 Terminal=false
 Type=Application

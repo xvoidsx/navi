@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Airtable
+Exec=navi-browser-run --force-dark-mode --app=https://airtable.com
+Comment=Spreadsheet-database hybrid for organizing anything.
+Terminal=false
+Type=Application
+Icon=navi-airtable
+StartupNotify=true
+Categories=Office;

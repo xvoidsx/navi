@@ -1,0 +1,32 @@
+# navi user override — replaces the packaged /usr/lib/systemd/user/waybar.service
+# outright (a user unit of the same name wins completely; a drop-in would not,
+# because systemd can only ADD dependencies in drop-ins, never remove them).
+#
+# Why the packaged unit cannot work here: it carries
+#     Requisite=graphical-session.target
+#     PartOf=graphical-session.target
+#     WantedBy=graphical-session.target
+# and graphical-session.target is never activated in a plain sddm-launched Wayland
+# session — navi.desktop just execs `sway`, so nothing pulls that target in. The
+# unit therefore fails to start silently. Confirmed on this box: the unit had
+# never once run during the session, and waybar only ever appeared because
+# something else happened to launch it.
+#
+# This replacement hooks into default.target, which is always active.
+#
+# NOTE: ExecStart uses `-b bar-0` deliberately — the packaged unit passes no bar
+# id, and the running session has always used bar-0.
+
+[Unit]
+Description=Waybar (navi)
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/waybar -b bar-0
+ExecReload=/bin/kill -SIGUSR2 $MAINPID
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

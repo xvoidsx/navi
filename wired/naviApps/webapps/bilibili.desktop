@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Bilibili
-Exec=chromium --force-dark-mode --app=https://www.bilibili.tv
+Exec=navi-browser-run --force-dark-mode --app=https://www.bilibili.tv
 Comment=Bilibili as a navi webapp
 Terminal=false
 Type=Application

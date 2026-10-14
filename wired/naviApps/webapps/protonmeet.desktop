@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Name=Proton Meet
-Exec=chromium --force-dark-mode --app=https://meet.proton.me
+Exec=navi-browser-run --force-dark-mode --app=https://meet.proton.me
 Comment=Proton Meet as a navi webapp
 Terminal=false
 Type=Application

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=navi-reminders
+Comment=Reminders: natural-language add, snooze, done — fires via systemd timers
+Exec=/usr/share/navi/wired/waybar/mod-open.sh "navi-reminders" navi-reminders
+Icon=x-office-calendar
+Terminal=false
+Categories=System;Settings;Utility;
+NoDisplay=false
