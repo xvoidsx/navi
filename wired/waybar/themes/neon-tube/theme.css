@@ -50,11 +50,13 @@ window#waybar {
     color: @nw;
     background-color: rgba(4, 1, 6, 0.90);
     background-image:
-        /* filament */
-        linear-gradient(to bottom,
-            rgba(0, 255, 255, 0) 26px,
-            rgba(255, 255, 255, 0.85) 27px,
-            rgba(0, 255, 255, 0) 28px),
+        /* filament — anchored to the base, not the top: the bar height is
+           content-driven, so a top-anchored px position drifts into the
+           middle of the text on taller renders */
+        linear-gradient(to top,
+            rgba(0, 255, 255, 0) 2px,
+            rgba(255, 255, 255, 0.85) 3px,
+            rgba(0, 255, 255, 0) 4px),
         /* the tube's own colour bleeding outward */
         linear-gradient(to bottom,
             rgba(255, 16, 240, 0.16) 8px,
