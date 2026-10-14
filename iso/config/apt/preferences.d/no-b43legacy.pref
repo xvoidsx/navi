@@ -1,0 +1,7 @@
+# firmware-b43legacy-installer is a firmware *downloader* (not firmware) for
+# ancient Broadcom chips. Its postinst tries to fetch firmware from the
+# internet and fails in the build sandbox, breaking the ISO build.
+# Pin it to -1 so apt never installs it (it's only a Recommends anyway).
+Package: firmware-b43legacy-installer
+Pin: release *
+Pin-Priority: -1
