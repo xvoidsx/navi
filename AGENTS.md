@@ -150,23 +150,13 @@ Firefox ESR ships too. The OS suggests, the user decides.
 - This arrangement is **experimental**: Raven is bench-testing it on new
   installs first, and it reverts in one commit if they don't like it.
 
-## Out-of-the-box apps: balenaEtcher (Raven's call, 2026-09-30)
+## Out-of-the-box apps: navi-imprint (replaces balenaEtcher, 2026-10-14)
 
-**balenaEtcher** ships by default — flash OS images to SD cards/USB drives,
-safely and easily, no terminal required. This removes the need to reach for
-GNOME Disks for flashing. Long-term, Raven wants a native nightshadeNeon
-**navi-disks** for this; Etcher holds the fort until then.
-
-- `install.sh`'s `setup_etcher` adds balena's official Cloudsmith apt repo
-  (keyring + sources file, replicated manually — never piped-to-bash) and
-  installs `balena-etcher-electron`. The old Bintray `deb.etcher.io` repo
-  is long dead; Cloudsmith is the current official channel.
-- **DISABLED 2026-10-01:** balena-etcher-electron hard-depends on gconf2,
-  which Debian removed from trixie entirely — apt refuses the install.
-  Both `setup_etcher` call sites in install.sh are commented out. Re-enable
-  if balena fixes their packaging, or retire when navi-imprint lands.
-- Listed in the manual (disks & images) and naviApps (`native-etcher`).
-- The .deb ships its own .desktop file, so it appears in rofi automatically.
+**navi-imprint** is xvoidsx's native nightshadeNeon ISO-flashing tool (Go/bubbletea) —
+flash OS images to SD cards/USB drives from the terminal. It replaced balenaEtcher,
+which was dropped 2026-10-01 when its `balena-etcher-electron` package hard-depended
+on gconf2 (removed from Debian trixie entirely — apt refuses the install). The old
+`setup_etcher` code paths in install.sh are retired, not just commented out.
 
 ## install.sh — installer and deployer
 
