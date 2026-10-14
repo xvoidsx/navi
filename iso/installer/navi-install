@@ -463,9 +463,12 @@ pick_disk() {
   # installer mid-provision. resolve the boot device and tag it.
   local boot_dev=""
   boot_dev="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
-  # SOURCE may be a partition (/dev/sdb1) — trim to the parent disk
-  if [ -n "$boot_dev" ]; then
-    boot_dev="$(lsblk -ndp -o NAME "$boot_dev" 2>/dev/null | head -1)"
+  # SOURCE may be a partition (/dev/sdb1) — trim to the parent disk.
+  # On live ISO, findmnt returns "overlay" (not a device) — skip lsblk then.
+  if [[ "$boot_dev" == /dev/* ]]; then
+    boot_dev="$(lsblk -ndp -o NAME "$boot_dev" 2>/dev/null | head -1 || true)"
+  else
+    boot_dev=""
   fi
 
   local i tag
