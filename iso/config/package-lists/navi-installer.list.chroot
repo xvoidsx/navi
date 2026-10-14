@@ -28,9 +28,6 @@ firmware-atheros
 firmware-brcm80211
 firmware-mediatek
 
-# firmware-b43legacy-installer is a firmware *downloader* (not firmware) for
-# ancient Broadcom chips; its postinst fails in the build sandbox. Exclude it.
--firmware-b43legacy-installer
 
 systemd-timesyncd
 
