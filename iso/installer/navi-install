@@ -1191,7 +1191,7 @@ EOF
   fi
   local ans
   read -r -p "    reboot now? [Y/n] " ans
-  case "${ans:-Y}" in [Yy]*) reboot ;; *) echo "    reboot when ready: reboot";; esac
+  case "${ans:-Y}" in [Yy]*) systemctl reboot ;; *) echo "    reboot when ready: systemctl reboot";; esac
 }
 
 main "$@"
