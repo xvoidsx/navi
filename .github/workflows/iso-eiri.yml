@@ -31,9 +31,9 @@ name: navi ISO (2.0 "eiri" experimental)
 #                                        navi-networking/calendar/audio)
 env:
   RELEASE: 2.0
-  ISO_BASENAME: navi-2.0-eiri-2026-10-13
+  ISO_BASENAME: navi-2.0-eiri-2026-10-15
   # bump to cut a fresh ISO (push trigger watches this file)
-  EIRI_BUILD: 24
+  EIRI_BUILD: 25
 
 on:
   # NOTE: workflow_dispatch requires the workflow file to exist on the
@@ -109,6 +109,7 @@ jobs:
             --distribution trixie \
             --archive-areas "main contrib non-free non-free-firmware" \
             --bootloaders "syslinux grub-efi" \
+            --uefi-secure-boot enable \
             --binary-images iso-hybrid \
             --debian-installer false \
             --memtest none \
