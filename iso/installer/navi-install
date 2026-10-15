@@ -767,7 +767,7 @@ run_debootstrap() {
     if debootstrap \
       --arch=amd64 \
       --components=main,contrib,non-free,non-free-firmware \
-      --include=linux-image-amd64,grub-efi-amd64,grub-pc,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,console-setup,ca-certificates,firmware-linux,firmware-realtek \
+      --include=linux-image-amd64,grub-efi-amd64-signed,shim-signed,grub-pc,efibootmgr,cryptsetup,cryptsetup-initramfs,initramfs-tools,opendoas,console-setup,ca-certificates,firmware-linux,firmware-realtek \
       trixie "$TARGET" http://deb.debian.org/debian >>"$UI_LOG" 2>&1; then
       ok "base system installed"
       return 0
