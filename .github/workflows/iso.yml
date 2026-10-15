@@ -121,6 +121,7 @@ jobs:
             --distribution trixie \
             --archive-areas "main contrib non-free non-free-firmware" \
             --bootloaders "syslinux grub-efi" \
+            --uefi-secure-boot enable \
             --binary-images iso-hybrid \
             --debian-installer false \
             --memtest none \
