@@ -248,6 +248,21 @@
     "icon": "🐸"
   },
   {
+    "id": "web-vk",
+    "name": "VK",
+    "summary": "Popular social network — communities, music, and video.",
+    "category": "Webapps",
+    "source": "webapp",
+    "package": "vk",
+    "url": "https://vk.com",
+    "install": "navi-webapp install vk",
+    "downloadUrl": "webapps/vk.desktop",
+    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=VK\nExec=navi-browser-run --force-dark-mode --app=https://vk.com\nComment=popular social network\nTerminal=false\nType=Application\nIcon=navi-vk\nStartupNotify=true\nCategories=Network;",
+    "homepage": "https://vk.com",
+    "logo": "icons/vk.png",
+    "icon": "🌐"
+  },
+  {
     "id": "web-rumble",
     "name": "Rumble",
     "summary": "Video platform. A popular YouTube alternative.",

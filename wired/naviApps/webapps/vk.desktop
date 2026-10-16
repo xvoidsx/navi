@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=VK
+Exec=navi-browser-run --force-dark-mode --app=https://vk.com
+Comment=popular social network
+Terminal=false
+Type=Application
+Icon=navi-vk
+StartupNotify=true
+Categories=Network;
