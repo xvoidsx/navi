@@ -43,9 +43,9 @@ import (
 
 const frameWidth = 68
 
-// Fixed-frame geometry: 27 body lines. The 8 browsers render 2 lines
-// each. Frame is 31 rows total.
-const nbBodyRows = 27
+// Fixed-frame geometry: 29 body lines. The 11 browsers render 2 lines
+// each. Frame is 33 rows total.
+const nbBodyRows = 29
 
 // ---------------------------------------------------------------------------
 // browser table
@@ -101,9 +101,16 @@ var browserTable = []browserDef{
 	{
 		ID: "edge", Name: "Microsoft Edge",
 		Blurb:     "Granular performance controls; the telemetry tradeoff is stated, not hidden.",
-		Binaries:  []string{"microsoft-edge-stable", "microsoft-edge", "microsoft-edge-dev", "microsoft-edge-beta"},
+		Binaries:  []string{"microsoft-edge-stable", "microsoft-edge", "microsoft-edge-beta"},
 		PolicyDir: "/etc/opt/edge/policies/managed",
 		ExtrasID:  "edge",
+	},
+	{
+		ID: "edge-dev", Name: "Microsoft Edge Dev",
+		Blurb:     "Weekly dev-channel builds — newest Chromium under the hood, occasional rough edges.",
+		Binaries:  []string{"microsoft-edge-dev"},
+		PolicyDir: "/etc/opt/edge/policies/managed",
+		ExtrasID:  "edge-dev",
 	},
 	{
 		ID: "brave-origin", Name: "Brave Origin",

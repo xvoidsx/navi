@@ -43,7 +43,7 @@ case "$(basename "$1")" in
 navi-agents-config) DIMS="87x27" ;;
 navi-audio) DIMS="69x20" ;;
 navi-bluetooth) DIMS="68x24" ;;
-navi-browser) DIMS="74x31" ;;
+navi-browser) DIMS="74x33" ;;
 navi-calendar) DIMS="69x30" ;;
 navi-display) DIMS="67x26" ;;
 navi-get) DIMS="75x39" ;;
