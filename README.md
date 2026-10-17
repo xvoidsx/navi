@@ -11,7 +11,7 @@
 
 **navi** is a GNU/Linux distribution from your friends at [xvoidsx](https://github.com/xvoidsx) — a complete, opinionated, **agent-native** desktop OS on a dependable Debian base.
 
-It uses [wiredWM](https://github.com/rav3ndust/wiredWM), our fork of the `sway` Wayland compositor, as its flagship desktop (X11/i3 fallback included). Wayland-first tiling, deep blacks, neon pink, phosphor green — the **nightshadeNeon** design language across the whole desktop.
+It uses [wiredWM](https://github.com/rav3ndust/wiredWM), our fork of the `sway` Wayland compositor, as its flagship desktop. Wayland-first tiling, deep blacks, neon pink, phosphor green — the **nightshadeNeon** design language across the whole desktop.
 
 It aims to celebrate the spirit of the Wired and provide a futuristic and yet retro-feeling computing environment that feels alive.
 
@@ -63,10 +63,16 @@ Your people, your protocols: **neighborli** (our fediverse instance), **glyyph**
 
 ### notes
 
-**navi 1.6 "mika"** is the current stable release. If you're new, grab the ISO from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page and give it a spin in a VM or on a spare machine.
+**navi 1.7 "mika"** is the current stable release. If you're new, grab the ISO from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page and give it a spin in a VM or on a spare machine.
 
 **eiri** is the rolling channel — it tracks the latest development, and public snapshots publish at [github.com/xvoidsx/navi/releases/tag/eiri](https://github.com/xvoidsx/navi/releases/tag/eiri). That's where Brave-as-default is landing first.
 
 Documentation lives in the built-in manual: press `Super+Shift+H` anywhere in **navi** to open it, or browse the `wired/manual` folder in this repo.
 
 Found a bug or have an idea? Open an issue in this repo's [issue tracker](https://github.com/xvoidsx/navi/issues) — that's where we track everything.
+
+### community
+
+Want to join in with ideas, let us know about issues, show us your navi battlestations (we will show these off on the site soon enough!), join in on the dev/design side of **navi**, or just kick it with the team and hang out? You're more than welcome in the **navi discord**:
+
+[join the navi discord!](https://discord.gg/Xtjjp55ymk)
