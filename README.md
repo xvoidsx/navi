@@ -3,7 +3,7 @@
 
 ###### welcome to the wired
 
-> **navi 1.6 "mika" is stable and available now** — the cohesion update.
+> **navi 1.7 "mika" is stable and available now** — the cohesion update.
 >
 > Download it from the [Releases](https://github.com/xvoidsx/navi/releases/latest) page. Boots on legacy BIOS and UEFI, x86_64.
 >
