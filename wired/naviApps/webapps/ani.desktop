@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=ani.pm
+Exec=navi-browser-run --force-dark-mode --app=https://ani.pm
+Comment=Free anime streaming, subbed and dubbed.
+Terminal=false
+Type=Application
+Icon=navi-ani
+StartupNotify=true
+Categories=AudioVideo;Video;

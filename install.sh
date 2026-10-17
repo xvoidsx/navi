@@ -138,7 +138,7 @@ PKGS=(
 # setup_telegram/setup_element below.)
 DEFAULT_WEBAPPS=(
   neighborli glyyph pandora
-  github youtube yomi twitch discord perplexity dropbox
+  github youtube ani twitch discord perplexity dropbox
   xbox-cloud geforce-now
   # Workspace Stack — installed out of the box on every fresh install
   # (Raven, 2026-09-30). Users can remove any of them from the naviApps store.

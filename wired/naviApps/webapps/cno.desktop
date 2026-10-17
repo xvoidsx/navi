@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=cno.to
+Exec=navi-browser-run --force-dark-mode --app=https://cno.to
+Comment=Free movies and TV shows in HD.
+Terminal=false
+Type=Application
+Icon=navi-cno
+StartupNotify=true
+Categories=AudioVideo;Video;
