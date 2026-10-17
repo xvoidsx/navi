@@ -2098,7 +2098,7 @@ EOF
 
 # ---------------------------------------------------------------- login screen
 
-# SDDM with the navi QML theme: session picker (Wayland / X11), the empty-set
+# SDDM with the navi QML theme: session picker, the empty-set
 # mark, and the wallpaper behind the login.
 setup_sddm() {
   step "login screen (sddm)"
@@ -2120,7 +2120,7 @@ setup_sddm() {
   # i3/picom/polybar configs stay in the repo as the port-back kit.
   $DOAS rm -f /usr/share/xsessions/navi.desktop
   # stamp the session names from wired/VERSION (single source of truth) so
-  # SDDM shows the channel — "navi 2.0 "eiri"" vs "navi 1.6 "mika"" — instead
+  # SDDM shows the channel — "navi 2.0 "eiri"" vs "navi 1.7 "mika"" — instead
   # of a stale hardcoded release. every deploy and every navi-update
   # refreshes these, so mika updates re-stamp automatically.
   local sver sname
@@ -2143,7 +2143,7 @@ setup_sddm() {
     }
   fi
   $DOAS systemctl enable sddm
-  ok "sddm serves the navi login; pick Wayland or X11 at the prompt"
+  ok "sddm serves the navi login"
 }
 
 # ---------------------------------------------------------------- chromium
