@@ -1,0 +1,393 @@
+/* ============================================================================
+ * NIGHTSHADE
+ * ----------------------------------------------------------------------------
+ * Belladonna glass. The bar is a violet dark with a slow aurora drifting
+ * underneath it; modules are glass pills rimmed in violet; the focused
+ * workspace breathes berry-pink light. Venom green is reserved for hover and
+ * healthy states — the colour of something alive in the dark.
+ *
+ * EXPERIMENTAL. The animation budget is deliberately small: one slow
+ * background drift on the bar, one breathing glow on the focused workspace,
+ * alert pulses on states that need them. Everything animates opacity, shadow,
+ * or background position — never layout. If the Cloudbook complains, the
+ * aurora goes first.
+ *
+ * Hover was designed against the jack-panel lesson: no infinite animation
+ * touches border-color on any module, so :hover declarations always win.
+ * The one exception (the focused workspace breathe) pauses on hover.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately, same as jack-panel.
+ * The navi mods emit emoji codepoints (weather conditions, volume); Symbols2
+ * carries clean monochrome glyphs that read at 10px. Noto Color Emoji is NOT
+ * named — its 109px bitmap strike downscales to mush at bar size.
+ * ========================================================================== */
+
+@define-color ns-ink #ece7f7;
+@define-color ns-dim #a79dc2;
+@define-color ns-faint #6f6589;
+@define-color ns-bg #0a0614;
+@define-color ns-panel rgba(19, 12, 32, 0.92);
+@define-color ns-berry #ff2fd6;
+@define-color ns-berry-soft rgba(255, 47, 214, 0.38);
+@define-color ns-berry-faint rgba(255, 47, 214, 0.16);
+@define-color ns-violet #8b5cf6;
+@define-color ns-violet-soft rgba(139, 92, 246, 0.40);
+@define-color ns-violet-faint rgba(139, 92, 246, 0.14);
+@define-color ns-venom #a3ff12;
+@define-color ns-venom-soft rgba(163, 255, 18, 0.42);
+@define-color ns-red #ff4d6d;
+@define-color ns-red-soft rgba(255, 77, 109, 0.55);
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", sans-serif;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* ----------------------------------------------------------------------------
+ * The bar: violet dark glass with a slow aurora underneath.
+ * -------------------------------------------------------------------------- */
+window#waybar {
+    color: @ns-ink;
+    background-color: rgba(10, 6, 20, 0.94);
+    background-image:
+        radial-gradient(ellipse 440px 100px at 12% 130%, rgba(255, 47, 214, 0.15), transparent 70%),
+        radial-gradient(ellipse 540px 120px at 88% 140%, rgba(139, 92, 246, 0.20), transparent 70%),
+        radial-gradient(ellipse 320px 90px at 55% 150%, rgba(163, 255, 18, 0.06), transparent 70%);
+    background-size: 135% 135%, 135% 135%, 135% 135%;
+    background-position: 0% 50%, 100% 50%, 50% 50%;
+    background-repeat: no-repeat;
+    border-bottom: 2px solid rgba(255, 47, 214, 0.42);
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    box-shadow:
+        0 0 22px rgba(255, 47, 214, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    animation: aurora-drift 26s ease-in-out infinite alternate;
+}
+
+/* One selector per keyframe — GTK CSS rejects comma-separated keyframes. */
+@keyframes aurora-drift {
+    from { background-position: 0% 50%, 100% 50%, 50% 50%; }
+    to   { background-position: 100% 50%, 0% 50%, 50% 50%; }
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Glass pills. Violet rims, soft inner top-light, faint violet halo.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 4px 6px 6px 6px;
+    padding: 2px 10px;
+    color: @ns-ink;
+    background-color: @ns-panel;
+    border: 1px solid @ns-violet-soft;
+    border-radius: 10px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        0 0 10px rgba(139, 92, 246, 0.12);
+    text-shadow: 0 0 6px rgba(255, 47, 214, 0.22);
+    transition: border-color 250ms ease-out, box-shadow 250ms ease-out, color 250ms ease-out;
+}
+
+/* Signature rim colours. */
+#custom-wired-launcher,
+#custom-power,
+#clock,
+#power-profiles-daemon { border-color: @ns-berry-soft; color: #ff8fe4; }
+
+#network,
+#backlight,
+#memory,
+#cpu { border-color: @ns-venom-soft; color: #c8ff7a; }
+
+#custom-volume,
+#idle_inhibitor,
+#bluetooth,
+#custom-bluetooth { border-color: rgba(139, 92, 246, 0.55); color: #c4b0ff; }
+
+#battery { border-color: rgba(236, 231, 247, 0.22); color: @ns-dim; }
+
+#custom-wired-launcher,
+#custom-power { font-size: 12px; }
+
+/* ----------------------------------------------------------------------------
+ * Workspaces: dim buds, the focused one breathing berry light.
+ * -------------------------------------------------------------------------- */
+#workspaces button {
+    min-width: 22px;
+    margin: 0 2px;
+    padding: 1px 7px;
+    color: @ns-dim;
+    background-color: rgba(10, 6, 20, 0.85);
+    border: 1px solid rgba(139, 92, 246, 0.22);
+    border-radius: 8px;
+    text-shadow: none;
+}
+
+#workspaces button.empty {
+    color: @ns-faint;
+    background-color: rgba(10, 6, 20, 0.55);
+    border-color: rgba(139, 92, 246, 0.12);
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: #ffffff;
+    background-color: rgba(255, 47, 214, 0.20);
+    border-color: rgba(255, 47, 214, 0.78);
+    text-shadow: 0 0 8px rgba(255, 47, 214, 0.90);
+    animation: breathe 3.4s ease-in-out infinite alternate;
+}
+
+@keyframes breathe {
+    from { box-shadow: 0 0 8px rgba(255, 47, 214, 0.32), inset 0 0 0 1px rgba(255, 47, 214, 0.22); }
+    to   { box-shadow: 0 0 22px rgba(255, 47, 214, 0.62), inset 0 0 0 1px rgba(255, 47, 214, 0.45); }
+}
+
+#workspaces button:hover {
+    color: #ffffff;
+    border-color: @ns-venom-soft;
+    box-shadow: 0 0 12px rgba(163, 255, 18, 0.45);
+    text-shadow: 0 0 6px rgba(163, 255, 18, 0.80);
+}
+
+#workspaces button.focused:hover {
+    animation-play-state: paused;
+}
+
+#window {
+    color: @ns-dim;
+    border-color: rgba(139, 92, 246, 0.20);
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    opacity: 0;
+}
+
+#custom-weather {
+    color: @ns-dim;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    font-size: 8px;
+    text-shadow: 0 0 5px rgba(139, 92, 246, 0.50);
+}
+
+/* ----------------------------------------------------------------------------
+ * States, expressed as rim colour. Alerts pulse their halo.
+ * -------------------------------------------------------------------------- */
+@keyframes shade-alert {
+    from { box-shadow: 0 0 6px rgba(255, 77, 109, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.07); }
+    to   { box-shadow: 0 0 22px rgba(255, 77, 109, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.07); }
+}
+
+#network.disconnected,
+#battery.critical {
+    color: @ns-red;
+    border-color: @ns-red-soft;
+    animation: shade-alert 1.2s ease-in-out infinite alternate;
+}
+
+#battery.warning { color: #ff8fe4; border-color: @ns-berry-soft; animation: none; }
+
+#bluetooth.off,
+#custom-bluetooth.off {
+    color: @ns-faint;
+    border-color: rgba(139, 92, 246, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    text-shadow: none;
+    animation: none;
+}
+
+#bluetooth.connected,
+#custom-bluetooth.connected {
+    color: #c4b0ff;
+    border-color: rgba(139, 92, 246, 0.70);
+    box-shadow: 0 0 14px rgba(139, 92, 246, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    animation: none;
+}
+
+#custom-tailscale.off {
+    color: @ns-faint;
+    border-color: rgba(139, 92, 246, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    text-shadow: none;
+    animation: none;
+}
+
+#custom-tailscale.connected {
+    color: #c4b0ff;
+    border-color: rgba(139, 92, 246, 0.70);
+    background-color: rgba(139, 92, 246, 0.12);
+    box-shadow: 0 0 13px rgba(139, 92, 246, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    animation: none;
+}
+
+#bluetooth.connecting,
+#custom-bluetooth.connecting {
+    color: #ff8fe4;
+    border-color: @ns-berry-soft;
+    animation: shade-alert 1s ease-in-out infinite alternate;
+}
+
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep {
+    color: @ns-faint;
+    border-color: rgba(139, 92, 246, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    text-shadow: none;
+    animation: none;
+}
+
+#custom-update.updates-available {
+    color: #ff8fe4;
+    border-color: @ns-berry-soft;
+    animation: shade-alert 2s ease-in-out infinite alternate;
+}
+
+#custom-bell.has-notifs,
+#custom-agent.agent-ready {
+    color: #c4b0ff;
+    border-color: rgba(139, 92, 246, 0.70);
+    box-shadow: 0 0 13px rgba(139, 92, 246, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    animation: none;
+}
+
+#custom-agent.agent-working {
+    color: #c8ff7a;
+    border-color: @ns-venom-soft;
+    box-shadow: 0 0 14px rgba(163, 255, 18, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    animation: none;
+}
+
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: #ff8fe4;
+    border-color: @ns-berry-soft;
+    animation: shade-alert 1s ease-in-out infinite alternate;
+}
+
+#custom-volume.muted {
+    color: @ns-faint;
+    border-color: rgba(139, 92, 246, 0.20);
+    text-shadow: none;
+    animation: none;
+}
+
+#idle_inhibitor.activated {
+    color: #c8ff7a;
+    border-color: @ns-venom-soft;
+    box-shadow: 0 0 12px rgba(163, 255, 18, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    animation: none;
+}
+
+#custom-nowplaying.idle {
+    color: @ns-faint;
+    border-color: rgba(139, 92, 246, 0.16);
+    text-shadow: none;
+    animation: none;
+}
+
+#custom-nowplaying.playing {
+    color: #ff8fe4;
+    border-color: @ns-berry-soft;
+    animation: shade-alert 2.2s ease-in-out infinite alternate;
+}
+
+#custom-nowplaying.paused {
+    color: #c4b0ff;
+    border-color: rgba(139, 92, 246, 0.55);
+    animation: none;
+}
+
+#tray { padding-left: 6px; padding-right: 6px; }
+#tray > .passive { opacity: 0.50; }
+
+#tray > .needs-attention {
+    background-color: rgba(255, 77, 109, 0.18);
+    border-radius: 8px;
+}
+
+/* ----------------------------------------------------------------------------
+ * Hover: something alive in the dark. Venom green, always.
+ *
+ * No infinite animation touches border-color on these modules (that was the
+ * jack-panel hover bug), so these declarations always win. The paused
+ * play-state covers the two breathing/pulsing exceptions.
+ * -------------------------------------------------------------------------- */
+#workspaces:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#custom-tailscale:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover {
+    color: #ffffff;
+    border-color: @ns-venom-soft;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.10),
+        0 0 18px rgba(163, 255, 18, 0.40);
+    text-shadow: 0 0 8px rgba(163, 255, 18, 0.65);
+    animation-play-state: paused;
+}
+
+#custom-power:hover {
+    color: @ns-red;
+    border-color: @ns-red-soft;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.10),
+        0 0 18px rgba(255, 77, 109, 0.55);
+    text-shadow: 0 0 8px rgba(255, 77, 109, 0.70);
+}
+
+tooltip {
+    color: @ns-ink;
+    background-color: rgba(10, 6, 20, 0.97);
+    border: 1px solid @ns-berry-soft;
+    border-radius: 8px;
+    box-shadow: 0 0 16px rgba(255, 47, 214, 0.30);
+}
+
+tooltip label { color: @ns-ink; }

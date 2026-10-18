@@ -209,6 +209,18 @@ window#waybar > box { background: transparent; }
     text-shadow: 0 0 7px rgba(255, 16, 240, 0.90);
 }
 
+/* Per-button hover: the container's :hover below can't do this job, and
+ * there was no button rule at all — hovering a workspace did nothing. */
+#workspaces button:hover {
+    color: @nw;
+    background-color: rgba(24, 14, 32, 0.95);
+    border-color: @ng-2;
+    box-shadow:
+        inset 0 0 0 1px rgba(5, 3, 8, 0.85),
+        0 0 10px rgba(57, 255, 20, 0.55);
+    text-shadow: 0 0 6px rgba(57, 255, 20, 0.80);
+}
+
 #window {
     color: rgba(255, 255, 255, 0.50);
     border-color: rgba(255, 255, 255, 0.14);
@@ -379,7 +391,13 @@ window#waybar.empty #window {
     border-radius: 8px;
 }
 
-/* Hover: the plug seats fully. */
+/* Hover: the plug seats fully.
+ *
+ * NOTE: every module above runs the infinite ring-drift animation on
+ * border-color, and a running animation beats a :hover declaration in the
+ * cascade — so the hover's border-color could never apply and only the glow
+ * got through. Pausing the drift on hover is the honest fix: the ring holds
+ * still, the green glow blooms, and the plug reads as seated. */
 #workspaces:hover,
 #clock:hover,
 #custom-weather:hover,
@@ -404,6 +422,7 @@ window#waybar.empty #window {
         inset 0 0 0 2px rgba(5, 3, 8, 0.70),
         0 0 18px rgba(57, 255, 20, 0.45);
     transition: border-color 300ms ease-out, box-shadow 700ms ease-out;
+    animation-play-state: paused;
 }
 
 #custom-power:hover {
