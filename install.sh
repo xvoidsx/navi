@@ -1505,7 +1505,6 @@ install_commands() {
   install_bin "nslock.sh"           "nslock"
   install_bin "naviWalls.sh"        "naviWalls"
   install_bin "gifpaperslain.sh"    "gifpaperslain"
-  install_bin "navi-wallpaper-coverflow.sh" "navi-wallpaper-coverflow"
   install_bin "navi-wallpaper.sh"   "navi-wallpaper"
   install_bin "navi-fetch.sh"      "navi-fetch"
   install_bin "navi-dmenu-run.sh"  "navi-dmenu-run"
