@@ -63,7 +63,8 @@
  * -------------------------------------------------------------------------- */
 window#waybar {
     color: @nw;
-    background-color: @plate;
+    /* a breath of translucency — the wallpaper shows through, just a tad */
+    background-color: rgba(11, 7, 16, 0.92);
 
     /* the signal pulse travelling the cable */
     background-image:

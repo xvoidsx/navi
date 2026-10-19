@@ -35,7 +35,8 @@
 /* Poured flat. No radius, no glow, no gradient. */
 window#waybar {
     color: @nw;
-    background-color: @slab;
+    /* a breath of translucency — the wallpaper shows through, just a tad */
+    background-color: rgba(10, 10, 10, 0.92);
     border: 1px solid @line;
     border-radius: 0;
     box-shadow: none;

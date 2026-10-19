@@ -47,7 +47,8 @@
 /* Deep space with an aurora of all three hues, drifting almost imperceptibly. */
 window#waybar {
     color: @bone;
-    background-color: @void;
+    /* a breath of translucency — the wallpaper shows through, just a tad */
+    background-color: rgba(3, 3, 5, 0.92);
     background-image:
         radial-gradient(ellipse 60% 120% at 15% 0%,
             rgba(255, 16, 240, 0.07) 0%,

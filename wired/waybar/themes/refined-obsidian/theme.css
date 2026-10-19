@@ -67,7 +67,8 @@
  * -------------------------------------------------------------------------- */
 window#waybar {
     color: @nw;
-    background-color: @ob;
+    /* a breath of translucency — the wallpaper shows through, just a tad */
+    background-color: rgba(10, 5, 11, 0.92);
     background-image:
         linear-gradient(to right,
             rgba(255, 16, 240, 0.10) 0%,

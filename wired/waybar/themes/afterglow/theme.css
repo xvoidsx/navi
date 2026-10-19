@@ -38,7 +38,8 @@
 /* Dusk glass: violet-black with a pink horizon wash along the top edge. */
 window#waybar {
     color: @nw;
-    background-color: @dusk;
+    /* a breath of translucency — the wallpaper shows through, just a tad */
+    background-color: rgba(13, 7, 20, 0.92);
     background-image:
         linear-gradient(to bottom,
             rgba(255, 16, 240, 0.10) 0%,

@@ -43,20 +43,13 @@
 }
 
 /* ----------------------------------------------------------------------------
- * The tube. A thick rounded glass shell, a bright filament line just above the
+ * The tube. A thick rounded glass shell, a hot filament baseline flush with the
  * base, and a wide bloom that makes the sign appear to light the room.
  * -------------------------------------------------------------------------- */
 window#waybar {
     color: @nw;
     background-color: rgba(4, 1, 6, 0.90);
     background-image:
-        /* filament — anchored to the base, not the top: the bar height is
-           content-driven, so a top-anchored px position drifts into the
-           middle of the text on taller renders */
-        linear-gradient(to top,
-            rgba(0, 255, 255, 0) 2px,
-            rgba(255, 255, 255, 0.85) 3px,
-            rgba(0, 255, 255, 0) 4px),
         /* the tube's own colour bleeding outward */
         linear-gradient(to bottom,
             rgba(255, 16, 240, 0.16) 8px,
@@ -68,16 +61,24 @@ window#waybar {
         0 0 18px rgba(255, 16, 240, 0.34),
         0 0 44px rgba(255, 16, 240, 0.14),
         inset 0 0 22px rgba(255, 16, 240, 0.10),
-        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        /* the filament: a hot baseline flush with the bottom of the tube */
+        inset 0 -2px 0 rgba(255, 16, 240, 0.90);
     animation: tube-glow 11s steps(5, end) infinite;
 }
 
-/* Slow breath of the tube's colour. */
+/* Slow breath of the tube's colour. Shell, bloom and filament baseline cycle
+   together — pink -> cyan -> green, like a sign rotating its gas. steps() keeps
+   it to a handful of discrete changes per cycle, so the motion stays cheap. */
 @keyframes tube-glow {
-    0%   { border-color: rgba(255, 16, 240, 0.42); }
-    33%  { border-color: rgba(0, 255, 255, 0.42); }
-    66%  { border-color: rgba(57, 255, 20, 0.42); }
-    100% { border-color: rgba(255, 16, 240, 0.42); }
+    0%   { border-color: rgba(255, 16, 240, 0.42);
+           box-shadow: 0 0 18px rgba(255, 16, 240, 0.34), 0 0 44px rgba(255, 16, 240, 0.14), inset 0 0 22px rgba(255, 16, 240, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -2px 0 rgba(255, 16, 240, 0.90); }
+    33%  { border-color: rgba(0, 255, 255, 0.42);
+           box-shadow: 0 0 18px rgba(0, 255, 255, 0.34), 0 0 44px rgba(0, 255, 255, 0.14), inset 0 0 22px rgba(0, 255, 255, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -2px 0 rgba(0, 255, 255, 0.90); }
+    66%  { border-color: rgba(57, 255, 20, 0.42);
+           box-shadow: 0 0 18px rgba(57, 255, 20, 0.34), 0 0 44px rgba(57, 255, 20, 0.14), inset 0 0 22px rgba(57, 255, 20, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -2px 0 rgba(57, 255, 20, 0.90); }
+    100% { border-color: rgba(255, 16, 240, 0.42);
+           box-shadow: 0 0 18px rgba(255, 16, 240, 0.34), 0 0 44px rgba(255, 16, 240, 0.14), inset 0 0 22px rgba(255, 16, 240, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -2px 0 rgba(255, 16, 240, 0.90); }
 }
 
 window#waybar > box { background: transparent; }

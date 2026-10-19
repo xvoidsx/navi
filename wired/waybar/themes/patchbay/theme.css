@@ -74,10 +74,11 @@
 window#waybar {
     color: @nw;
 
-    /* Pure black. The channel ticks that used to run along the bottom fought
+    /* Pure black, with a breath of translucency — the wallpaper shows through,
+     * just a tad. The channel ticks that used to run along the bottom fought
      * the pulsing wire for attention — two competing rhythms in three pixels of
      * height. With them gone the wire is the only light down there. */
-    background-color: #000000;
+    background-color: rgba(0, 0, 0, 0.92);
 
     /* 1. the packet: a comet that runs the trace          */
     background-image:
