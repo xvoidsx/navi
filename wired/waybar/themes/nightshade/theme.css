@@ -1,10 +1,11 @@
 /* ============================================================================
  * NIGHTSHADE
  * ----------------------------------------------------------------------------
- * Belladonna glass. The bar is a violet dark with a slow aurora drifting
- * underneath it; modules are glass pills rimmed in violet; the focused
- * workspace breathes berry-pink light. Venom green is reserved for hover and
- * healthy states — the colour of something alive in the dark.
+ * Belladonna glass. Not neon — moonlight on poison. The bar is near-black
+ * violet with a slow aurora breathing underneath it; modules are dark glass
+ * with soft violet rims; the focused workspace glows deep berry. Venom green
+ * appears only where something is alive — hover, healthy states. It is the
+ * quietest theme in the set, and the most dangerous-looking.
  *
  * EXPERIMENTAL. The animation budget is deliberately small: one slow
  * background drift on the bar, one breathing glow on the focused workspace,
@@ -25,11 +26,11 @@
 @define-color ns-ink #ece7f7;
 @define-color ns-dim #a79dc2;
 @define-color ns-faint #6f6589;
-@define-color ns-bg #0a0614;
-@define-color ns-panel rgba(19, 12, 32, 0.92);
-@define-color ns-berry #ff2fd6;
-@define-color ns-berry-soft rgba(255, 47, 214, 0.38);
-@define-color ns-berry-faint rgba(255, 47, 214, 0.16);
+@define-color ns-bg #07040f;
+@define-color ns-panel rgba(14, 9, 26, 0.92);
+@define-color ns-berry #e01b8f;
+@define-color ns-berry-soft rgba(224, 27, 143, 0.38);
+@define-color ns-berry-faint rgba(224, 27, 143, 0.16);
 @define-color ns-violet #8b5cf6;
 @define-color ns-violet-soft rgba(139, 92, 246, 0.40);
 @define-color ns-violet-faint rgba(139, 92, 246, 0.14);
@@ -49,21 +50,21 @@
  * -------------------------------------------------------------------------- */
 window#waybar {
     color: @ns-ink;
-    background-color: rgba(10, 6, 20, 0.94);
+    background-color: rgba(7, 4, 15, 0.94);
     background-image:
-        radial-gradient(ellipse 440px 100px at 12% 130%, rgba(255, 47, 214, 0.15), transparent 70%),
-        radial-gradient(ellipse 540px 120px at 88% 140%, rgba(139, 92, 246, 0.20), transparent 70%),
-        radial-gradient(ellipse 320px 90px at 55% 150%, rgba(163, 255, 18, 0.06), transparent 70%);
-    background-size: 135% 135%, 135% 135%, 135% 135%;
+        radial-gradient(ellipse 620px 140px at 12% 130%, rgba(224, 27, 143, 0.22), transparent 70%),
+        radial-gradient(ellipse 720px 160px at 88% 140%, rgba(139, 92, 246, 0.28), transparent 70%),
+        radial-gradient(ellipse 480px 120px at 55% 150%, rgba(139, 92, 246, 0.12), transparent 70%);
+    background-size: 160% 160%, 160% 160%, 160% 160%;
     background-position: 0% 50%, 100% 50%, 50% 50%;
     background-repeat: no-repeat;
-    border-bottom: 2px solid rgba(255, 47, 214, 0.42);
+    border-bottom: 2px solid rgba(224, 27, 143, 0.35);
     border-top-left-radius: 10px;
     border-top-right-radius: 10px;
     box-shadow:
-        0 0 22px rgba(255, 47, 214, 0.16),
+        0 0 22px rgba(224, 27, 143, 0.16),
         inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    animation: aurora-drift 26s ease-in-out infinite alternate;
+    animation: aurora-drift 38s ease-in-out infinite alternate;
 }
 
 /* One selector per keyframe — GTK CSS rejects comma-separated keyframes. */
@@ -109,7 +110,7 @@ window#waybar > box { background: transparent; }
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.07),
         0 0 10px rgba(139, 92, 246, 0.12);
-    text-shadow: 0 0 6px rgba(255, 47, 214, 0.22);
+    text-shadow: 0 0 6px rgba(224, 27, 143, 0.22);
     transition: border-color 250ms ease-out, box-shadow 250ms ease-out, color 250ms ease-out;
 }
 
@@ -142,7 +143,7 @@ window#waybar > box { background: transparent; }
     margin: 0 2px;
     padding: 1px 7px;
     color: @ns-dim;
-    background-color: rgba(10, 6, 20, 0.85);
+    background-color: rgba(7, 4, 15, 0.85);
     border: 1px solid rgba(139, 92, 246, 0.22);
     border-radius: 8px;
     text-shadow: none;
@@ -150,22 +151,22 @@ window#waybar > box { background: transparent; }
 
 #workspaces button.empty {
     color: @ns-faint;
-    background-color: rgba(10, 6, 20, 0.55);
+    background-color: rgba(7, 4, 15, 0.55);
     border-color: rgba(139, 92, 246, 0.12);
 }
 
 #workspaces button.focused,
 #workspaces button.active {
     color: #ffffff;
-    background-color: rgba(255, 47, 214, 0.20);
-    border-color: rgba(255, 47, 214, 0.78);
-    text-shadow: 0 0 8px rgba(255, 47, 214, 0.90);
+    background-color: rgba(224, 27, 143, 0.20);
+    border-color: rgba(224, 27, 143, 0.78);
+    text-shadow: 0 0 8px rgba(224, 27, 143, 0.90);
     animation: breathe 3.4s ease-in-out infinite alternate;
 }
 
 @keyframes breathe {
-    from { box-shadow: 0 0 8px rgba(255, 47, 214, 0.32), inset 0 0 0 1px rgba(255, 47, 214, 0.22); }
-    to   { box-shadow: 0 0 22px rgba(255, 47, 214, 0.62), inset 0 0 0 1px rgba(255, 47, 214, 0.45); }
+    from { box-shadow: 0 0 8px rgba(224, 27, 143, 0.32), inset 0 0 0 1px rgba(224, 27, 143, 0.22); }
+    to   { box-shadow: 0 0 22px rgba(224, 27, 143, 0.62), inset 0 0 0 1px rgba(224, 27, 143, 0.45); }
 }
 
 #workspaces button:hover {
@@ -384,10 +385,10 @@ window#waybar.empty #window {
 
 tooltip {
     color: @ns-ink;
-    background-color: rgba(10, 6, 20, 0.97);
+    background-color: rgba(7, 4, 15, 0.97);
     border: 1px solid @ns-berry-soft;
     border-radius: 8px;
-    box-shadow: 0 0 16px rgba(255, 47, 214, 0.30);
+    box-shadow: 0 0 16px rgba(224, 27, 143, 0.30);
 }
 
 tooltip label { color: @ns-ink; }
