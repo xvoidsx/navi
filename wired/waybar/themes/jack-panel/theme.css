@@ -396,9 +396,10 @@ window#waybar.empty #window {
  *
  * NOTE: every module above runs the infinite ring-drift animation on
  * border-color, and a running animation beats a :hover declaration in the
- * cascade — so the hover's border-color could never apply and only the glow
- * got through. Pausing the drift on hover is the honest fix: the ring holds
- * still, the green glow blooms, and the plug reads as seated. */
+ * cascade — paused or not, the frozen keyframe value keeps overriding the
+ * hover. animation:none removes the animation outright so the green border
+ * actually applies and sticks. The drift restarts from 0% on un-hover,
+ * which reads as the plug pulling back out. */
 #workspaces:hover,
 #clock:hover,
 #custom-weather:hover,
@@ -423,7 +424,7 @@ window#waybar.empty #window {
         inset 0 0 0 2px rgba(5, 3, 8, 0.70),
         0 0 18px rgba(57, 255, 20, 0.45);
     transition: border-color 300ms ease-out, box-shadow 700ms ease-out;
-    animation-play-state: paused;
+    animation: none;
 }
 
 #custom-power:hover {
