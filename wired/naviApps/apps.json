@@ -233,6 +233,21 @@
     "icon": "🦋"
   },
   {
+    "id": "web-attie",
+    "name": "Attie",
+    "summary": "Bluesky's AI builder. Describe a feed, poll, game, or site — Attie makes it.",
+    "category": "AI",
+    "source": "webapp",
+    "package": "attie",
+    "url": "https://attie.ai",
+    "install": "navi-webapp install attie",
+    "downloadUrl": "webapps/attie.desktop",
+    "desktopEntry": "[Desktop Entry]\nVersion=1.0\nName=Attie\nExec=navi-browser-run --force-dark-mode --app=https://attie.ai\nComment=Attie as a navi webapp\nTerminal=false\nType=Application\nIcon=navi-attie\nStartupNotify=true\nCategories=Network;",
+    "homepage": "https://attie.ai",
+    "logo": "icons/attie.png",
+    "icon": "✨"
+  },
+  {
     "id": "web-gab",
     "name": "Gab",
     "summary": "Free speech social network — speak freely.",
