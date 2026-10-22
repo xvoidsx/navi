@@ -119,6 +119,15 @@ bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOU
 # --no-repeat is load-bearing: without it, holding the key flaps the toggle.
 bindsym --no-repeat Alt+v exec /usr/share/navi/hey-lain/bin/toggle.sh
 
+# Voxtype dictation: hold Scroll Lock to record, release to transcribe
+# at the cursor. The compositor owns the key, so the voxtype daemon
+# must run with its built-in hotkey disabled ([hotkey] enabled = false)
+# and state_file = "auto". Engine: Moonshine Base — the lightest,
+# fastest-CPU option in voxtype, kind to old hardware and memory
+# bandwidth alike. Inert on machines without voxtype installed.
+bindsym --no-repeat Scroll_Lock exec --no-startup-id voxtype record start
+bindsym --release Scroll_Lock exec --no-startup-id voxtype record stop
+
 floating_modifier $mod
 
 # start a terminal.
