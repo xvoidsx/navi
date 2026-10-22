@@ -146,7 +146,7 @@ var browserTable = []browserDef{
 	{
 		ID: "chrome-canary", Name: "Google Chrome Canary",
 		Blurb:     "Bleeding-edge Chrome — for life on the cutting edge.",
-		Binaries:  []string{"google-chrome-unstable"},
+		Binaries:  []string{"google-chrome-canary"},
 		PolicyDir: "/etc/opt/chrome/policies/managed",
 		ExtrasID:  "chrome-canary",
 	},

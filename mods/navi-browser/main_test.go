@@ -83,7 +83,7 @@ func TestResolveFallbackChain(t *testing.T) {
 	bindir := t.TempDir()
 	home := t.TempDir()
 	withEnv(t, home, bindir) // empty PATH dir: nothing installed
-	for _, name := range []string{"chromium", "brave-browser", "brave-browser-nightly", "google-chrome-unstable"} {
+	for _, name := range []string{"chromium", "brave-browser", "brave-browser-nightly", "google-chrome-canary"} {
 		p := filepath.Join(bindir, name)
 		os.WriteFile(p, []byte("#!/bin/sh\n"), 0o755)
 	}
@@ -119,12 +119,12 @@ func TestResolveFallbackChain(t *testing.T) {
 	os.Remove(configPath())
 	os.Remove(filepath.Join(bindir, "chromium"))
 	id, bin = resolveBinary()
-	if id != "chrome-canary" || !strings.HasSuffix(bin, "google-chrome-unstable") {
+	if id != "chrome-canary" || !strings.HasSuffix(bin, "google-chrome-canary") {
 		t.Fatalf("resolve = %q %q, want chrome-canary first-installed", id, bin)
 	}
 
 	// nothing at all -> unresolved, caller falls back to bare "chromium"
-	os.Remove(filepath.Join(bindir, "google-chrome-unstable"))
+	os.Remove(filepath.Join(bindir, "google-chrome-canary"))
 	id, bin = resolveBinary()
 	if id != "" || bin != "chromium" {
 		t.Fatalf("resolve = %q %q, want empty + chromium", id, bin)

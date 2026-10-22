@@ -14,7 +14,7 @@ import (
 func testApps() []app {
 	return []app{
 		{ID: "native-edge", Name: "Microsoft Edge", Summary: "Microsoft's Chromium-based browser", Category: "Internet", Source: "native", Package: "edge", Install: "navi-extras --install edge", Remove: "doas apt remove -y microsoft-edge-stable"},
-		{ID: "native-chrome-canary", Name: "Google Chrome Canary", Summary: "Bleeding-edge Chromium-based browser", Category: "Internet", Source: "native", Package: "chrome-canary", Install: "navi-extras --install chrome-canary", Remove: "doas apt remove -y google-chrome-unstable"},
+		{ID: "native-chrome-canary", Name: "Google Chrome Canary", Summary: "Bleeding-edge Chromium-based browser", Category: "Internet", Source: "native", Package: "chrome-canary", Install: "navi-extras --install chrome-canary", Remove: "doas apt remove -y google-chrome-canary"},
 		{ID: "web-navi-radio", Name: "navi radio", Summary: "Our own music app", Category: "navi", Source: "webapp", Package: "navi-radio", Install: "navi-webapp navi-radio"},
 		{ID: "agent-ollama", Name: "Ollama", Summary: "Run open models locally", Category: "AI", Source: "agent", Install: "ollama"},
 	}

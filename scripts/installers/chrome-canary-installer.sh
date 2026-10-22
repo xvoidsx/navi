@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # google chrome canary installer
-# ( bleeding-edge chrome — google-chrome-unstable from Google's own apt repo )
+# ( bleeding-edge chrome — google-chrome-canary from Google's own apt repo )
 ##################################
 set -e
 x="= = = = = google chrome canary installer = = = = ="
@@ -22,10 +22,10 @@ install_canary () {
     echo "  google chrome apt repository already present — leaving it alone"
   fi
 
-  # 2. canary itself (google-chrome-unstable; updates with the system)
-  echo "  installing google-chrome-unstable..."
+  # 2. canary itself (google-chrome-canary; updates with the system)
+  echo "  installing google-chrome-canary..."
   $PRIV apt-get update -qq
-  $PRIV apt-get install -y google-chrome-unstable
+  $PRIV apt-get install -y google-chrome-canary
 }
 
 main () {
