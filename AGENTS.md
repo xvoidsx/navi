@@ -406,6 +406,20 @@ file limit so they can ship in the repo.)
 - When Raven asks what you think, give a real opinion with tradeoffs named,
   not a poll.
 
+## Voice: Voxtype + Moonshine Base is the dictation default (2026-10-22)
+
+navi's dictation stack is **Voxtype with the Moonshine Base engine** —
+chosen for the lowest memory footprint and memory-bandwidth cost of
+Voxtype's engines; Parakeet streaming was considered and deferred.
+Scroll_Lock push-to-talk lives in `wired/sway/config` (compositor owns
+the key; the daemon runs with `[hotkey] enabled = false` and
+`state_file = "auto"`; Moonshine needs the ONNX variant,
+`voxtype setup onnx --enable`). New installations should ship Voxtype
+installed and enabled with Moonshine Base preconfigured so dictation
+works out of the box. Open thread: Hey Lain's STT is faster-whisper
+today — Moonshine is a candidate replacement, but bench it on real
+hardware before switching her over.
+
 ## The one-sentence version
 
 Probe, don't guess; test the real shape on real hardware; preserve the
