@@ -1199,14 +1199,14 @@
     "logo": "icons/standardnotes.png"
   },
   {
-    "id": "flatpak-obsidian",
+    "id": "native-obsidian",
     "name": "Obsidian",
-    "summary": "Local-first knowledge base — your notes live as plain Markdown files in a vault you own. Backlinks, graph view, and a huge plugin ecosystem; no account, no cloud lock-in.",
+    "summary": "Local-first knowledge base — your notes live as plain Markdown files in a vault you own. Backlinks, graph view, and a huge plugin ecosystem; no account, no cloud lock-in. The official .deb, straight from Dynalist.",
     "category": "Productivity",
-    "source": "flatpak",
-    "package": "md.obsidian.Obsidian",
-    "install": "flatpak install -y flathub md.obsidian.Obsidian",
-    "remove": "flatpak uninstall -y md.obsidian.Obsidian",
+    "source": "native",
+    "package": "obsidian",
+    "install": "navi-extras --install obsidian",
+    "remove": "doas apt remove -y obsidian",
     "homepage": "https://obsidian.md",
     "icon": "🔮"
   },

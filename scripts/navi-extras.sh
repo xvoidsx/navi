@@ -48,6 +48,7 @@ EXTRAS=(
   "cliamp|cliamp|Terminal music player|command -v cliamp >/dev/null 2>&1|cliamp-installer.sh|"
   "telegram|Telegram|Fast, cloud-synced messaging — native desktop app|command -v telegram >/dev/null 2>&1|telegram-installer.sh|"
   "element|Element|Decentralized chat over Matrix — native desktop app|command -v element-desktop >/dev/null 2>&1|element-installer.sh|"
+  "obsidian|Obsidian|Local-first Markdown knowledge base — your notes as plain files you own, from the official .deb|dpkg -s obsidian >/dev/null 2>&1|obsidian-installer.sh|"
   "cyberia|cyberia|xvoidsx's nightshadeNeon Matrix client — terminal chat with inline images (friendly fork of pkulak's matui)|command -v cyberia >/dev/null 2>&1|cyberia-installer.sh|"
   "navi-radio|navi radio|xvoidsx's Electron music app — internet radio + local music library, native filesystem access|dpkg -s navi-radio >/dev/null 2>&1|navi-radio-installer.sh|"
   "sumi|sumi|xvoidsx's Electron writing app — 墨, distraction-free Markdown with native open/save dialogs|dpkg -s sumi >/dev/null 2>&1|sumi-installer.sh|"
