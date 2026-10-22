@@ -1199,6 +1199,18 @@
     "logo": "icons/standardnotes.png"
   },
   {
+    "id": "flatpak-obsidian",
+    "name": "Obsidian",
+    "summary": "Local-first knowledge base — your notes live as plain Markdown files in a vault you own. Backlinks, graph view, and a huge plugin ecosystem; no account, no cloud lock-in.",
+    "category": "Productivity",
+    "source": "flatpak",
+    "package": "md.obsidian.Obsidian",
+    "install": "flatpak install -y flathub md.obsidian.Obsidian",
+    "remove": "flatpak uninstall -y md.obsidian.Obsidian",
+    "homepage": "https://obsidian.md",
+    "icon": "🔮"
+  },
+  {
     "id": "web-ente",
     "name": "Ente",
     "summary": "FOSS encrypted photos.",
