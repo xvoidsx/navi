@@ -55,6 +55,7 @@ EXTRAS=(
   "fossfit|FOSSfit|xvoidsx's Electron fitness app — workouts, weight charts, meditation|dpkg -s fossfit >/dev/null 2>&1|fossfit-installer.sh|"
   "tailscale|Tailscale|Zero-config mesh VPN — your own private network across every device|command -v tailscale >/dev/null 2>&1|tailscale-installer.sh|"
   "pi|pi|The pi agent — xvoidsx is testing it as an alternative Lain engine (interactive installer)|command -v pi >/dev/null 2>&1|pi-installer.sh|"
+  "thinkrail|ThinkRail|JetBrains' open-source agentic IDE — pi engine, worktree workspaces, spec graph (opens as a chromeless webapp window)|command -v thinkrail >/dev/null 2>&1|thinkrail-installer.sh|"
   "songsnatch|SongSnatch|Snag audio from YouTube via yt-dlp — saves to ~/Music|command -v songsnatch >/dev/null 2>&1|songsnatch-installer.sh|"
 )
 
