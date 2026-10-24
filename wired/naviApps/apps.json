@@ -995,7 +995,7 @@
     "id": "native-cyberia",
     "name": "cyberia",
     "summary": "xvoidsx's nightshadeNeon Matrix client — terminal chat with inline images.",
-    "category": "Internet",
+    "category": "navi",
     "source": "native",
     "package": "cyberia",
     "install": "navi-extras --install cyberia",
