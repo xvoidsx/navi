@@ -1341,7 +1341,7 @@
     "id": "agent-wisp",
     "name": "Wisp",
     "summary": "xvoidsx's navi-native coding harness — fork of opencode with nightshadeNeon theme, Ollama local by default, reads navi's agents.env.",
-    "category": "agents",
+    "category": "navi",
     "source": "agent",
     "package": "wisp",
     "install": "curl -fsSL https://raw.githubusercontent.com/xvoidsx/wisp/dev/install.sh | bash",
