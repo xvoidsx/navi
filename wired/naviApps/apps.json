@@ -1879,6 +1879,19 @@
     "icon": "💠"
   },
   {
+    "id": "native-thinkrail",
+    "name": "ThinkRail",
+    "summary": "JetBrains' open-source agentic IDE — the pi coding agent in a real IDE, with git-worktree workspaces and a spec graph the agent actually reads. Opens as a chromeless webapp window.",
+    "category": "Editors",
+    "source": "native",
+    "package": "thinkrail",
+    "install": "navi-extras --install thinkrail",
+    "remove": "thinkrail uninstall; rm -f ~/.local/share/applications/thinkrail.desktop ~/.local/bin/thinkrail-webapp ~/.local/share/icons/hicolor/scalable/apps/thinkrail.svg",
+    "homepage": "https://thinkrail.ai",
+    "logo": "icons/thinkrail.svg",
+    "icon": "🛤️"
+  },
+  {
     "id": "native-zed",
     "name": "Zed",
     "summary": "The fast, collaborative editor — Rust-native speed, multiplayer editing, AI built in.",
