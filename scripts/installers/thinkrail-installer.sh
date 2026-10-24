@@ -96,8 +96,28 @@ Icon=thinkrail
 Terminal=false
 Categories=Development;
 EOF
+    # Icon: upstream's own desktop icon (apps/desktop/assets/icon.svg,
+    # Apache-2.0, black rounded square + neon-green TR mark). Ships
+    # beside this script in the repo; falls back to a fresh download
+    # from upstream main if the file isn't next to the script.
+    ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+    mkdir -p "$ICON_DIR"
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "$SCRIPT_DIR/thinkrail-icon.svg" ]; then
+        cp "$SCRIPT_DIR/thinkrail-icon.svg" "$ICON_DIR/thinkrail.svg"
+    elif curl -fsSL --connect-timeout 20 --max-time 60 \
+            -o "$ICON_DIR/thinkrail.svg" \
+            https://raw.githubusercontent.com/JetBrains/thinkrail/main/apps/desktop/assets/icon.svg; then
+        :
+    else
+        echo "  (icon unavailable — launcher will show a generic icon)" >&2
+        rm -f "$ICON_DIR/thinkrail.svg"
+    fi
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
+    fi
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
     fi
     echo "  launcher installed: $DESKTOP_FILE"
     echo "  run it from your app launcher, or: $WRAPPER"
