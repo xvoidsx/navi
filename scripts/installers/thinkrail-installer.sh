@@ -54,31 +54,43 @@ main() {
     cat > "$WRAPPER" <<'EOF'
 #!/usr/bin/env bash
 # thinkrail-webapp — open ThinkRail as a chromeless webapp window.
-# Starts the local server on :24243 if it isn't answering yet, then
-# opens the app window through navi's browser runner (falls back to
-# brave nightly, then chromium). Same ~/.thinkrail state as the CLI
-# and the desktop build — the window is just a view onto the server.
+# Reuses a running server if one answers (default port 24242, or the
+# fallback port a previous start landed on); otherwise starts one with
+# --no-open so thinkrail itself does NOT pop a browser tab first, and
+# only then opens the app window through navi's browser runner (falls
+# back to brave nightly, then chromium). Same ~/.thinkrail state as the
+# CLI and the desktop build — the window is just a view onto the server.
 set -u
 BIN="$(command -v thinkrail 2>/dev/null || true)"
 [ -n "$BIN" ] || BIN="$HOME/.local/bin/thinkrail"
-if ! curl -fsS --max-time 2 http://localhost:24243 >/dev/null 2>&1; then
+LOG="$HOME/.local/share/thinkrail-server.log"
+PORT=""
+for p in 24243 24242; do
+    if curl -fsS --max-time 2 "http://localhost:$p" >/dev/null 2>&1; then PORT="$p"; break; fi
+done
+if [ -z "$PORT" ]; then
     if [ -x "$BIN" ]; then
-        # NOTE: thinkrail itself may open a browser window on first
-        # start — close it; the server stays up and this window is
-        # the one you keep.
-        setsid nohup "$BIN" >/dev/null 2>&1 < /dev/null &
+        # --port 24243 is the requested port; thinkrail falls back to a
+        # free port if it is taken and logs "using free port N" — read
+        # the actual port back out of the log instead of assuming.
+        setsid nohup "$BIN" --no-open --port 24243 >"$LOG" 2>&1 < /dev/null &
     fi
     for _ in $(seq 1 40); do
-        curl -fsS --max-time 2 http://localhost:24243 >/dev/null 2>&1 && break
+        if grep -oE 'using free port [0-9]+' "$LOG" 2>/dev/null | grep -oE '[0-9]+' | head -1 | grep -q .; then
+            PORT="$(grep -oE 'using free port [0-9]+' "$LOG" | grep -oE '[0-9]+' | head -1)"
+            break
+        fi
+        if curl -fsS --max-time 2 http://localhost:24243 >/dev/null 2>&1; then PORT=24243; break; fi
         sleep 0.5
     done
+    [ -n "$PORT" ] || PORT=24243
 fi
 if command -v navi-browser-run >/dev/null 2>&1; then
-    exec navi-browser-run --force-dark-mode --app=http://localhost:24243
+    exec navi-browser-run --force-dark-mode --app="http://localhost:$PORT"
 elif command -v brave-browser-nightly >/dev/null 2>&1; then
-    exec brave-browser-nightly --force-dark-mode --app=http://localhost:24243
+    exec brave-browser-nightly --force-dark-mode --app="http://localhost:$PORT"
 elif command -v chromium >/dev/null 2>&1; then
-    exec chromium --force-dark-mode --app=http://localhost:24243
+    exec chromium --force-dark-mode --app="http://localhost:$PORT"
 else
     echo "thinkrail-webapp: no Chromium-family browser found" >&2
     exit 1
