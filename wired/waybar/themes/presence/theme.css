@@ -1,0 +1,308 @@
+/* ============================================================================
+ * PRESENCE
+ * ----------------------------------------------------------------------------
+ * Quiet static. The bar is near-black and near-colourless — desaturated
+ * grey on grey, flat square modules, hairline borders, no glow anywhere —
+ * except one neon pink eye. The focused workspace is the eye: pink text,
+ * pink underline, a slow breathing halo. Notifications, blocked agents,
+ * and available updates also turn the eye toward them. Everything else
+ * stays quiet. It is the bar version of Lain in the wired: present,
+ * watching, saying almost nothing.
+ *
+ * Four tones, and only four. Grey is quiet, white is alive, pink is the
+ * eye, red is danger. Nothing else gets a colour — that discipline is the
+ * whole theme. If a new state needs a colour, it is one of these four.
+ *
+ * Animation budget: one slow breathe on the focused workspace, one pulse
+ * on states that need the user right now. Both animate box-shadow only,
+ * never border-color, and both pause on hover — the jack-panel lesson,
+ * honoured. The bar itself does not move.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately, same as
+ * jack-panel and nightshade. The navi mods emit emoji codepoints
+ * (weather conditions, volume); Symbols2 carries clean monochrome glyphs
+ * that read at 10px. Noto Color Emoji is NOT named — its 109px bitmap
+ * strike downscales to mush at bar size.
+ * ========================================================================== */
+
+@define-color pr-ink #d7d7da;
+@define-color pr-dim #96969e;
+@define-color pr-faint #5f5f66;
+@define-color pr-bg #0b0b0d;
+@define-color pr-hairline rgba(255, 255, 255, 0.06);
+@define-color pr-panel rgba(255, 255, 255, 0.02);
+@define-color pr-pink #ff10f0;
+@define-color pr-pink-soft rgba(255, 16, 240, 0.45);
+@define-color pr-pink-faint rgba(255, 16, 240, 0.14);
+@define-color pr-red #ff5555;
+@define-color pr-red-soft rgba(255, 85, 85, 0.50);
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", sans-serif;
+    font-size: 10px;
+    font-weight: normal;
+}
+
+/* ----------------------------------------------------------------------------
+ * The bar: near-black, flat, with a faint scanline texture underneath.
+ * The stripes are barely there — texture, not decoration. If the scanline
+ * layer ever looks wrong on hardware, deleting the background-image line
+ * leaves the whole design intact.
+ * -------------------------------------------------------------------------- */
+window#waybar {
+    color: @pr-ink;
+    background-color: @pr-bg;
+    background-image: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0px, rgba(0, 0, 0, 0.28) 1px, transparent 1px, transparent 3px);
+    background-repeat: repeat;
+    border-bottom: 1px solid #232327;
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Flat modules. Square corners, hairline borders, no shadow. The bar reads
+ * as one quiet instrument strip, not a row of pills.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 4px 3px;
+    padding: 2px 10px;
+    color: @pr-dim;
+    background-color: @pr-panel;
+    border: 1px solid @pr-hairline;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+    transition: color 200ms ease-out, border-color 200ms ease-out;
+}
+
+#clock {
+    color: @pr-ink;
+    font-weight: bold;
+}
+
+#custom-wired-launcher,
+#custom-power {
+    color: @pr-ink;
+    font-size: 12px;
+}
+
+/* ----------------------------------------------------------------------------
+ * Workspaces: dim numbers, the focused one is the eye.
+ * -------------------------------------------------------------------------- */
+#workspaces button {
+    min-width: 22px;
+    margin: 0 2px;
+    padding: 1px 8px;
+    color: @pr-dim;
+    background-color: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    text-shadow: none;
+}
+
+#workspaces button.empty {
+    color: @pr-faint;
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @pr-pink;
+    font-weight: bold;
+    border-bottom-color: @pr-pink;
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.65);
+    animation: eye-breathe 4s ease-in-out infinite alternate;
+}
+
+/* One selector per keyframe — GTK CSS rejects comma-separated keyframes. */
+@keyframes eye-breathe {
+    from { box-shadow: 0 2px 8px rgba(255, 16, 240, 0.22); }
+    to   { box-shadow: 0 2px 20px rgba(255, 16, 240, 0.55); }
+}
+
+#workspaces button:hover {
+    color: #ffffff;
+}
+
+#workspaces button.focused:hover {
+    animation-play-state: paused;
+}
+
+#window {
+    color: @pr-dim;
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    opacity: 0;
+}
+
+#custom-weather {
+    color: @pr-dim;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    font-size: 8px;
+}
+
+/* ----------------------------------------------------------------------------
+ * States, in the four tones. Quiet states go faint. Alive states go white.
+ * The eye turns pink only where it needs to look. Red is danger alone.
+ * -------------------------------------------------------------------------- */
+@keyframes eye-alert {
+    from { box-shadow: 0 0 6px rgba(255, 16, 240, 0.25); }
+    to   { box-shadow: 0 0 20px rgba(255, 16, 240, 0.70); }
+}
+
+@keyframes presence-alert {
+    from { box-shadow: 0 0 6px rgba(255, 85, 85, 0.25); }
+    to   { box-shadow: 0 0 20px rgba(255, 85, 85, 0.70); }
+}
+
+/* Quiet: off, asleep, up to date, idle, muted, no notifications. */
+#bluetooth.off,
+#custom-bluetooth.off,
+#custom-tailscale.off,
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep,
+#custom-nowplaying.idle,
+#custom-volume.muted {
+    color: @pr-faint;
+    border-color: rgba(255, 255, 255, 0.03);
+    animation: none;
+}
+
+/* Alive, but not the eye: connected, ready, playing, working. */
+#bluetooth.connected,
+#custom-bluetooth.connected,
+#custom-tailscale.connected,
+#custom-agent.agent-ready,
+#custom-agent.agent-working,
+#custom-nowplaying.playing,
+#idle_inhibitor.activated {
+    color: @pr-ink;
+    border-color: rgba(255, 255, 255, 0.14);
+    animation: none;
+}
+
+#custom-nowplaying.paused {
+    color: @pr-dim;
+    animation: none;
+}
+
+/* The eye: updates waiting, notifications waiting. */
+#custom-update.updates-available,
+#custom-bell.has-notifs {
+    color: @pr-pink;
+    border-color: @pr-pink-soft;
+    animation: none;
+}
+
+/* The eye, urgent: an agent needs the user right now. */
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: @pr-pink;
+    border-color: @pr-pink-soft;
+    animation: eye-alert 1.2s ease-in-out infinite alternate;
+}
+
+/* Connecting is a transition, so it gets the eye too, briefly. */
+#bluetooth.connecting,
+#custom-bluetooth.connecting {
+    color: @pr-pink;
+    border-color: @pr-pink-soft;
+    animation: none;
+}
+
+/* Danger alone is red. */
+#network.disconnected,
+#battery.critical {
+    color: @pr-red;
+    border-color: @pr-red-soft;
+    animation: presence-alert 1.2s ease-in-out infinite alternate;
+}
+
+#battery.warning {
+    color: @pr-ink;
+    border-color: rgba(255, 255, 255, 0.14);
+    animation: none;
+}
+
+#tray { padding-left: 6px; padding-right: 6px; }
+#tray > .passive { opacity: 0.50; }
+
+#tray > .needs-attention {
+    background-color: @pr-pink-faint;
+    border-radius: 0;
+}
+
+/* ----------------------------------------------------------------------------
+ * Hover: white, nothing more. No glow, no colour — presence stays quiet
+ * even when touched. The paused play-state covers the breathing and
+ * pulsing exceptions, so hover always wins.
+ * -------------------------------------------------------------------------- */
+#workspaces:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#custom-tailscale:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.18);
+    animation-play-state: paused;
+}
+
+#custom-power:hover {
+    color: @pr-red;
+    border-color: @pr-red-soft;
+}
+
+tooltip {
+    color: @pr-ink;
+    background-color: rgba(11, 11, 13, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+tooltip label { color: @pr-ink; }
