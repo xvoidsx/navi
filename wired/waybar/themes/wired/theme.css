@@ -1,0 +1,353 @@
+/* ============================================================================
+ * WIRED
+ * ----------------------------------------------------------------------------
+ * Full nightshadeNeon, Lain in the signal. Not a variant, not a whisper —
+ * everything at once: the canonical trio (pink, green, cyan) over the dark,
+ * sharp slabs instead of soft pills, and a glitch running through it. The
+ * focused workspace doesn't glow, it glitches: an RGB-split shadow that
+ * jumps its offsets in hard steps, the way a bad signal tears. The clock
+ * carries a static split, like time itself is slightly out of phase.
+ *
+ * The trio has jobs. Pink is attention and launch. Green is healthy and
+ * alive. Cyan is flow and information. Red appears for danger alone — it
+ * is not part of the trio, and it never decorates.
+ *
+ * The bar is slightly transparent (0.82) with sheerer modules (0.55), so
+ * the wallpaper shows through both layers. Glitch is cheap on purpose:
+ * one stepped animation on the focused workspace, pulses on urgent states,
+ * nothing anywhere else.
+ *
+ * GLITCH HONESTY: the split itself is static text-shadow, which always
+ * renders. The offset jumps animate text-shadow in steps; if GTK ever
+ * refuses to interpolate that property, the opacity dips in the same
+ * keyframes still run (opacity is proven animatable here), so the worst
+ * case is a flickering split instead of a jumping one. Either way it
+ * reads as a bad signal, which is the whole point.
+ *
+ * Hover was designed against the jack-panel lesson: no infinite animation
+ * touches border-color on any module, so :hover declarations always win,
+ * and every animation pauses on hover.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately, same as the rest
+ * of the set. The navi mods emit emoji codepoints (weather conditions,
+ * volume); Symbols2 carries clean monochrome glyphs that read at 10px.
+ * Noto Color Emoji is NOT named — its 109px bitmap strike downscales to
+ * mush at bar size.
+ * ========================================================================== */
+
+@define-color wr-ink #ece7f7;
+@define-color wr-dim #a89ec4;
+@define-color wr-faint #6f6589;
+@define-color wr-base rgba(7, 4, 15, 0.82);
+@define-color wr-slab rgba(7, 4, 15, 0.55);
+@define-color wr-pink #ff10f0;
+@define-color wr-pink-soft rgba(255, 16, 240, 0.45);
+@define-color wr-pink-faint rgba(255, 16, 240, 0.14);
+@define-color wr-green #39ff14;
+@define-color wr-green-soft rgba(57, 255, 20, 0.45);
+@define-color wr-cyan #00ffff;
+@define-color wr-cyan-soft rgba(0, 255, 255, 0.45);
+@define-color wr-red #ff3131;
+@define-color wr-red-soft rgba(255, 49, 49, 0.55);
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", sans-serif;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* ----------------------------------------------------------------------------
+ * The bar: the dark, sheer, with a live pink wire along the bottom.
+ * -------------------------------------------------------------------------- */
+window#waybar {
+    color: @wr-ink;
+    background-color: @wr-base;
+    border-bottom: 2px solid @wr-pink-soft;
+    box-shadow: 0 0 18px rgba(255, 16, 240, 0.12);
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Sharp slabs. Translucent dark over the sheer bar, signature rims.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#power-profiles-daemon,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 4px 4px;
+    padding: 2px 10px;
+    color: @wr-dim;
+    background-color: @wr-slab;
+    border: 1px solid rgba(236, 231, 247, 0.14);
+    border-radius: 4px;
+    box-shadow: none;
+    text-shadow: none;
+    transition: border-color 200ms ease-out, color 200ms ease-out;
+}
+
+/* Signature rims. Pink launches, cyan flows, green lives. */
+#custom-wired-launcher,
+#custom-power,
+#custom-update,
+#custom-bell { border-color: @wr-pink-soft; color: #ff8fe4; }
+
+#network,
+#custom-volume,
+#bluetooth,
+#custom-bluetooth,
+#custom-weather,
+#custom-nowplaying { border-color: @wr-cyan-soft; color: #a8ffff; }
+
+#custom-tailscale,
+#custom-agent,
+#memory,
+#cpu { border-color: @wr-green-soft; color: #c8ff7a; }
+
+#battery { border-color: rgba(236, 231, 247, 0.14); color: @wr-dim; }
+
+#custom-wired-launcher,
+#custom-power { font-size: 12px; }
+
+/* The clock is out of phase: a static RGB split, always on. */
+#clock {
+    color: @wr-ink;
+    text-shadow: 1px 0 rgba(255, 16, 240, 0.55), -1px 0 rgba(0, 255, 255, 0.55);
+}
+
+/* ----------------------------------------------------------------------------
+ * Workspaces: dim slabs, the focused one glitching.
+ * -------------------------------------------------------------------------- */
+#workspaces button {
+    min-width: 22px;
+    margin: 0 2px;
+    padding: 1px 7px;
+    color: @wr-dim;
+    background-color: rgba(7, 4, 15, 0.55);
+    border: 1px solid rgba(236, 231, 247, 0.14);
+    border-radius: 4px;
+    text-shadow: none;
+}
+
+#workspaces button.empty {
+    color: @wr-faint;
+    border-color: rgba(236, 231, 247, 0.07);
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: #ffffff;
+    background-color: @wr-pink-faint;
+    border-color: @wr-pink-soft;
+    box-shadow: 0 0 12px rgba(255, 16, 240, 0.35);
+    animation: wired-glitch 7s steps(1, end) infinite;
+}
+
+/* The glitch: mostly a steady split, with hard jumps and dips a few times
+ * per loop. Steps timing makes the jumps cuts, not slides — a bad signal
+ * tears, it doesn't glide. One selector per keyframe, as GTK requires. */
+@keyframes wired-glitch {
+    0%   { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    86%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    87%  { text-shadow: 3px 0 rgba(255, 16, 240, 0.9), -3px 0 rgba(0, 255, 255, 0.9); opacity: 0.82; }
+    88%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    92%  { text-shadow: -2px 0 rgba(255, 16, 240, 0.9), 2px 0 rgba(0, 255, 255, 0.9); opacity: 0.9; }
+    93%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    100% { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+}
+
+#workspaces button:hover {
+    color: #ffffff;
+    border-color: @wr-cyan-soft;
+    text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75);
+}
+
+#workspaces button.focused:hover {
+    animation-play-state: paused;
+}
+
+#window {
+    color: @wr-dim;
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    opacity: 0;
+}
+
+/* ----------------------------------------------------------------------------
+ * States, in the trio. Quiet goes faint, alive goes its signature color,
+ * attention goes pink, danger alone goes red.
+ * -------------------------------------------------------------------------- */
+@keyframes wired-pink-alert {
+    from { box-shadow: 0 0 6px rgba(255, 16, 240, 0.25); }
+    to   { box-shadow: 0 0 20px rgba(255, 16, 240, 0.70); }
+}
+
+@keyframes wired-red-alert {
+    from { box-shadow: 0 0 6px rgba(255, 49, 49, 0.25); }
+    to   { box-shadow: 0 0 20px rgba(255, 49, 49, 0.70); }
+}
+
+/* Quiet: off, asleep, up to date, idle, muted. */
+#bluetooth.off,
+#custom-bluetooth.off,
+#custom-tailscale.off,
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep,
+#custom-nowplaying.idle,
+#custom-volume.muted {
+    color: @wr-faint;
+    border-color: rgba(236, 231, 247, 0.07);
+    box-shadow: none;
+    text-shadow: none;
+    animation: none;
+}
+
+/* Alive: connected and working read green, playing reads cyan. */
+#bluetooth.connected,
+#custom-bluetooth.connected,
+#custom-tailscale.connected,
+#custom-agent.agent-ready,
+#custom-agent.agent-working {
+    color: #c8ff7a;
+    border-color: @wr-green-soft;
+    animation: none;
+}
+
+#custom-nowplaying.playing {
+    color: #a8ffff;
+    border-color: @wr-cyan-soft;
+    animation: none;
+}
+
+#custom-nowplaying.paused {
+    color: @wr-dim;
+    animation: none;
+}
+
+#idle_inhibitor.activated {
+    color: #c8ff7a;
+    border-color: @wr-green-soft;
+    animation: none;
+}
+
+/* Attention: updates, notifications, and agents that need the user. */
+#custom-update.updates-available,
+#custom-bell.has-notifs {
+    color: #ff8fe4;
+    border-color: @wr-pink-soft;
+    animation: none;
+}
+
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: #ff8fe4;
+    border-color: @wr-pink-soft;
+    animation: wired-pink-alert 1s ease-in-out infinite alternate;
+}
+
+#bluetooth.connecting,
+#custom-bluetooth.connecting {
+    color: #ff8fe4;
+    border-color: @wr-pink-soft;
+    animation: none;
+}
+
+/* Danger alone is red. */
+#network.disconnected,
+#battery.critical {
+    color: @wr-red;
+    border-color: @wr-red-soft;
+    animation: wired-red-alert 1.2s ease-in-out infinite alternate;
+}
+
+#battery.warning {
+    color: #ff8fe4;
+    border-color: @wr-pink-soft;
+    animation: none;
+}
+
+#battery.charging {
+    color: #c8ff7a;
+    border-color: @wr-green-soft;
+    animation: none;
+}
+
+#tray { padding-left: 6px; padding-right: 6px; }
+#tray > .passive { opacity: 0.50; }
+
+#tray > .needs-attention {
+    background-color: @wr-pink-faint;
+    border-radius: 4px;
+}
+
+/* ----------------------------------------------------------------------------
+ * Hover: white with the split on. The split is the theme's signature, so
+ * hover wears it too — and pauses every animation, so hover always wins.
+ * -------------------------------------------------------------------------- */
+#workspaces:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#custom-tailscale:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover {
+    color: #ffffff;
+    border-color: rgba(236, 231, 247, 0.30);
+    text-shadow: 1px 0 rgba(255, 16, 240, 0.65), -1px 0 rgba(0, 255, 255, 0.65);
+    animation-play-state: paused;
+}
+
+#custom-power:hover {
+    color: @wr-red;
+    border-color: @wr-red-soft;
+    text-shadow: 0 0 8px rgba(255, 49, 49, 0.70);
+}
+
+tooltip {
+    color: @wr-ink;
+    background-color: rgba(7, 4, 15, 0.95);
+    border: 1px solid @wr-pink-soft;
+    border-radius: 4px;
+    box-shadow: 0 0 16px rgba(255, 16, 240, 0.25);
+}
+
+tooltip label { color: @wr-ink; }

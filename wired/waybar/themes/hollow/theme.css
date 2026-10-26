@@ -1,0 +1,213 @@
+/* ============================================================================
+ * HOLLOW
+ * ----------------------------------------------------------------------------
+ * Ghost, emptied further. Ghost said "color is the signal"; hollow says
+ * almost nothing is. No color voices, no glow, no bold, no boxes, no
+ * borders — just type in one grey scale, floating over the wallpaper.
+ * White means "here" or "alive". Red is the only color in the entire
+ * theme, and it means danger alone. Even the clock stays dim until it is
+ * hovered. If ghost is the bar that isn't there, hollow is the bar that
+ * barely was.
+ *
+ * The greys are alpha whites, not solid greys, so they adapt to whatever
+ * wallpaper is underneath instead of fighting it. The bar and every
+ * module are fully transparent — the wallpaper is the theme.
+ *
+ * The only motion is none. Zero animations; one soft hover fade. Like
+ * ghost, this is nearly free by construction — there is almost nothing
+ * to repaint.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately, same as ghost.
+ * The navi mods emit emoji codepoints (weather conditions, volume);
+ * Symbols2 carries clean monochrome glyphs that read at 10px. Noto Color
+ * Emoji is NOT named — its 109px bitmap strike downscales to mush.
+ * ========================================================================== */
+
+@define-color hw-ink #f2f0ea;
+@define-color hw-dim rgba(242, 240, 234, 0.45);
+@define-color hw-faint rgba(242, 240, 234, 0.25);
+@define-color hw-red #ff3131;
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", monospace;
+    font-size: 10px;
+    font-weight: normal;
+}
+
+/* Nothing. The wallpaper is the background. */
+window#waybar {
+    color: @hw-ink;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Modules are type, not widgets. Same spacing contract as ghost: equal
+ * padding, no separators, no backgrounds, no borders.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#power-profiles-daemon,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 4px 2px;
+    padding: 2px 10px;
+    color: @hw-dim;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+    transition: color 200ms ease-out;
+}
+
+/* Nothing shouts. The launcher and power key are dim like everything else;
+   the clock stays dim too — time doesn't need to shout either. */
+#custom-wired-launcher,
+#custom-power { color: @hw-dim; font-size: 12px; }
+
+#clock { color: @hw-dim; }
+
+/* Workspaces: bare numerals, no boxes. Focused is white, plain — no glow,
+   no underline, no color. White is the loudest hollow gets. */
+#workspaces button {
+    min-width: 18px;
+    margin: 0 2px;
+    padding: 1px 4px;
+    color: @hw-faint;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.empty { color: @hw-faint; }
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @hw-ink;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.urgent {
+    color: @hw-red;
+    background: transparent;
+    text-shadow: none;
+}
+
+#window { color: @hw-faint; }
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+#custom-weather { font-size: 9px; }
+
+/* ----------------------------------------------------------------------------
+ * State. White is alive or attended-to; red is danger; everything else
+ * stays grey. Muted is not danger, so it stays faint. Warning is not
+ * danger either, so it goes white instead of red.
+ * -------------------------------------------------------------------------- */
+#custom-volume.muted {
+    color: @hw-faint;
+}
+
+#network.disconnected,
+#battery.critical {
+    color: @hw-red;
+}
+
+#battery.warning { color: @hw-ink; }
+
+#battery.charging { color: @hw-ink; }
+
+#bluetooth.off,
+#custom-bluetooth.off,
+#custom-tailscale.off,
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep,
+#custom-nowplaying.idle {
+    color: @hw-faint;
+}
+
+#bluetooth.connected,
+#custom-bluetooth.connected,
+#custom-tailscale.connected,
+#custom-update.updates-available,
+#custom-bell.has-notifs,
+#custom-agent.agent-ready,
+#custom-agent.agent-working,
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked,
+#custom-nowplaying.playing,
+#custom-nowplaying.paused,
+#idle_inhibitor.activated {
+    color: @hw-ink;
+}
+
+#tray > .passive { opacity: 0.4; }
+#tray > .needs-attention { color: @hw-red; }
+
+/* Hover: the cell under the pointer brightens to white. That's all. */
+#workspaces button:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#custom-tailscale:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover {
+    color: @hw-ink;
+    background: transparent;
+}
+
+tooltip {
+    color: @hw-ink;
+    background-color: rgba(10, 8, 12, 0.95);
+    border: 1px solid rgba(242, 240, 234, 0.2);
+    border-radius: 0;
+}
+
+tooltip label { color: @hw-ink; }
