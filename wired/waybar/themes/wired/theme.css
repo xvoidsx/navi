@@ -164,7 +164,7 @@ window#waybar > box { background: transparent; }
     background: transparent;
     border: none;
     text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75);
-    animation: wired-glitch 4s steps(1, end) infinite;
+    animation: wired-glitch 4s steps(2, end) infinite;
 }
 
 /* The glitch: a steady split torn three times per loop — but the tear
@@ -172,25 +172,32 @@ window#waybar > box { background: transparent; }
  * this hardware; hollow's whisper proves color does. So the numeral
  * stays split (static shadow, always rendered) and its color tears
  * white-to-pink-to-cyan in hard steps. A bad signal tears, it doesn't
- * glide. One selector per keyframe, as GTK requires. */
+ * glide. One selector per keyframe, as GTK requires. Steps floor is 2:
+ * every steps(1, end) animation in this set stayed frozen on hardware,
+ * while steps(2) and up all move — with a single step GTK holds the
+ * first keyframe for the whole loop, and these tears start and end on
+ * the base color, so that reads as static. */
 @keyframes wired-glitch {
     0%   { color: #ffffff; }
     14%  { color: #ffffff; }
     15%  { color: #ff10f0; }
-    17%  { color: #ffffff; }
+    20%  { color: #ff10f0; }
+    21%  { color: #ffffff; }
     49%  { color: #ffffff; }
     50%  { color: #00ffff; }
-    52%  { color: #ffffff; }
+    55%  { color: #00ffff; }
+    56%  { color: #ffffff; }
     84%  { color: #ffffff; }
     85%  { color: #ff10f0; }
-    87%  { color: #ffffff; }
+    90%  { color: #ff10f0; }
+    91%  { color: #ffffff; }
     100% { color: #ffffff; }
 }
 
 #workspaces button:hover {
     color: #ffffff;
     text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75);
-    animation: wired-glitch 4s steps(1, end) infinite;
+    animation: wired-glitch 4s steps(2, end) infinite;
 }
 
 #workspaces button.focused:hover {
@@ -200,20 +207,23 @@ window#waybar > box { background: transparent; }
 /* Urgent tears red-to-white: attention that glitches. */
 #workspaces button.urgent {
     color: @wr-red;
-    animation: wired-urgent 4s steps(1, end) infinite;
+    animation: wired-urgent 4s steps(2, end) infinite;
 }
 
 @keyframes wired-urgent {
     0%   { color: @wr-red; }
     14%  { color: @wr-red; }
     15%  { color: #ffffff; }
-    17%  { color: @wr-red; }
+    20%  { color: #ffffff; }
+    21%  { color: @wr-red; }
     49%  { color: @wr-red; }
     50%  { color: #ffffff; }
-    52%  { color: @wr-red; }
+    55%  { color: #ffffff; }
+    56%  { color: @wr-red; }
     84%  { color: @wr-red; }
     85%  { color: #ffffff; }
-    87%  { color: @wr-red; }
+    90%  { color: #ffffff; }
+    91%  { color: @wr-red; }
     100% { color: @wr-red; }
 }
 

@@ -12,8 +12,10 @@
  * Motion is stepped and color-only, the properties this hardware proves
  * it animates (hollow's whisper, patchbay's packet and wire, neon-tube's
  * flicker). No smooth easing: GTK repaints the whole bar per animated
- * frame, so smooth motion is the most expensive motion here. Average
- * cost is tiny — a handful of discrete changes per minute.
+ * frame, so smooth motion is the most expensive motion here. Steps floor
+ * is 2: every steps(1, end) animation in this set stayed frozen on
+ * hardware, while steps(2) and up all move. Average cost is tiny — a
+ * handful of discrete changes per minute.
  *
  * FONT NOTE: "Noto Sans Symbols2" is listed deliberately, same as the rest
  * of the set. The navi mods emit emoji codepoints (weather conditions,
@@ -45,20 +47,23 @@ window#waybar {
     color: @st-ink;
     background-color: @st-base;
     border-bottom: 1px solid @st-edge;
-    animation: static-edge 26s steps(1, end) infinite;
+    animation: static-edge 26s steps(2, end) infinite;
 }
 
 @keyframes static-edge {
     0%   { border-bottom-color: @st-edge; }
-    30%  { border-bottom-color: @st-edge; }
-    31%  { border-bottom-color: rgba(255, 16, 240, 0.80); }
-    32%  { border-bottom-color: @st-edge; }
-    55%  { border-bottom-color: @st-edge; }
-    56%  { border-bottom-color: rgba(0, 255, 255, 0.80); }
-    57%  { border-bottom-color: @st-edge; }
-    80%  { border-bottom-color: @st-edge; }
-    81%  { border-bottom-color: rgba(57, 255, 20, 0.80); }
-    82%  { border-bottom-color: @st-edge; }
+    29%  { border-bottom-color: @st-edge; }
+    30%  { border-bottom-color: rgba(255, 16, 240, 0.80); }
+    33%  { border-bottom-color: rgba(255, 16, 240, 0.80); }
+    34%  { border-bottom-color: @st-edge; }
+    54%  { border-bottom-color: @st-edge; }
+    55%  { border-bottom-color: rgba(0, 255, 255, 0.80); }
+    58%  { border-bottom-color: rgba(0, 255, 255, 0.80); }
+    59%  { border-bottom-color: @st-edge; }
+    79%  { border-bottom-color: @st-edge; }
+    80%  { border-bottom-color: rgba(57, 255, 20, 0.80); }
+    83%  { border-bottom-color: rgba(57, 255, 20, 0.80); }
+    84%  { border-bottom-color: @st-edge; }
     100% { border-bottom-color: @st-edge; }
 }
 
@@ -123,17 +128,19 @@ window#waybar > box { background: transparent; }
 /* The clock tears twice per loop — pink, then cyan, then calm. */
 #clock {
     color: @st-ink;
-    animation: static-clock 23s steps(1, end) infinite;
+    animation: static-clock 23s steps(2, end) infinite;
 }
 
 @keyframes static-clock {
     0%   { color: @st-ink; }
-    44%  { color: @st-ink; }
-    45%  { color: @st-pink; }
-    46%  { color: @st-ink; }
-    70%  { color: @st-ink; }
-    71%  { color: #00ffff; }
-    72%  { color: @st-ink; }
+    43%  { color: @st-ink; }
+    44%  { color: @st-pink; }
+    47%  { color: @st-pink; }
+    48%  { color: @st-ink; }
+    69%  { color: @st-ink; }
+    70%  { color: #00ffff; }
+    73%  { color: #00ffff; }
+    74%  { color: @st-ink; }
     100% { color: @st-ink; }
 }
 
@@ -163,27 +170,30 @@ window#waybar > box { background: transparent; }
     background: transparent;
     border: none;
     text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75);
-    animation: static-tear 4s steps(1, end) infinite;
+    animation: static-tear 4s steps(2, end) infinite;
 }
 
 @keyframes static-tear {
     0%   { color: #ffffff; }
     14%  { color: #ffffff; }
     15%  { color: #ff10f0; }
-    17%  { color: #ffffff; }
+    20%  { color: #ff10f0; }
+    21%  { color: #ffffff; }
     49%  { color: #ffffff; }
     50%  { color: #00ffff; }
-    52%  { color: #ffffff; }
+    55%  { color: #00ffff; }
+    56%  { color: #ffffff; }
     84%  { color: #ffffff; }
     85%  { color: #ff10f0; }
-    87%  { color: #ffffff; }
+    90%  { color: #ff10f0; }
+    91%  { color: #ffffff; }
     100% { color: #ffffff; }
 }
 
 #workspaces button:hover {
     color: #ffffff;
     text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75);
-    animation: static-tear 4s steps(1, end) infinite;
+    animation: static-tear 4s steps(2, end) infinite;
 }
 
 #workspaces button.focused:hover {
@@ -192,20 +202,23 @@ window#waybar > box { background: transparent; }
 
 #workspaces button.urgent {
     color: @st-red;
-    animation: static-urgent 4s steps(1, end) infinite;
+    animation: static-urgent 4s steps(2, end) infinite;
 }
 
 @keyframes static-urgent {
     0%   { color: @st-red; }
     14%  { color: @st-red; }
     15%  { color: #ffffff; }
-    17%  { color: @st-red; }
+    20%  { color: #ffffff; }
+    21%  { color: @st-red; }
     49%  { color: @st-red; }
     50%  { color: #ffffff; }
-    52%  { color: @st-red; }
+    55%  { color: #ffffff; }
+    56%  { color: @st-red; }
     84%  { color: @st-red; }
     85%  { color: #ffffff; }
-    87%  { color: @st-red; }
+    90%  { color: #ffffff; }
+    91%  { color: @st-red; }
     100% { color: @st-red; }
 }
 

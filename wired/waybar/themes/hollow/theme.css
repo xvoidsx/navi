@@ -92,17 +92,18 @@ window#waybar > box { background: transparent; }
 #clock { color: @hw-dim; }
 
 #clock {
-    animation: hollow-tear 24s steps(1, end) infinite;
+    animation: hollow-tear 24s steps(2, end) infinite;
 }
 
-/* A rare tear: the clock catches white once per loop, barely a quarter
+/* A rare tear: the clock catches white once per loop, about half a
  * second. Hollow barely moves — that's why the one time it does, you
- * notice. */
+ * notice. Steps floor is 2: the steps(1) version stayed frozen. */
 @keyframes hollow-tear {
     0%   { color: @hw-dim; }
-    62%  { color: @hw-dim; }
-    63%  { color: @hw-ink; }
-    64%  { color: @hw-dim; }
+    61%  { color: @hw-dim; }
+    62%  { color: @hw-ink; }
+    64%  { color: @hw-ink; }
+    65%  { color: @hw-dim; }
     100% { color: @hw-dim; }
 }
 

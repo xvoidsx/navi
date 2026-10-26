@@ -94,17 +94,18 @@ window#waybar > box { background: transparent; }
 #clock { color: @nw; }
 
 #clock {
-    animation: ghost-tear 24s steps(1, end) infinite;
+    animation: ghost-tear 24s steps(2, end) infinite;
 }
 
-/* A rare tear: the clock flashes pink once per loop, barely a quarter
+/* A rare tear: the clock flashes pink once per loop, about half a
  * second. Ghost almost never moves — that's why the one time it does,
- * you notice. */
+ * you notice. Steps floor is 2: the steps(1) version stayed frozen. */
 @keyframes ghost-tear {
     0%   { color: @nw; }
-    39%  { color: @nw; }
-    40%  { color: @np; }
-    41%  { color: @nw; }
+    38%  { color: @nw; }
+    39%  { color: @np; }
+    41%  { color: @np; }
+    42%  { color: @nw; }
     100% { color: @nw; }
 }
 
