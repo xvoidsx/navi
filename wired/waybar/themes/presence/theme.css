@@ -14,9 +14,11 @@
  * whole theme. If a new state needs a colour, it is one of these four.
  *
  * Animation budget: one slow breathe on the focused workspace, one pulse
- * on states that need the user right now. Both animate box-shadow only,
- * never border-color, and both pause on hover — the jack-panel lesson,
- * honoured. The bar itself does not move.
+ * on states that need the user right now, one slow scanline crawl on the
+ * bar. Everything animates box-shadow or background-position only, never
+ * border-color, and the workspace animations pause on hover — the
+ * jack-panel lesson, honoured. The bar barely moves: one stripe period
+ * every twelve seconds, so the motion loops seamlessly.
  *
  * FONT NOTE: "Noto Sans Symbols2" is listed deliberately, same as
  * jack-panel and nightshade. The navi mods emit emoji codepoints
@@ -45,16 +47,33 @@
 
 /* ----------------------------------------------------------------------------
  * The bar: near-black, flat, with a faint scanline texture underneath.
- * The stripes are barely there — texture, not decoration. If the scanline
- * layer ever looks wrong on hardware, deleting the background-image line
- * leaves the whole design intact.
+ * The stripes are barely there — texture, not decoration. The recipe is
+ * crt-scope's proven one (to bottom, rgba(0, 0, 0, 0) gaps, 1px dark lines
+ * at 0.30), plus a slow downward crawl so the texture reads through
+ * motion as well as contrast. If the scanline layer ever looks wrong on
+ * hardware, deleting the background-image and animation lines leaves the
+ * whole design intact.
  * -------------------------------------------------------------------------- */
 window#waybar {
     color: @pr-ink;
     background-color: @pr-bg;
-    background-image: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0px, rgba(0, 0, 0, 0.28) 1px, transparent 1px, transparent 3px);
+    background-image:
+        repeating-linear-gradient(to bottom,
+            rgba(0, 0, 0, 0) 0,
+            rgba(0, 0, 0, 0) 2px,
+            rgba(0, 0, 0, 0.30) 2px,
+            rgba(0, 0, 0, 0.30) 3px);
     background-repeat: repeat;
+    background-position: 0 0;
     border-bottom: 1px solid #232327;
+    animation: scan-crawl 12s linear infinite;
+}
+
+/* One slow crawl: one full stripe period per loop, so the motion loops
+ * seamlessly. One selector per keyframe — GTK CSS rejects comma lists. */
+@keyframes scan-crawl {
+    from { background-position: 0 0; }
+    to   { background-position: 0 3px; }
 }
 
 window#waybar > box { background: transparent; }
