@@ -164,7 +164,7 @@ window#waybar > box { background: transparent; }
     background: transparent;
     border: none;
     text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75);
-    animation: wired-glitch 4s steps(2, end) infinite;
+    animation: wired-glitch 4s steps(16, end) infinite;
 }
 
 /* The glitch: a steady split torn three times per loop — but the tear
@@ -172,11 +172,11 @@ window#waybar > box { background: transparent; }
  * this hardware; hollow's whisper proves color does. So the numeral
  * stays split (static shadow, always rendered) and its color tears
  * white-to-pink-to-cyan in hard steps. A bad signal tears, it doesn't
- * glide. One selector per keyframe, as GTK requires. Steps floor is 2:
- * every steps(1, end) animation in this set stayed frozen on hardware,
- * while steps(2) and up all move — with a single step GTK holds the
- * first keyframe for the whole loop, and these tears start and end on
- * the base color, so that reads as static. */
+ * glide. One selector per keyframe, as GTK requires. Steps must cover
+ * the keyframe intervals: steps(1) and steps(2) both froze multi-stop
+ * tears on hardware, while from/to pairs move on steps(2) and patchbay's
+ * 4-stop cycles move on steps(5-6) — the working rule is steps >=
+ * intervals. This glitch has 13 intervals, so steps(16). */
 @keyframes wired-glitch {
     0%   { color: #ffffff; }
     14%  { color: #ffffff; }
@@ -197,7 +197,7 @@ window#waybar > box { background: transparent; }
 #workspaces button:hover {
     color: #ffffff;
     text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75);
-    animation: wired-glitch 4s steps(2, end) infinite;
+    animation: wired-glitch 4s steps(16, end) infinite;
 }
 
 #workspaces button.focused:hover {
@@ -207,7 +207,7 @@ window#waybar > box { background: transparent; }
 /* Urgent tears red-to-white: attention that glitches. */
 #workspaces button.urgent {
     color: @wr-red;
-    animation: wired-urgent 4s steps(2, end) infinite;
+    animation: wired-urgent 4s steps(16, end) infinite;
 }
 
 @keyframes wired-urgent {

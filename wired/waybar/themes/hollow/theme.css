@@ -92,12 +92,12 @@ window#waybar > box { background: transparent; }
 #clock { color: @hw-dim; }
 
 #clock {
-    animation: hollow-tear 24s steps(2, end) infinite;
+    animation: hollow-tear 24s steps(8, end) infinite;
 }
 
 /* A rare tear: the clock catches white once per loop, about half a
  * second. Hollow barely moves — that's why the one time it does, you
- * notice. Steps floor is 2: the steps(1) version stayed frozen. */
+ * notice. Steps must cover the intervals (5 here), so steps(8). */
 @keyframes hollow-tear {
     0%   { color: @hw-dim; }
     61%  { color: @hw-dim; }
