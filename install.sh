@@ -1645,6 +1645,7 @@ setup_zram() {
   # a compressed swap device in RAM, so big deb unpacks and heavy
   # browser tabs stop getting OOM-killed. permanent and system-wide —
   # this is why the per-installer memory warnings are gone.
+  local zram_reconfigured=0
   if [ ! -f /etc/default/zramswap ] \
     || ! grep -q "^ALGO=zstd" /etc/default/zramswap 2>/dev/null; then
     $DOAS tee /etc/default/zramswap >/dev/null <<'EOF'
@@ -1653,6 +1654,7 @@ ALGO=zstd
 PERCENT=50
 PRIORITY=100
 EOF
+    zram_reconfigured=1
     ok "zram configured (zstd, 50% of RAM)"
   else
     ok "zram already configured"
@@ -1662,7 +1664,19 @@ EOF
       || warn "could not enable zramswap.service"
   fi
   if navi_zram_active; then
-    ok "zram swap already active"
+    if [ "$zram_reconfigured" -eq 1 ]; then
+      # config just changed — a live device keeps its old algorithm until
+      # it is restarted, so restart now instead of waiting for a reboot.
+      # swapoff can fail under heavy pressure; then the new config still
+      # lands on next boot.
+      if $DOAS systemctl restart zramswap.service 2>/dev/null; then
+        ok "zram restarted with new config (zstd)"
+      else
+        warn "zram config updated but restart failed — zstd applies on next boot"
+      fi
+    else
+      ok "zram swap already active"
+    fi
   elif $DOAS systemctl start zramswap.service 2>/dev/null; then
     ok "zram swap active"
   else
