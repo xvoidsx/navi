@@ -1,21 +1,25 @@
 /* ============================================================================
  * WIRED
  * ----------------------------------------------------------------------------
- * Full nightshadeNeon, Lain in the signal. Not a variant, not a whisper —
- * everything at once: the canonical trio (pink, green, cyan) over the dark,
- * sharp slabs instead of soft pills, and a glitch running through it. The
- * focused workspace doesn't glow, it glitches: an RGB-split shadow that
- * jumps its offsets in hard steps, the way a bad signal tears. The clock
- * carries a static split, like time itself is slightly out of phase.
+ * Full nightshadeNeon, Lain in the signal — and deliberately not nightshade
+ * and not patchbay. Nightshade is violet glass pills with a berry glow.
+ * Patchbay is dark plates soldered onto a trace with a packet running it.
+ * Wired has no plates, no stems, no pills, no cycling wire: the modules
+ * are bare type in trio colors over a sheer dark bar, the only chrome is
+ * a static trio-gradient wire along the bottom edge, and the motion is
+ * glitch — the focused workspace tears its RGB split in hard steps, like
+ * a bad signal. The color lives in the type, not the furniture.
  *
  * The trio has jobs. Pink is attention and launch. Green is healthy and
  * alive. Cyan is flow and information. Red appears for danger alone — it
  * is not part of the trio, and it never decorates.
  *
- * The bar is slightly transparent (0.82) with sheerer modules (0.55), so
- * the wallpaper shows through both layers. Glitch is cheap on purpose:
- * one stepped animation on the focused workspace, pulses on urgent states,
- * nothing anywhere else.
+ * The bar is slightly transparent (0.82) so the wallpaper shows through.
+ * Motion is stepped, never smooth (patchbay's cost model: GTK repaints
+ * the whole bar per animated frame, so smooth easing is the most
+ * expensive motion here). The glitch loop is short and busy on purpose —
+ * three tears per four seconds, offsets up to four pixels — because the
+ * last version's rare 70-millisecond bursts were easy to miss entirely.
  *
  * GLITCH HONESTY: the split itself is static text-shadow, which always
  * renders. The offset jumps animate text-shadow in steps; if GTK ever
@@ -39,13 +43,10 @@
 @define-color wr-dim #a89ec4;
 @define-color wr-faint #6f6589;
 @define-color wr-base rgba(7, 4, 15, 0.82);
-@define-color wr-slab rgba(7, 4, 15, 0.55);
 @define-color wr-pink #ff10f0;
 @define-color wr-pink-soft rgba(255, 16, 240, 0.45);
 @define-color wr-pink-faint rgba(255, 16, 240, 0.14);
-@define-color wr-green #39ff14;
 @define-color wr-green-soft rgba(57, 255, 20, 0.45);
-@define-color wr-cyan #00ffff;
 @define-color wr-cyan-soft rgba(0, 255, 255, 0.45);
 @define-color wr-red #ff3131;
 @define-color wr-red-soft rgba(255, 49, 49, 0.55);
@@ -57,19 +58,24 @@
 }
 
 /* ----------------------------------------------------------------------------
- * The bar: the dark, sheer, with a live pink wire along the bottom.
+ * The bar: the dark, sheer, with a static trio wire along the bottom edge.
+ * All three neons at once, not cycling — patchbay already owns the cycling
+ * wire, and a static gradient reads as one live cable, not a chase.
  * -------------------------------------------------------------------------- */
 window#waybar {
     color: @wr-ink;
     background-color: @wr-base;
-    border-bottom: 2px solid @wr-pink-soft;
-    box-shadow: 0 0 18px rgba(255, 16, 240, 0.12);
+    background-image: linear-gradient(to right, rgba(255, 16, 240, 0.9), rgba(0, 255, 255, 0.9) 50%, rgba(57, 255, 20, 0.9));
+    background-size: 100% 2px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
 }
 
 window#waybar > box { background: transparent; }
 
 /* ----------------------------------------------------------------------------
- * Sharp slabs. Translucent dark over the sheer bar, signature rims.
+ * Modules are type, not widgets. No backgrounds, no borders, no slabs —
+ * the trio lives in the letters. Wide padding is the only structure.
  * -------------------------------------------------------------------------- */
 #workspaces,
 #window,
@@ -95,39 +101,34 @@ window#waybar > box { background: transparent; }
 #disk,
 #tray {
     min-height: 20px;
-    margin: 4px 4px;
+    margin: 4px 2px;
     padding: 2px 10px;
     color: @wr-dim;
-    background-color: @wr-slab;
-    border: 1px solid rgba(236, 231, 247, 0.14);
-    border-radius: 4px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
     box-shadow: none;
     text-shadow: none;
-    transition: border-color 200ms ease-out, color 200ms ease-out;
+    transition: color 200ms ease-out;
 }
 
-/* Signature rims. Pink launches, cyan flows, green lives. */
+/* Voices. Pink launches, cyan flows, green lives. */
 #custom-wired-launcher,
-#custom-power,
-#custom-update,
-#custom-bell { border-color: @wr-pink-soft; color: #ff8fe4; }
+#custom-power { color: #ff8fe4; font-size: 12px; }
 
 #network,
 #custom-volume,
 #bluetooth,
 #custom-bluetooth,
 #custom-weather,
-#custom-nowplaying { border-color: @wr-cyan-soft; color: #a8ffff; }
+#custom-nowplaying { color: #a8ffff; }
 
 #custom-tailscale,
 #custom-agent,
 #memory,
-#cpu { border-color: @wr-green-soft; color: #c8ff7a; }
+#cpu { color: #c8ff7a; }
 
-#battery { border-color: rgba(236, 231, 247, 0.14); color: @wr-dim; }
-
-#custom-wired-launcher,
-#custom-power { font-size: 12px; }
+#battery { color: @wr-dim; }
 
 /* The clock is out of phase: a static RGB split, always on. */
 #clock {
@@ -136,49 +137,52 @@ window#waybar > box { background: transparent; }
 }
 
 /* ----------------------------------------------------------------------------
- * Workspaces: dim slabs, the focused one glitching.
+ * Workspaces: dim numerals, the focused one glitching.
  * -------------------------------------------------------------------------- */
 #workspaces button {
     min-width: 22px;
     margin: 0 2px;
     padding: 1px 7px;
     color: @wr-dim;
-    background-color: rgba(7, 4, 15, 0.55);
-    border: 1px solid rgba(236, 231, 247, 0.14);
-    border-radius: 4px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
     text-shadow: none;
 }
 
 #workspaces button.empty {
     color: @wr-faint;
-    border-color: rgba(236, 231, 247, 0.07);
 }
 
 #workspaces button.focused,
 #workspaces button.active {
     color: #ffffff;
-    background-color: @wr-pink-faint;
-    border-color: @wr-pink-soft;
-    box-shadow: 0 0 12px rgba(255, 16, 240, 0.35);
-    animation: wired-glitch 7s steps(1, end) infinite;
+    background: transparent;
+    border: none;
+    animation: wired-glitch 4s steps(1, end) infinite;
 }
 
-/* The glitch: mostly a steady split, with hard jumps and dips a few times
- * per loop. Steps timing makes the jumps cuts, not slides — a bad signal
- * tears, it doesn't glide. One selector per keyframe, as GTK requires. */
+/* The glitch: a steady split torn three times per loop, hard cuts, offsets
+ * up to four pixels. Steps timing makes the jumps cuts, not slides — a bad
+ * signal tears, it doesn't glide. One selector per keyframe, as GTK
+ * requires. */
 @keyframes wired-glitch {
     0%   { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
-    86%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
-    87%  { text-shadow: 3px 0 rgba(255, 16, 240, 0.9), -3px 0 rgba(0, 255, 255, 0.9); opacity: 0.82; }
-    88%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
-    92%  { text-shadow: -2px 0 rgba(255, 16, 240, 0.9), 2px 0 rgba(0, 255, 255, 0.9); opacity: 0.9; }
-    93%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    14%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    15%  { text-shadow: 4px 0 rgba(255, 16, 240, 0.9), -4px 0 rgba(0, 255, 255, 0.9); opacity: 0.8; }
+    17%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    49%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    50%  { text-shadow: -3px 0 rgba(255, 16, 240, 0.9), 3px 0 rgba(0, 255, 255, 0.9); opacity: 0.85; }
+    52%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    84%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    85%  { text-shadow: 4px 0 rgba(255, 16, 240, 0.9), -4px 0 rgba(0, 255, 255, 0.9); opacity: 0.8; }
+    87%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
     100% { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
 }
 
 #workspaces button:hover {
     color: #ffffff;
-    border-color: @wr-cyan-soft;
     text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75);
 }
 
@@ -200,8 +204,8 @@ window#waybar.empty #window {
 }
 
 /* ----------------------------------------------------------------------------
- * States, in the trio. Quiet goes faint, alive goes its signature color,
- * attention goes pink, danger alone goes red.
+ * States, in the trio, through type alone. Quiet goes faint, alive goes
+ * its voice color, attention goes pink, danger alone goes red.
  * -------------------------------------------------------------------------- */
 @keyframes wired-pink-alert {
     from { box-shadow: 0 0 6px rgba(255, 16, 240, 0.25); }
@@ -223,8 +227,6 @@ window#waybar.empty #window {
 #custom-nowplaying.idle,
 #custom-volume.muted {
     color: @wr-faint;
-    border-color: rgba(236, 231, 247, 0.07);
-    box-shadow: none;
     text-shadow: none;
     animation: none;
 }
@@ -236,13 +238,11 @@ window#waybar.empty #window {
 #custom-agent.agent-ready,
 #custom-agent.agent-working {
     color: #c8ff7a;
-    border-color: @wr-green-soft;
     animation: none;
 }
 
 #custom-nowplaying.playing {
     color: #a8ffff;
-    border-color: @wr-cyan-soft;
     animation: none;
 }
 
@@ -253,7 +253,6 @@ window#waybar.empty #window {
 
 #idle_inhibitor.activated {
     color: #c8ff7a;
-    border-color: @wr-green-soft;
     animation: none;
 }
 
@@ -261,21 +260,18 @@ window#waybar.empty #window {
 #custom-update.updates-available,
 #custom-bell.has-notifs {
     color: #ff8fe4;
-    border-color: @wr-pink-soft;
     animation: none;
 }
 
 #custom-agent.agent-listening,
 #custom-agent.agent-blocked {
     color: #ff8fe4;
-    border-color: @wr-pink-soft;
-    animation: wired-pink-alert 1s ease-in-out infinite alternate;
+    animation: wired-pink-alert 1s steps(4, end) infinite alternate;
 }
 
 #bluetooth.connecting,
 #custom-bluetooth.connecting {
     color: #ff8fe4;
-    border-color: @wr-pink-soft;
     animation: none;
 }
 
@@ -283,19 +279,16 @@ window#waybar.empty #window {
 #network.disconnected,
 #battery.critical {
     color: @wr-red;
-    border-color: @wr-red-soft;
-    animation: wired-red-alert 1.2s ease-in-out infinite alternate;
+    animation: wired-red-alert 1.2s steps(4, end) infinite alternate;
 }
 
 #battery.warning {
     color: #ff8fe4;
-    border-color: @wr-pink-soft;
     animation: none;
 }
 
 #battery.charging {
     color: #c8ff7a;
-    border-color: @wr-green-soft;
     animation: none;
 }
 
@@ -304,7 +297,7 @@ window#waybar.empty #window {
 
 #tray > .needs-attention {
     background-color: @wr-pink-faint;
-    border-radius: 4px;
+    border-radius: 0;
 }
 
 /* ----------------------------------------------------------------------------
@@ -331,14 +324,12 @@ window#waybar.empty #window {
 #bluetooth:hover,
 #custom-bluetooth:hover {
     color: #ffffff;
-    border-color: rgba(236, 231, 247, 0.30);
     text-shadow: 1px 0 rgba(255, 16, 240, 0.65), -1px 0 rgba(0, 255, 255, 0.65);
     animation-play-state: paused;
 }
 
 #custom-power:hover {
     color: @wr-red;
-    border-color: @wr-red-soft;
     text-shadow: 0 0 8px rgba(255, 49, 49, 0.70);
 }
 
@@ -346,7 +337,7 @@ tooltip {
     color: @wr-ink;
     background-color: rgba(7, 4, 15, 0.95);
     border: 1px solid @wr-pink-soft;
-    border-radius: 4px;
+    border-radius: 0;
     box-shadow: 0 0 16px rgba(255, 16, 240, 0.25);
 }
 

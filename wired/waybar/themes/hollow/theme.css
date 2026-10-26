@@ -13,9 +13,9 @@
  * wallpaper is underneath instead of fighting it. The bar and every
  * module are fully transparent — the wallpaper is the theme.
  *
- * The only motion is none. Zero animations; one soft hover fade. Like
- * ghost, this is nearly free by construction — there is almost nothing
- * to repaint.
+ * Almost no motion: one whisper — the focused numeral breathes between
+ * dim and white in two steps. Like ghost, this is nearly free by
+ * construction — there is almost nothing to repaint.
  *
  * FONT NOTE: "Noto Sans Symbols2" is listed deliberately, same as ghost.
  * The navi mods emit emoji codepoints (weather conditions, volume);
@@ -114,6 +114,18 @@ window#waybar > box { background: transparent; }
     border: none;
     box-shadow: none;
     text-shadow: none;
+    animation: hollow-breathe 4s steps(2, end) infinite alternate;
+}
+
+/* One whisper of motion: the focused numeral breathes between dim and
+ * white in two steps. Hollow barely moves, but it is not dead. */
+@keyframes hollow-breathe {
+    from { color: @hw-dim; }
+    to   { color: @hw-ink; }
+}
+
+#workspaces button.focused:hover {
+    animation: none;
 }
 
 #workspaces button.urgent {

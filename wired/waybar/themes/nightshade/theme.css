@@ -50,7 +50,8 @@
  * -------------------------------------------------------------------------- */
 window#waybar {
     color: @ns-ink;
-    background-color: rgba(7, 4, 15, 0.94);
+    /* a breath of translucency — the wallpaper shows through, just a tad */
+    background-color: rgba(7, 4, 15, 0.92);
     background-image:
         radial-gradient(ellipse 620px 140px at 12% 130%, rgba(224, 27, 143, 0.22), transparent 70%),
         radial-gradient(ellipse 720px 160px at 88% 140%, rgba(139, 92, 246, 0.28), transparent 70%),

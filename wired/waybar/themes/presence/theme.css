@@ -13,12 +13,15 @@
  * eye, red is danger. Nothing else gets a colour — that discipline is the
  * whole theme. If a new state needs a colour, it is one of these four.
  *
- * Animation budget: one slow breathe on the focused workspace, one pulse
- * on states that need the user right now, one slow scanline crawl on the
- * bar. Everything animates box-shadow or background-position only, never
- * border-color, and the workspace animations pause on hover — the
- * jack-panel lesson, honoured. The bar barely moves: one stripe period
- * every six seconds, so the motion loops seamlessly.
+ * Animation budget, in patchbay's stepped language: one stepped eye pulse
+ * on the focused workspace, one stepped pulse on states that need the
+ * user right now, one stepped scanline crawl on the bar. Everything
+ * animates box-shadow or background-position only, never border-color,
+ * and the workspace animations pause on hover — the jack-panel lesson,
+ * honoured. No smooth easing anywhere: GTK repaints the whole bar per
+ * animated frame, so smooth motion is the most expensive motion here.
+ * The crawl jumps one stripe pixel per second; the eye swells in three
+ * steps over six seconds. Visible, cheap, digital.
  *
  * FONT NOTE: "Noto Sans Symbols2" is listed deliberately, same as
  * jack-panel and nightshade. The navi mods emit emoji codepoints
@@ -67,7 +70,7 @@ window#waybar {
     background-repeat: repeat;
     background-position: 0 0;
     border-bottom: 1px solid #232327;
-    animation: scan-crawl 6s linear infinite;
+    animation: scan-crawl 4s steps(4, end) infinite;
 }
 
 /* One slow crawl: one full stripe period per loop, so the motion loops
@@ -153,11 +156,11 @@ window#waybar > box { background: transparent; }
     font-weight: bold;
     border-bottom-color: @pr-pink;
     text-shadow: 0 0 8px rgba(255, 16, 240, 0.65);
-    animation: eye-breathe 4s ease-in-out infinite alternate;
+    animation: eye-pulse 6s steps(3, end) infinite alternate;
 }
 
 /* One selector per keyframe — GTK CSS rejects comma-separated keyframes. */
-@keyframes eye-breathe {
+@keyframes eye-pulse {
     from { box-shadow: 0 2px 8px rgba(255, 16, 240, 0.22); }
     to   { box-shadow: 0 2px 20px rgba(255, 16, 240, 0.55); }
 }
@@ -250,7 +253,7 @@ window#waybar.empty #window {
 #custom-agent.agent-blocked {
     color: @pr-pink;
     border-color: @pr-pink-soft;
-    animation: eye-alert 1.2s ease-in-out infinite alternate;
+    animation: eye-alert 1.2s steps(4, end) infinite alternate;
 }
 
 /* Connecting is a transition, so it gets the eye too, briefly. */
@@ -266,7 +269,7 @@ window#waybar.empty #window {
 #battery.critical {
     color: @pr-red;
     border-color: @pr-red-soft;
-    animation: presence-alert 1.2s ease-in-out infinite alternate;
+    animation: presence-alert 1.2s steps(4, end) infinite alternate;
 }
 
 #battery.warning {
