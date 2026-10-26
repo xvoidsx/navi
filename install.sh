@@ -112,7 +112,7 @@ PKGS=(
   # the bottom-center volume OSD (GTK3 popup).
   grim python3-pil python3-gi gir1.2-gtk-3.0
   # zram-tools: compressed swap for low-memory machines (setup_zram
-  # enables it only when RAM <= 2 GiB). the cloudbook bench proved big
+  # enables it only when RAM <= 8 GiB). the cloudbook bench proved big
   # deb unpacks OOM without it.
   zram-tools
   # navi-power mod (eiri): power-profiles-daemon provides

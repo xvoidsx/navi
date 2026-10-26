@@ -22,9 +22,9 @@ navi_swaptotal_kb() {
 }
 
 # true (exit 0) when this machine is low on memory.
-# default threshold: 2 GiB.
+# default threshold: 8 GiB.
 navi_is_lowmem() {
-    local threshold="${NAVI_LOWMEM_KB:-2097152}"
+    local threshold="${NAVI_LOWMEM_KB:-8388608}"
     local total
     total="$(navi_memtotal_kb)"
     [ -n "$total" ] && [ "$total" -le "$threshold" ]
