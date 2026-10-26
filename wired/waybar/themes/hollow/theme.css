@@ -91,6 +91,21 @@ window#waybar > box { background: transparent; }
 
 #clock { color: @hw-dim; }
 
+#clock {
+    animation: hollow-tear 24s steps(1, end) infinite;
+}
+
+/* A rare tear: the clock catches white once per loop, barely a quarter
+ * second. Hollow barely moves — that's why the one time it does, you
+ * notice. */
+@keyframes hollow-tear {
+    0%   { color: @hw-dim; }
+    62%  { color: @hw-dim; }
+    63%  { color: @hw-ink; }
+    64%  { color: @hw-dim; }
+    100% { color: @hw-dim; }
+}
+
 /* Workspaces: bare numerals, no boxes. Focused is white, plain — no glow,
    no underline, no color. White is the loudest hollow gets. */
 #workspaces button {

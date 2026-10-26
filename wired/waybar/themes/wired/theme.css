@@ -190,10 +190,31 @@ window#waybar > box { background: transparent; }
 #workspaces button:hover {
     color: #ffffff;
     text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75);
+    animation: wired-glitch 4s steps(1, end) infinite;
 }
 
 #workspaces button.focused:hover {
     animation-play-state: paused;
+}
+
+/* Urgent tears red-to-white: attention that glitches. */
+#workspaces button.urgent {
+    color: @wr-red;
+    animation: wired-urgent 4s steps(1, end) infinite;
+}
+
+@keyframes wired-urgent {
+    0%   { color: @wr-red; }
+    14%  { color: @wr-red; }
+    15%  { color: #ffffff; }
+    17%  { color: @wr-red; }
+    49%  { color: @wr-red; }
+    50%  { color: #ffffff; }
+    52%  { color: @wr-red; }
+    84%  { color: @wr-red; }
+    85%  { color: #ffffff; }
+    87%  { color: @wr-red; }
+    100% { color: @wr-red; }
 }
 
 #window {

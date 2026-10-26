@@ -93,6 +93,21 @@ window#waybar > box { background: transparent; }
 
 #clock { color: @nw; }
 
+#clock {
+    animation: ghost-tear 24s steps(1, end) infinite;
+}
+
+/* A rare tear: the clock flashes pink once per loop, barely a quarter
+ * second. Ghost almost never moves — that's why the one time it does,
+ * you notice. */
+@keyframes ghost-tear {
+    0%   { color: @nw; }
+    39%  { color: @nw; }
+    40%  { color: @np; }
+    41%  { color: @nw; }
+    100% { color: @nw; }
+}
+
 /* The working voices: volume and network in cyan. */
 #custom-volume,
 #network,
