@@ -17,16 +17,19 @@
  * The bar is slightly transparent (0.82) so the wallpaper shows through.
  * Motion is stepped, never smooth (patchbay's cost model: GTK repaints
  * the whole bar per animated frame, so smooth easing is the most
- * expensive motion here). The glitch loop is short and busy on purpose —
- * three tears per four seconds, offsets up to four pixels — because the
- * last version's rare 70-millisecond bursts were easy to miss entirely.
+ * expensive motion here), and it runs on color, the property this
+ * hardware proves it animates — hollow's whisper runs on color, while
+ * text-shadow and box-shadow motion did not show. The glitch loop is
+ * short and busy on purpose: three color tears per four seconds,
+ * because the last version's rare shadow bursts were easy to miss
+ * entirely — and, it turns out, did not render at all.
  *
- * GLITCH HONESTY: the split itself is static text-shadow, which always
- * renders. The offset jumps animate text-shadow in steps; if GTK ever
- * refuses to interpolate that property, the opacity dips in the same
- * keyframes still run (opacity is proven animatable here), so the worst
- * case is a flickering split instead of a jumping one. Either way it
- * reads as a bad signal, which is the whole point.
+ * GLITCH HONESTY, revised by hardware: the split is static text-shadow,
+ * which always renders, and the tear is color, which this machine
+ * proves it animates. An earlier version tore the shadow offsets
+ * instead — and on this hardware that motion never showed up at all.
+ * Color tearing reads just as glitchy: the channel jumps, the split
+ * stays, the signal is bad either way.
  *
  * Hover was designed against the jack-panel lesson: no infinite animation
  * touches border-color on any module, so :hover declarations always win,
@@ -160,25 +163,28 @@ window#waybar > box { background: transparent; }
     color: #ffffff;
     background: transparent;
     border: none;
+    text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75);
     animation: wired-glitch 4s steps(1, end) infinite;
 }
 
-/* The glitch: a steady split torn three times per loop, hard cuts, offsets
- * up to four pixels. Steps timing makes the jumps cuts, not slides — a bad
- * signal tears, it doesn't glide. One selector per keyframe, as GTK
- * requires. */
+/* The glitch: a steady split torn three times per loop — but the tear
+ * itself is color now, not shadow. Text-shadow motion did not show on
+ * this hardware; hollow's whisper proves color does. So the numeral
+ * stays split (static shadow, always rendered) and its color tears
+ * white-to-pink-to-cyan in hard steps. A bad signal tears, it doesn't
+ * glide. One selector per keyframe, as GTK requires. */
 @keyframes wired-glitch {
-    0%   { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
-    14%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
-    15%  { text-shadow: 4px 0 rgba(255, 16, 240, 0.9), -4px 0 rgba(0, 255, 255, 0.9); opacity: 0.8; }
-    17%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
-    49%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
-    50%  { text-shadow: -3px 0 rgba(255, 16, 240, 0.9), 3px 0 rgba(0, 255, 255, 0.9); opacity: 0.85; }
-    52%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
-    84%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
-    85%  { text-shadow: 4px 0 rgba(255, 16, 240, 0.9), -4px 0 rgba(0, 255, 255, 0.9); opacity: 0.8; }
-    87%  { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
-    100% { text-shadow: 1px 0 rgba(255, 16, 240, 0.75), -1px 0 rgba(0, 255, 255, 0.75); opacity: 1; }
+    0%   { color: #ffffff; }
+    14%  { color: #ffffff; }
+    15%  { color: #ff10f0; }
+    17%  { color: #ffffff; }
+    49%  { color: #ffffff; }
+    50%  { color: #00ffff; }
+    52%  { color: #ffffff; }
+    84%  { color: #ffffff; }
+    85%  { color: #ff10f0; }
+    87%  { color: #ffffff; }
+    100% { color: #ffffff; }
 }
 
 #workspaces button:hover {
@@ -208,13 +214,13 @@ window#waybar.empty #window {
  * its voice color, attention goes pink, danger alone goes red.
  * -------------------------------------------------------------------------- */
 @keyframes wired-pink-alert {
-    from { box-shadow: 0 0 6px rgba(255, 16, 240, 0.25); }
-    to   { box-shadow: 0 0 20px rgba(255, 16, 240, 0.70); }
+    from { color: #ff8fe4; }
+    to   { color: #ffffff; }
 }
 
 @keyframes wired-red-alert {
-    from { box-shadow: 0 0 6px rgba(255, 49, 49, 0.25); }
-    to   { box-shadow: 0 0 20px rgba(255, 49, 49, 0.70); }
+    from { color: @wr-red; }
+    to   { color: #ffffff; }
 }
 
 /* Quiet: off, asleep, up to date, idle, muted. */

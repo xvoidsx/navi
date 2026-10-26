@@ -4,7 +4,7 @@
  * Quiet static. The bar is near-black and near-colourless — desaturated
  * grey on grey, flat square modules, hairline borders, no glow anywhere —
  * except one neon pink eye. The focused workspace is the eye: pink text,
- * pink underline, a slow breathing halo. Notifications, blocked agents,
+ * pink underline, a slow pink-to-white pulse. Notifications, blocked agents,
  * and available updates also turn the eye toward them. Everything else
  * stays quiet. It is the bar version of Lain in the wired: present,
  * watching, saying almost nothing.
@@ -13,15 +13,17 @@
  * eye, red is danger. Nothing else gets a colour — that discipline is the
  * whole theme. If a new state needs a colour, it is one of these four.
  *
- * Animation budget, in patchbay's stepped language: one stepped eye pulse
- * on the focused workspace, one stepped pulse on states that need the
- * user right now, one stepped scanline crawl on the bar. Everything
- * animates box-shadow or background-position only, never border-color,
- * and the workspace animations pause on hover — the jack-panel lesson,
+ * Animation budget, in patchbay's stepped language — and on the properties
+ * this hardware proves it animates. Hollow's whisper runs on color, and
+ * jack-panel's ring-drift runs on border-color; box-shadow and
+ * text-shadow motion did not show on this machine, so nothing here
+ * animates those. The eye pulses pink-to-white in two steps, the bar's
+ * hairline breathes pink in two steps, urgent states pulse to white.
+ * The scanline crawl stays as a bonus — if background-position runs on
+ * your build it's a second motion; the color motions are the ones that
+ * carry it. Workspace animations pause on hover — the jack-panel lesson,
  * honoured. No smooth easing anywhere: GTK repaints the whole bar per
  * animated frame, so smooth motion is the most expensive motion here.
- * The crawl jumps one stripe pixel per second; the eye swells in three
- * steps over six seconds. Visible, cheap, digital.
  *
  * FONT NOTE: "Noto Sans Symbols2" is listed deliberately, same as
  * jack-panel and nightshade. The navi mods emit emoji codepoints
@@ -70,7 +72,8 @@ window#waybar {
     background-repeat: repeat;
     background-position: 0 0;
     border-bottom: 1px solid #232327;
-    animation: scan-crawl 4s steps(4, end) infinite;
+    animation: scan-crawl 4s steps(4, end) infinite,
+        hairline-breath 6s steps(2, end) infinite alternate;
 }
 
 /* One slow crawl: one full stripe period per loop, so the motion loops
@@ -78,6 +81,13 @@ window#waybar {
 @keyframes scan-crawl {
     from { background-position: 0 0; }
     to   { background-position: 0 4px; }
+}
+
+/* The hairline breathes pink in two steps — the bar's visible motion,
+ * on border-color, a property this hardware proves it animates. */
+@keyframes hairline-breath {
+    from { border-bottom-color: #232327; }
+    to   { border-bottom-color: rgba(255, 16, 240, 0.30); }
 }
 
 window#waybar > box { background: transparent; }
@@ -156,13 +166,15 @@ window#waybar > box { background: transparent; }
     font-weight: bold;
     border-bottom-color: @pr-pink;
     text-shadow: 0 0 8px rgba(255, 16, 240, 0.65);
-    animation: eye-pulse 6s steps(3, end) infinite alternate;
+    animation: eye-pulse 4s steps(2, end) infinite alternate;
 }
 
-/* One selector per keyframe — GTK CSS rejects comma-separated keyframes. */
+/* One selector per keyframe — GTK CSS rejects comma-separated keyframes.
+ * Color, not glow: the eye's pulse is pink-to-white now, because
+ * box-shadow motion did not show on this hardware. */
 @keyframes eye-pulse {
-    from { box-shadow: 0 2px 8px rgba(255, 16, 240, 0.22); }
-    to   { box-shadow: 0 2px 20px rgba(255, 16, 240, 0.55); }
+    from { color: @pr-pink; }
+    to   { color: #ffffff; }
 }
 
 #workspaces button:hover {
@@ -199,13 +211,13 @@ window#waybar.empty #window {
  * The eye turns pink only where it needs to look. Red is danger alone.
  * -------------------------------------------------------------------------- */
 @keyframes eye-alert {
-    from { box-shadow: 0 0 6px rgba(255, 16, 240, 0.25); }
-    to   { box-shadow: 0 0 20px rgba(255, 16, 240, 0.70); }
+    from { color: @pr-pink; }
+    to   { color: #ffffff; }
 }
 
 @keyframes presence-alert {
-    from { box-shadow: 0 0 6px rgba(255, 85, 85, 0.25); }
-    to   { box-shadow: 0 0 20px rgba(255, 85, 85, 0.70); }
+    from { color: @pr-red; }
+    to   { color: #ffffff; }
 }
 
 /* Quiet: off, asleep, up to date, idle, muted, no notifications. */
