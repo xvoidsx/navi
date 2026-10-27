@@ -57,6 +57,7 @@ EXTRAS=(
   "pi|pi|The pi agent — xvoidsx is testing it as an alternative Lain engine (interactive installer)|command -v pi >/dev/null 2>&1|pi-installer.sh|"
   "thinkrail|ThinkRail|JetBrains' open-source agentic IDE — pi engine, worktree workspaces, spec graph (opens as a chromeless webapp window)|command -v thinkrail >/dev/null 2>&1 && [ -f \"$HOME/.local/share/applications/thinkrail.desktop\" ]|thinkrail-installer.sh|"
   "songsnatch|SongSnatch|Snag audio from YouTube via yt-dlp — saves to ~/Music|command -v songsnatch >/dev/null 2>&1|songsnatch-installer.sh|"
+  "artcraft|ArtCraft Launcher|One place to install, update and open all 13 Craft apps — native, open-source, in Rust, from the official .deb|dpkg -s artcraft-launcher >/dev/null 2>&1|artcraft-installer.sh|"
 )
 
 # where do the installer scripts live?
