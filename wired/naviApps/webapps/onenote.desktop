@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=OneNote
+Exec=navi-browser-run --force-dark-mode --app=https://www.office.com/launch/onenote
+Comment=OneNote as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-onenote
+StartupNotify=true
+Categories=Office;

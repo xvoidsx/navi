@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Zoom
+Exec=navi-browser-run --force-dark-mode --app=https://app.zoom.us
+Comment=Zoom as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-zoom
+StartupNotify=true
+Categories=Network;

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=OneDrive
+Exec=navi-browser-run --force-dark-mode --app=https://onedrive.live.com
+Comment=OneDrive as a navi webapp
+Terminal=false
+Type=Application
+Icon=navi-onedrive
+StartupNotify=true
+Categories=Office;
