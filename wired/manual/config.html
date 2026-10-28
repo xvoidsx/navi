@@ -35,7 +35,7 @@
 	<pre style="text-align:center;color:#ff10f0">.__   __.      ___   ____    ____  __
 |  \ |  |     /   \  \   \  /   / |  |
 |   \|  |    /  ^  \  \   \/   /  |  |
-|  . `  |   /  ^  \  \   \/   /  |  |
+|  . `  |   /  /_\  \  \      /   |  |
 |  |\   |  /  _____  \  \    /    |  |
 |__| \__| /__/     \__\  \__/     |__|</pre>
 	<h2 style="color:#39ff14;text-align:center">* * * * * * * * * * * * * * * * * * * * * * *</h2>
@@ -47,9 +47,12 @@
 	<h3 style="color:#ff10f0">the panel</h3>
 	<p>The top panel is <code>waybar</code>, configured at <code>$HOME/.config/waybar/</code>. Each module — workspaces, clock, volume, networks, battery — can be rearranged, restyled, or removed.</p>
 	<h3 style="color:#ff10f0">theme</h3>
-	<p>navi follows the <b>nightshadeNeon</b> design language: deep blacks, neon pink, and phosphor green. GTK apps use navi's own <b>nightshadeNeon</b> GTK theme with the <b>Moka</b> icon set out of the box. You can change either with <code>nwg-look</code> or your GTK settings tool of choice. The defaults are just a starting point — nothing is locked.</p>
+	<p>navi follows the <b>nightshadeNeon</b> design language: deep blacks, neon pink, and phosphor green. GTK apps use navi's own <b>nightshadeNeon</b> GTK theme with the <b>Moka</b> icon set out of the box. The theme is repo-managed: change it by editing the theme files directly, not with a settings tool — <code>nwg-look</code> is not used on navi, since it rewrote settings wholesale and shadowed the system defaults. The defaults are just a starting point — nothing is locked.</p>
+	<p>Press <b>Alt+T</b> to open the theme picker and switch the waybar theme. Note that after an update, a theme only reaches the bar when you pick it again — re-apply your theme after updating.</p>
 	<h3 style="color:#ff10f0">terminal and shell</h3>
 	<p>Your shell is configured via <code>$HOME/.bashrc</code>, which sources navi's shared bashrc. Terminal-specific settings live in each terminal's own config (for example, <code>$HOME/.config/alacritty/</code>).</p>
+	<h3 style="color:#ff10f0">agent providers</h3>
+	<p>Agent API keys live in <code>$HOME/.config/navi/agents.env</code> — the canonical key store for non-local backends. The agent center's <b>providers</b> tab manages it, and navi-lain-config, Hey Lain, and the panel modules all read from it.</p>
 	<h3 style="color:#ff10f0">a note on upgrades</h3>
 	<p>navi's own files live under <code>/usr/share/navi</code> and your personal configs live under <code>$HOME/.config</code>. Keep your customizations in your home directory and they'll survive reinstalls and updates of navi's files.</p>
 	<p><b>Up next</b>: <a href="misc.html">misc.</a></p>
@@ -59,3 +62,4 @@
 	<h6 style="color:#ff10f0;text-align:center">built with ❤️ by <a href="">xvoidsx</a></h6>
 </footer>
 </html>
+

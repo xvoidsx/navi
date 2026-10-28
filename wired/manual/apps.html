@@ -47,7 +47,7 @@
 	<h1 style="color:#ff10f0;text-align:center">software included with Navi ~</h1>
 	<p><a href="manual.html">go back</a></p>
 	<p>We want <b>Navi</b> to be a complete setup, ready to use out of the box the second it's installed.</p>
-	<p>To that effect, there is plenty of software pre-installed ready for you and ready to go. For development, gaming, writing, listening to music, watching videos, browsing the web, managing your files, jumping into a terminal, there is plenty of software here and ready for you the minute you fire up your NaviOS machine.</p>
+	<p>To that effect, there is plenty of software pre-installed ready for you and ready to go. For development, gaming, writing, listening to music, watching videos, browsing the web, managing your files, jumping into a terminal, there is plenty of software here and ready for you the minute you fire up your navi machine.</p>
 	<p>Here is a list of software you can find pre-installed on Navi, both written and/or forked by us, and hand-picked by us for inclusion into the distribution.</p>
 	<h3 style="color:#ff10f0">terminals</h3>
 	<p>One of the most important pieces of software on GNU/Linux distros is their terminal emulators. We use terminals in order to interface directly with our machines, so having a great terminal available out of the box in order to issue commands and write scripts is important! We include a few terminals you can select from in Navi, and you can choose the one you like best, or install other terminals if you have a preference:</p>
@@ -57,7 +57,7 @@
 		<li><b>kitty</b> is a feature-rich GPU-based terminal emulator.</li>
 		<li><b>sakura</b> is a simple GTK terminal emulator.</li>
 		<li><b>stterm</b> (st) is a super lightweight terminal emulator from the suckless project.</li>
-		<li><b>xterm</b> is the classic X terminal emulator, always there when you need it.</li>
+		<li><b>copland</b> is navi's in-house terminal, shipped as a dogfood build; alacritty remains the default.</li>
 	</ul>
 	<h3 style="color:#ff10f0">file management</h3>
 	<p>One of the core features any computer needs is a file manager so that you can organize all your stuff just how you like it. We include two file managers on Navi, so you can do things your own way.</p>
@@ -66,7 +66,7 @@
 		<li><b>nnn</b> is a blazing-fast TUI file manager for those who want to handle their files from their terminal of choice.</li>
 	</ul>
 	<h3 style="color:#ff10f0">disks & images</h3>
-	<p>Need to flash an ISO to a USB drive or SD card? <b>balenaEtcher</b> ships out of the box — pick an image, pick a drive, flash. Safe and easy, no terminal required.</p>
+	<p>Need to flash an ISO to a USB drive or SD card? <b>navi-imprint</b> ships out of the box — our native nightshadeNeon flashing tool — pick an image, pick a drive, flash. Safe and easy, no terminal required.</p>
 	<h3 style="color:#ff10f0">web browsers</h3>
 	<p>Browsing the web is something that everyone does these days, and in order to browse the web, you need a web browser, of course! We believe that web browsers should be free and open-source software so you can trust them, and as such, the web browsers we include inside of the distribution are all FOSS. Here are the ones we include:</p>
 	<ul>
@@ -81,12 +81,15 @@
 	<ul>
 		<li><b>NaviVim</b> is navi's default terminal editor — a full Neovim distribution with a dashboard, file tree, fuzzy finding, and the nightshadeNeon theme, ready the moment you open it.</li>
 		<li><b>naviCode</b> is navi's graphical editor — VScodium with the nightshadeNeon theme and the Rina Hermes ACP extension, putting Lain right in your sidebar. Same soul, new window.</li>
+		<li><b>ThinkRail</b> is JetBrains' agentic IDE, shipped as a chromeless webapp.</li>
+		<li><b>Entire</b> is the git forge for agents, available as a webapp.</li>
 		<li><b>vim</b> is the top-tier terminal-based text editor underneath it all, with navi's custom vim config for when you want the classics.</li>
 	</ul>
 	<h3 style="color:#ff10f0">messaging</h3>
 	<p>Staying in touch comes in the box:</p>
 	<ul>
 		<li><b>Telegram</b> ships as a native desktop app, installed by default.</li>
+		<li><b>cyberia</b> is navi's default Matrix client.</li>
 		<li><b>Element</b> (Matrix chat) and other messaging apps are one pick away in the <b>navi-extras</b> menu.</li>
 	</ul>
 	<h3 style="color:#ff10f0">agents</h3>
@@ -96,9 +99,9 @@
 		<li><b>wisp</b> is xvoidsx's navi-native coding agent — an opencode fork with nightshadeNeon theme, katakana rain, Ollama-first providers, and herdr integration.</li>
 		<li><b>opencode</b> is an agentic coding assistant for the terminal.</li>
 		<li><b>omp</b> (oh my pi) is a standalone agent harness.</li>
-		<li><b>goose</b> is an open-source AI agent for automating engineering tasks, and the default agent harness as of 1.2.</li>
+		<li><b>goose</b> is an open-source AI agent for automating engineering tasks.</li>
 		<li><b>herdr</b> is an agent multiplexer for running multiple agents at once.</li>
-		<li><b>hermes</b>, <b>codex</b>, <b>kimi code</b>, <b>aider</b>, <b>openclaw</b>, <b>kilo code</b>, and <b>muse code</b> round out the bench.</li>
+		<li><b>hermes</b> rounds out the default lineup. <b>codex</b>, <b>kimi code</b>, <b>aider</b>, <b>openclaw</b>, <b>kilo code</b>, and <b>muse code</b> — and the rest of the 21-agent shelf — install via <b>navi-get</b> and are not part of the default install.</li>
 	</ul>
 	<p><b>pi</b> and <b>crush</b> shipped in earlier release candidates; both now live in the agents shelf of the <b>naviApps</b> store rather than the default install.</p>
 	<h3 style="color:#ff10f0">music players</h3>
@@ -112,10 +115,18 @@
 	<ul>
 		<li><b>mpv</b> is a lightweight video player that does right what it says on the tin - plays videos. An extremely simple UI, it shows you the content and media controls, and that's pretty much it.</li>
 	</ul>
+	<h3 style="color:#ff10f0">office and meetings</h3>
+	<p>For school and work, the Microsoft 365 apps and Zoom are available as webapps, ready to sign into once installed:</p>
+	<ul>
+		<li><b>Word</b>, <b>Excel</b>, <b>PowerPoint</b>, <b>OneNote</b>, and <b>OneDrive</b> cover documents, spreadsheets, slides, notes, and files.</li>
+		<li><b>Zoom</b> covers meetings and classes.</li>
+	</ul>
+	<h3 style="color:#ff10f0">artcraft</h3>
+	<p><b>ArtCraft Launcher</b> installs and updates the ArtCraft app suite from its official packages — grab it from the store and it keeps the suite current.</p>
 	<h3 style="color:#ff10f0">nightshade software</h3>
 	<p>The <b>nightshade</b> suite of software is our own set of tools available for you. Here are some of the pieces of <b>nightshade</b> software packed into the box with Navi:</p>
 	<ul>
-		<li><b>naviApps</b> is our nightshadeNeon app store — a curated catalog of 134 apps across four shelves: <b>from xvoidsx</b> (our own software), <b>native apps</b> (everything <code>navi-extras</code> can install), <b>agents</b> (a 17-strong agent shelf), and <b>webapps</b>.</li>
+		<li><b>naviApps</b> is our nightshadeNeon app store — a curated catalog of 175 apps, including our own software, native apps, a 21-strong agent shelf, and webapps, all installable through the store and <b>navi-get</b>.</li>
 		<li><b>navi radio</b> is our music webapp for streaming tunes.</li>
 		<li><b>neighborli</b> is our Fediverse instance based on Mastodon, and our webapp is included so you can join the Fediverse if you'd like to see what free and open-source social media is all about.</li>
 		<li><b>glyyph</b> is our Nostr client. You can use it to explore Nostr, the distributed social protocol currently powering a swath of web applications.</li>
@@ -130,3 +141,4 @@
 	<h6 style="color:#ff10f0;text-align:center">built with ❤️ by <a href="">xvoidsx</a></h6>
 </footer>
 </html>
+
