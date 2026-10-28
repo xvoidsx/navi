@@ -54,7 +54,10 @@ def app_of(node):
 def collect(node, ctx, windows, top_id=None):
     """Walk a workspace subtree; append one entry per window con."""
     for child in list(node.get("nodes", [])) + list(node.get("floating_nodes", [])):
-        if child.get("type") != "con":
+        # sway types floating windows "floating_con", not "con" — the old
+        # == "con" gate dropped every floating window before it could be
+        # collected or recursed into, so floats never reached the grid.
+        if child.get("type") not in ("con", "floating_con"):
             continue
         tid = top_id if top_id is not None else child.get("id")
         if is_window(child):

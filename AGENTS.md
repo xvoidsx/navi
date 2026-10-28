@@ -337,6 +337,11 @@ it, and only for what's actually done.
 - **Field failures get field-grade diagnostics.** When a launcher misbehaves
   on hardware, it must leave logs (`mod-open.log`); diagnose the live
   output, not the mocks.
+- **Sway tree node types include `floating_con`.** Any walker that filters
+  `type == "con"` silently drops every floating window — `navi-switcher.py`
+  did exactly this (the `floating_nodes` walk was there, but the type gate
+  threw each entry away before collection or recursion). Accept both
+  `"con"` and `"floating_con"` when walking windows.
 - **`gaps` has two forms; runtime changes must use the 4-arg one.** sway/i3's
   2-arg form (`gaps inner 0`) is the *config-directive* path — it only sets the
   default for future workspaces and never re-arranges the live ones. Anything
