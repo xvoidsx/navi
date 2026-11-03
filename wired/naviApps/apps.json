@@ -818,6 +818,19 @@
     "logo": "icons/photopea.png"
   },
   {
+    "id": "native-sable",
+    "name": "Sable",
+    "summary": "Fast Matrix client with a Rust core — navi's default GUI chat, with E2EE and MatrixRTC calls.",
+    "category": "Internet",
+    "source": "native",
+    "package": "sable",
+    "install": "navi-extras --install sable",
+    "remove": "doas apt remove -y sable",
+    "homepage": "https://app.sable.moe",
+    "logo": "icons/sable.svg",
+    "icon": "🌙"
+  },
+  {
     "id": "native-element",
     "name": "Element",
     "summary": "Decentralized chat over Matrix — the native desktop app, with real notifications. Bridges to just about everything.",

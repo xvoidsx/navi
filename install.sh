@@ -134,8 +134,8 @@ PKGS=(
 # `navi-webapp install`. Names must match .desktop filenames in
 # wired/naviApps/webapps/ exactly. Tweak freely — users can always
 # add/remove more from the naviApps store.
-# (telegram and element graduated to native apps — both install via
-# setup_telegram/setup_element below.)
+# (telegram and sable are native apps — both install via
+# setup_telegram/setup_sable below. Element stays available from the naviApps store.)
 DEFAULT_WEBAPPS=(
   neighborli glyyph pandora
   github youtube ani twitch discord perplexity dropbox
@@ -1836,30 +1836,22 @@ setup_telegram() {
   fi
 }
 
-setup_element() {
-  step "element (native)"
-  if command -v element-desktop >/dev/null 2>&1; then
-    ok "element already installed — skipping"
+setup_sable() {
+  step "sable (native)"
+  if dpkg -s sable >/dev/null 2>&1; then
+    ok "sable already installed — skipping"
     return 0
   fi
-  local installer="$REPO_DIR/scripts/installers/element-installer.sh"
-  [ -x "$installer" ] || installer="/usr/share/navi/installers/element-installer.sh"
+  local installer="$REPO_DIR/scripts/installers/sable-installer.sh"
+  [ -x "$installer" ] || installer="/usr/share/navi/installers/sable-installer.sh"
   if [ ! -x "$installer" ]; then
-    warn "element installer not found — skipping (later: navi-extras --install element)"
+    warn "sable installer not found — skipping (later: navi-extras --install sable)"
     return 0
   fi
   if bash "$installer"; then
-    ok "element installed natively"
-    # Electron can't auto-detect the secret store on sway/wayland — force
-    # gnome-libsecret so safeStorage uses the keyring instead of falling
-    # back to plaintext (which users correctly reject).
-    for d in /usr/share/applications ~/.local/share/applications; do
-      if [ -f "$d/element-desktop.desktop" ]; then
-        $DOAS sed -i 's|^Exec=element-desktop|Exec=element-desktop --password-store=gnome-libsecret|' "$d/element-desktop.desktop" 2>/dev/null ||           sed -i 's|^Exec=element-desktop|Exec=element-desktop --password-store=gnome-libsecret|' "$d/element-desktop.desktop"
-      fi
-    done
+    ok "sable installed natively"
   else
-    warn "element installer failed — retry later with: navi-extras --install element"
+    warn "sable installer failed — retry later with: navi-extras --install sable"
   fi
 }
 
@@ -2616,7 +2608,7 @@ main() {
     setup_fonts
     setup_webapps
     setup_telegram
-    setup_element
+    setup_sable
     setup_cyberia
     setup_navi_radio
     setup_sumi
@@ -2663,7 +2655,7 @@ main() {
   setup_fonts
   setup_webapps
   setup_telegram
-  setup_element
+  setup_sable
   setup_cyberia
   setup_navi_radio
   setup_sumi
