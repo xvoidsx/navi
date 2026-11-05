@@ -76,3 +76,5 @@ Found a bug or have an idea? Open an issue in this repo's [issue tracker](https:
 Want to join in with ideas, let us know about issues, show us your navi battlestations (we will show these off on the site soon enough!), join in on the dev/design side of **navi**, or just kick it with the team and hang out? You're more than welcome in the **navi discord**:
 
 [join the navi discord!](https://discord.gg/Xtjjp55ymk)
+
+There's also a [navi Harmony server](https://har.mony.lol/invite/480AY334) — Discord-shaped chat that federates over ActivityPub, so the neighborli crowd can join in directly.
