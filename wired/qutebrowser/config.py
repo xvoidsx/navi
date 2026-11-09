@@ -128,7 +128,8 @@ c.url.start_pages = [f"file://{_startpage}"]
 c.url.default_page = f"file://{_startpage}"
 
 # kirie adblocking: Brave's adblock-rust engine when present, hosts lists as fallback
-# (for the full engine: pip install --break-system-packages adblock)
+# (install.sh installs the engine via pip — if it ever goes missing:
+# pip install --break-system-packages adblock)
 try:
     import adblock  # noqa: F401
     c.content.blocking.method = "adblock"

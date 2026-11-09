@@ -1438,6 +1438,16 @@ deploy_configs() {
   # itself, so both land in ~/.config/qutebrowser/.
   deploy_config "qutebrowser/config.py"       "$HOME/.config/qutebrowser/config.py"
   deploy_config "qutebrowser/startpage.html"  "$HOME/.config/qutebrowser/startpage.html"
+  # kirie adblock engine: qutebrowser's adblock lists (EasyList, brave-unbreak,
+  # uBO filters) only engage when the `adblock` module is importable — without
+  # it config.py silently falls back to hosts blocking and the lists sit inert.
+  # python3-adblock isn't in trixie or trixie-backports (sid only), so the
+  # engine comes from PyPI (abi3 wheel, no build step). Best-effort: a failed
+  # install must not fail the whole deploy — kirie still runs, on hosts lists.
+  if ! python3 -c "import adblock" 2>/dev/null; then
+    $DOAS python3 -m pip install --break-system-packages adblock \
+      || warn "kirie adblock engine install failed — kirie falls back to hosts blocking (pip install --break-system-packages adblock)"
+  fi
   # chromium extensions per-user (deliberately NOT managed policy — that
   # dir is shared with forks like Helium): nightshadeNeon theme + blackice
   # as External Extensions, scoped to ~/.config/chromium so forks never
