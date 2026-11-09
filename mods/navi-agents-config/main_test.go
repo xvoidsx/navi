@@ -64,3 +64,38 @@ func TestImportFromEnv(t *testing.T) {
 		t.Fatalf("re-import found %d, want 0", n)
 	}
 }
+
+func TestDefaultAgentRoundTrip(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	// no navi-lain/hermes anywhere, so the no-file fallback is opencode.
+	t.Setenv("PATH", t.TempDir())
+
+	if got := readDefaultAgent(); got != "opencode" {
+		t.Fatalf("no file: got %q, want opencode", got)
+	}
+	if err := writeDefaultAgent("goose"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readDefaultAgent(); got != "goose" {
+		t.Fatalf("round-trip: got %q, want goose", got)
+	}
+	// garbage in the file resolves to the navi-Q fallback, not the garbage.
+	p := defaultAgentPath()
+	if err := os.WriteFile(p, []byte("not-a-harness\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := readDefaultAgent(); got != "opencode" {
+		t.Fatalf("garbage file: got %q, want opencode", got)
+	}
+}
+
+func TestListHerdrAgentsNotInstalled(t *testing.T) {
+	// empty PATH: herdr is nowhere to be found, so the message must say
+	// it isn't installed — never that it isn't running.
+	t.Setenv("PATH", t.TempDir())
+	_, note := listHerdrAgents()
+	if note != "herdr isn't installed" {
+		t.Fatalf("got %q, want herdr-isn't-installed", note)
+	}
+}

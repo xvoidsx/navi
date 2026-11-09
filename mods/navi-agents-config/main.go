@@ -135,11 +135,18 @@ func strField(m map[string]any, keys ...string) string {
 }
 
 // listHerdrAgents parses `herdr agent list`. The server-down shape is JSON
-// with an "error" key and exit code 0, so the body is parsed, not the exit.
+// with an "error" key and exit code 0, so the body is parsed, not the exit —
+// but some herdr versions fail the call outright when the server is down,
+// so a failed call with no output means "not running", never "not installed".
+// Installation and runtime are checked separately; the two states get
+// different messages.
 func listHerdrAgents() ([]herdrAgent, string) {
+	if _, err := exec.LookPath("herdr"); err != nil {
+		return nil, "herdr isn't installed"
+	}
 	out, err := exec.Command("herdr", "agent", "list").Output()
-	if err != nil {
-		return nil, "herdr isn't installed or won't run"
+	if err != nil && len(out) == 0 {
+		return nil, "herdr isn't running — run herdr to start it"
 	}
 	var doc map[string]any
 	if err := json.Unmarshal(out, &doc); err != nil {
@@ -381,13 +388,20 @@ func defaultAgentPath() string {
 
 func readDefaultAgent() string {
 	b, err := os.ReadFile(defaultAgentPath())
-	if err != nil {
-		return "opencode"
-	}
-	for _, h := range knownHarnesses {
-		if strings.TrimSpace(string(b)) == h.bin {
-			return h.bin
+	if err == nil {
+		for _, h := range knownHarnesses {
+			if strings.TrimSpace(string(b)) == h.bin {
+				return h.bin
+			}
 		}
+	}
+	// no file yet (or garbage in it): resolve the same way navi-Q does —
+	// Lain first, then opencode. The center must show what alt+a opens.
+	if _, err := exec.LookPath("navi-lain"); err == nil {
+		return "hermes"
+	}
+	if _, err := exec.LookPath("hermes"); err == nil {
+		return "hermes"
 	}
 	return "opencode"
 }
@@ -1457,7 +1471,7 @@ func (m model) statusView() string {
 		ol, olStyle = "up", lipgloss.NewStyle().Foreground(theme.Green)
 	}
 	b.WriteString(theme.Dimmed.Render("ollama    ") + olStyle.Render(ol) + "\n\n")
-	b.WriteString(theme.Dimmed.Render("enter jump to agent · r read output · 1-4 tabs · q quit"))
+	b.WriteString(theme.Dimmed.Render("enter jump to agent · r read output · 1-6 tabs · q quit"))
 	return b.String()
 }
 
@@ -1504,7 +1518,7 @@ func (m model) modelsView() string {
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString(theme.Dimmed.Render("o on/off · p pull · d delete · r refresh · 1-4 tabs · q quit"))
+	b.WriteString(theme.Dimmed.Render("o on/off · p pull · d delete · r refresh · 1-6 tabs · q quit"))
 	return b.String()
 }
 
@@ -1518,7 +1532,7 @@ func (m model) harnessView() string {
 			st = lipgloss.NewStyle().Foreground(theme.Green).Render("installed")
 		}
 		if h.Bin == m.defaultAgent {
-			mark = lipgloss.NewStyle().Foreground(theme.Pink).Render("★ ")
+			mark = lipgloss.NewStyle().Foreground(theme.Pink).Render("♥ ")
 		}
 		row := fmt.Sprintf("%s%-10s %s", mark, h.Bin, st)
 		if i == m.harnessCursor {
@@ -1528,8 +1542,8 @@ func (m model) harnessView() string {
 		}
 	}
 	b.WriteString("\n")
-	b.WriteString(theme.Dimmed.Render("the ★ harness is the default agent — and what navi-Q (alt+a) opens") + "\n\n")
-	b.WriteString(theme.Dimmed.Render("enter set default · 1-4 tabs · q quit"))
+	b.WriteString(theme.Dimmed.Render("the ♥ harness is the default agent — and what navi-Q (alt+a) opens") + "\n\n")
+	b.WriteString(theme.Dimmed.Render("enter select the default agent · 1-6 tabs · q quit"))
 	return b.String()
 }
 
@@ -1538,7 +1552,7 @@ func (m model) providerView() string {
 	switch m.pscreen {
 	case pscreenList:
 		b.WriteString(m.plist.View() + "\n")
-		b.WriteString(theme.Dimmed.Render("enter select · a add custom · i import from environment · 1-4 tabs · q quit"))
+		b.WriteString(theme.Dimmed.Render("enter select · a add custom · i import from environment · 1-6 tabs · q quit"))
 		if h := importHint(m.providers, m.fileVals); h != "" && m.status == "" {
 			b.WriteString("\n" + theme.Dimmed.Render(h))
 		}
