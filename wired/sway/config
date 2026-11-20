@@ -148,6 +148,16 @@ bindsym $mod+Tab exec --no-startup-id "rofi -show combi -combi-modi window,drun,
 bindsym --no-repeat Mod1+Tab exec --no-startup-id /usr/share/navi/wired/scripts/navi-switcher.sh
 bindsym --no-repeat Mod1+Shift+Tab exec --no-startup-id /usr/share/navi/wired/scripts/navi-switcher.sh --prev
 
+# float mode ("normie mode"): Super+Shift+M toggles every window between
+# tiling and floating-with-titlebars; Alt+F4 closes like Windows;
+# Super+minus hides a window to the scratchpad (sway's minimize),
+# Super+Shift+minus brings it back. See wired/scripts/navi-float-mode.sh.
+# Reversible at runtime; nothing here edits a config file.
+bindsym $mod+Shift+m exec --no-startup-id /usr/share/navi/wired/scripts/navi-float-mode.sh
+bindsym Mod1+F4 kill
+bindsym $mod+minus scratchpad show
+bindsym $mod+Shift+minus move scratchpad
+
 # other useful binds
 bindsym $mod+Shift+n exec --no-startup-id "dunstctl history-pop"
 bindsym $mod+c exec --no-startup-id "gsimplecal"
