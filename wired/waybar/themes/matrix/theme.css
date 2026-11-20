@@ -1,0 +1,375 @@
+/* ============================================================================
+ * MATRIX
+ * ----------------------------------------------------------------------------
+ * The bar as the code rain itself: pure black, film green, white for the
+ * real world. The stream falls; everything else stands still.
+ *
+ * This is deliberately NOT crt-scope. That theme is a phosphor tube — a
+ * translucent face, scanlines, a vignette, an aperture grille, bloom on
+ * every glyph, pink and cyan second voices, separators ruling the modules
+ * apart, a blinking block cursor on the clock. Matrix is the opposite in
+ * every one of those choices:
+ *
+ *   crt-scope                matrix
+ *   ---------                ------
+ *   translucent tube         solid black, fully opaque — the wallpaper
+ *                            rain shows AROUND the bar, never through it
+ *   scanlines + vignette     no scanlines, no vignette, no grille
+ *   4px radius + border      0 radius, no border at all — one 1px hairline
+ *   + glow                   along the bottom edge, the code line
+ *   text-shadow bloom        no text-shadow anywhere — flat, hard type
+ *   pink + cyan accents      green and white ONLY. No pink, no cyan, no
+ *                            red — danger is white-hot, not red
+ *   1px separators          no separators — whitespace is the only
+ *   between modules          spacing, the code breathes
+ *   blinking cursor clock    the clock is white and still — the one real
+ *                            thing in the stream
+ *   restrained motion        the rain moves, always, in discrete steps
+ *
+ * THE RAIN. One animated layer: a repeating gradient of bright-headed
+ * dashes (a 2px bright head, an 8px tail, transparent to the end of the
+ * 28px period) falls through a static field of faint vertical columns.
+ * The keyframes move it exactly one period — 28px — so the loop is
+ * seamless by construction: position 28px looks identical to position 0.
+ * It travels in 6 discrete steps over 6 seconds: one visible change per
+ * second. The films' rain is chunky and glyph-stepped anyway, so the
+ * steps ARE the look, not a compromise.
+ *
+ * COST MODEL — read before adding motion.
+ * GTK3 has no partial damage here: any animated property repaints the whole
+ * bar, all Pango text included, at ~15ms a frame. Measured on this machine:
+ *
+ *     no animation ............ 0.2% of a core
+ *     ~1 visible change/sec ... ~18% of a core
+ *     continuous 60Hz ......... ~90% of a core
+ *
+ * The rain is the theme's signature and it costs ~1 change/sec. Everything
+ * else is static and free after first paint — no second animation runs
+ * alongside it, and the alert blinks only fire while something is actually
+ * wrong. If the price ever feels too high on the bench, slow the rain to
+ * 12s (same 6 steps, half the changes) before touching anything else.
+ *
+ * GTK CSS RULES (each one cost us a release):
+ * - One selector per keyframe rule. `0%, 100% { }` fails the parser.
+ * - Animation steps must cover the keyframe intervals (stops - 1).
+ *   Two-stop keyframes = 1 interval, so steps(6) is plenty.
+ * - A running animation beats :hover on border-color. The rain animates
+ *   background-position on window#waybar only, never border-color on a
+ *   module, so module hover stays live.
+ *
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
+ * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
+ * monochrome sun-behind-rain / fog that reads correctly at 10px.
+ *
+ * The white square the weather module used to show was NOT a missing font.
+ * weather.sh emitted each glyph followed by U+FE0F VARIATION SELECTOR-16, which
+ * forces emoji *presentation*. Pango honoured that and demanded a real colour
+ * emoji font, and the only one installed (Noto Color Emoji) is a fixed 109px
+ * strike that cannot be used at bar size — so GTK drew the .notdef box. The fix
+ * belongs in weather.sh, which now strips the selector in json_escape.
+ *
+ * Noto Color Emoji is deliberately NOT named in this stack for the same reason:
+ * it is a 109px bitmap strike and would downscale to mush at 10px.
+ * ========================================================================== */
+
+@define-color rain #00ff41;
+@define-color rain-dim rgba(0, 255, 65, 0.55);
+@define-color rain-faint rgba(0, 255, 65, 0.28);
+@define-color rain-ghost rgba(0, 255, 65, 0.12);
+@define-color real #f2fff2;
+@define-color void #000000;
+@define-color ink #001a06;
+
+* {
+    font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", monospace;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+/* ----------------------------------------------------------------------------
+ * The stream: falling dashes through static columns, over a flat black slab.
+ * Layer order is top-first. Only the dash layer moves.
+ * -------------------------------------------------------------------------- */
+window#waybar {
+    color: @rain-dim;
+    background-color: @void;
+    background-image:
+        /* falling dashes: bright head, tail, transparent — 28px period */
+        repeating-linear-gradient(to bottom,
+            rgba(0, 255, 65, 0.34) 0,
+            rgba(0, 255, 65, 0.34) 2px,
+            rgba(0, 255, 65, 0.10) 2px,
+            rgba(0, 255, 65, 0.10) 8px,
+            rgba(0, 255, 65, 0) 8px,
+            rgba(0, 255, 65, 0) 28px),
+        /* static columns: faint vertical rules the dashes fall through */
+        repeating-linear-gradient(to right,
+            rgba(0, 255, 65, 0.07) 0,
+            rgba(0, 255, 65, 0.07) 1px,
+            rgba(0, 255, 65, 0) 1px,
+            rgba(0, 255, 65, 0) 7px),
+        /* faint wash so the slab is never dead flat */
+        linear-gradient(to bottom,
+            rgba(0, 255, 65, 0.05) 0%,
+            rgba(0, 255, 65, 0) 60%,
+            rgba(0, 255, 65, 0.04) 100%);
+    background-size: 100% 28px, 7px 100%, 100% 100%;
+    background-position: 0 0, 0 0, 0 0;
+    border: none;
+    border-bottom: 1px solid rgba(0, 255, 65, 0.45);
+    border-radius: 0;
+    box-shadow: none;
+    animation: rain-fall 6s steps(6, end) infinite;
+}
+
+/* One period of travel per loop — the seam never shows. */
+@keyframes rain-fall {
+    0%   { background-position: 0 0, 0 0, 0 0; }
+    100% { background-position: 0 28px, 0 0, 0 0; }
+}
+
+window#waybar > box { background: transparent; }
+
+/* ----------------------------------------------------------------------------
+ * Modules as code tokens. No boxes, no separators, no glow — whitespace
+ * alone spaces them. Every module gets the same margin/padding; if a new
+ * module looks "off", check it against this contract before adding an
+ * override.
+ * -------------------------------------------------------------------------- */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#memory,
+#cpu,
+#disk,
+#tray {
+    min-height: 20px;
+    margin: 2px 3px;
+    padding: 2px 8px;
+    color: @rain-dim;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+    transition: color 200ms ease-out, background-color 200ms ease-out;
+}
+
+/* The clock is the real world — white, still, the one thing that isn't rain. */
+#clock {
+    color: @real;
+}
+
+#custom-wired-launcher,
+#custom-power {
+    color: @rain;
+    font-size: 12px;
+}
+
+#network,
+#backlight,
+#memory,
+#cpu { color: @rain-dim; }
+
+#custom-volume,
+#idle_inhibitor { color: @rain; }
+
+#battery { color: @rain-dim; }
+
+/* Workspaces as bare glyphs. The focused one is an inverted block — a
+ * cursor cell, not a button. No borders on any of them. */
+#workspaces button {
+    min-width: 20px;
+    margin: 0 1px;
+    padding: 1px 6px;
+    color: @rain-faint;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.empty {
+    color: rgba(0, 255, 65, 0.16);
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    color: @ink;
+    background-color: @rain;
+    text-shadow: none;
+}
+
+#workspaces button.urgent {
+    color: @real;
+    background-color: rgba(255, 255, 255, 0.14);
+    animation: alarm-blink 1s steps(2, end) infinite alternate;
+}
+
+#window {
+    color: @rain-faint;
+}
+
+window#waybar.empty #window {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+}
+
+#custom-weather {
+    color: @rain-faint;
+    font-size: 8px;
+    padding: 2px 8px;
+}
+
+/* ----------------------------------------------------------------------------
+ * State. Danger is white-hot, never red — the discipline holds everywhere.
+ * -------------------------------------------------------------------------- */
+@keyframes alarm-blink {
+    from { color: @real; background-color: rgba(255, 255, 255, 0.14); }
+    to   { color: @rain-dim; background-color: transparent; }
+}
+
+#network.disconnected,
+#battery.critical {
+    color: @real;
+    animation: alarm-blink 1s steps(2, end) infinite alternate;
+}
+
+#battery.warning { color: @real; }
+
+/* Bluetooth: faint when off, white when linked — presence is the real world. */
+#bluetooth.off,
+#custom-bluetooth.off {
+    color: @rain-faint;
+}
+
+#bluetooth.connected,
+#custom-bluetooth.connected {
+    color: @real;
+}
+
+#bluetooth.connecting,
+#custom-bluetooth.connecting {
+    color: @rain;
+    animation: alarm-blink 1.4s steps(2, end) infinite alternate;
+}
+
+#custom-tailscale.off {
+    color: @rain-faint;
+    animation: none;
+}
+
+#custom-tailscale.connected {
+    color: @real;
+    animation: none;
+}
+
+#custom-update.up-to-date,
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep {
+    color: @rain-faint;
+}
+
+#custom-update.updates-available {
+    color: @real;
+    animation: alarm-blink 2s steps(2, end) infinite alternate;
+}
+
+#custom-bell.has-notifs,
+#custom-agent.agent-ready {
+    color: @real;
+}
+
+@keyframes agent-pulse {
+    from { color: @rain; }
+    to   { color: @real; }
+}
+
+#custom-agent.agent-working {
+    animation: agent-pulse 2s steps(4, end) infinite alternate;
+}
+
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: @real;
+    animation: alarm-blink 0.9s steps(2, end) infinite alternate;
+}
+
+#custom-volume.muted {
+    color: @rain-faint;
+}
+
+#idle_inhibitor.activated { color: @real; }
+
+#custom-nowplaying.idle { color: @rain-faint; }
+
+#custom-nowplaying.playing {
+    color: @real;
+}
+
+#custom-nowplaying.paused { color: @rain-dim; }
+
+#tray > .passive { opacity: 0.4; }
+
+#tray > .needs-attention {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-radius: 0;
+}
+
+/* Hover: the line under the pointer lights up — a line of code, selected. */
+#workspaces:hover,
+#clock:hover,
+#custom-weather:hover,
+#custom-volume:hover,
+#network:hover,
+#battery:hover,
+#backlight:hover,
+#idle_inhibitor:hover,
+#power-profiles-daemon:hover,
+#tray:hover,
+#custom-wired-launcher:hover,
+#custom-power:hover,
+#custom-update:hover,
+#custom-bell:hover,
+#custom-nowplaying:hover,
+#custom-agent:hover,
+#custom-tailscale:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover {
+    color: @real;
+    background-color: rgba(0, 255, 65, 0.12);
+}
+
+#workspaces button:hover {
+    color: @real;
+    background-color: rgba(0, 255, 65, 0.12);
+}
+
+tooltip {
+    color: @rain;
+    background-color: rgba(0, 0, 0, 0.97);
+    border: 1px solid rgba(0, 255, 65, 0.45);
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+tooltip label { color: @rain; }
