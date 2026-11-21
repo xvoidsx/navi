@@ -13,6 +13,13 @@
  * or background position — never layout. If the Cloudbook complains, the
  * aurora goes first.
  *
+ * 2026-11-21 slimming pass (Raven's bench): pills tightened — padding
+ * 10→7, radius 10→8, margins trimmed — after the bar read chunky and the
+ * clock cluster sat left of true center. Slimming narrows the right side
+ * ~130px so the center lands closer; true centering needs the sides
+ * balanced, and module order is shared config (config.jsonc), not theme,
+ * so that part stays open until Raven picks which modules move left.
+ *
  * Hover was designed against the jack-panel lesson: no infinite animation
  * touches border-color on any module, so :hover declarations always win.
  * The one exception (the focused workspace breathe) pauses on hover.
@@ -101,13 +108,13 @@ window#waybar > box { background: transparent; }
 #cpu,
 #disk,
 #tray {
-    min-height: 20px;
-    margin: 4px 6px 6px 6px;
-    padding: 2px 10px;
+    min-height: 18px;
+    margin: 3px 4px 4px 4px;
+    padding: 2px 7px;
     color: @ns-ink;
     background-color: @ns-panel;
     border: 1px solid @ns-violet-soft;
-    border-radius: 10px;
+    border-radius: 8px;
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.07),
         0 0 10px rgba(139, 92, 246, 0.12);
@@ -140,13 +147,13 @@ window#waybar > box { background: transparent; }
  * Workspaces: dim buds, the focused one breathing berry light.
  * -------------------------------------------------------------------------- */
 #workspaces button {
-    min-width: 22px;
+    min-width: 20px;
     margin: 0 2px;
-    padding: 1px 7px;
+    padding: 1px 5px;
     color: @ns-dim;
     background-color: rgba(7, 4, 15, 0.85);
     border: 1px solid rgba(139, 92, 246, 0.22);
-    border-radius: 8px;
+    border-radius: 7px;
     text-shadow: none;
 }
 
@@ -345,7 +352,7 @@ window#waybar.empty #window {
     animation: none;
 }
 
-#tray { padding-left: 6px; padding-right: 6px; }
+#tray { padding-left: 4px; padding-right: 4px; }
 #tray > .passive { opacity: 0.50; }
 
 #tray > .needs-attention {
