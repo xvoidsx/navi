@@ -6,14 +6,14 @@ and **navi (X11)**.
 
 ## background
 
-Static: `/usr/share/navi/wired/wp/lain3wp.jpg` (shipped with the repo).
+Static: `/usr/share/navi/wired/wp/neon-lain.png` (shipped with the repo).
 
 Animated (optional): the theme plays
 `/usr/share/navi/wired/wp/login-loop.mp4` on a loop over the static
 image when the file exists. Generate it from the flagship gifpaper:
 
 ```sh
-ffmpeg -i navi-lain.gif -movflags +faststart -pix_fmt yuv420p \
+ffmpeg -i neon-lain.gif -movflags +faststart -pix_fmt yuv420p \
   /usr/share/navi/wired/wp/login-loop.mp4
 ```
 

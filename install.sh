@@ -1491,7 +1491,7 @@ deploy_configs() {
 verify_wallpaper_wiring() {
   # the canonical sway config execs /usr/bin/navi-wallpaper, which paints the
   # animated wallpaper first (mpvpaper) and falls back to the static swaybg
-  # image at /usr/share/navi/wired/wp/lain-hairclip-neon.png.
+  # image at /usr/share/navi/wired/wp/neon-lain.png.
   local cfg="$HOME/.config/sway/config"
   if grep -q "navi-wallpaper" "$cfg" 2>/dev/null; then
     ok "sway config wires navi-wallpaper (mpvpaper + swaybg fallback)"

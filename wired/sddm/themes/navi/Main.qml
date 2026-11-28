@@ -23,7 +23,7 @@ Rectangle {
         id: wallpaper
         anchors.fill: parent
         fillMode: Image.PreserveAspectCrop
-        source: "file:///usr/share/navi/wired/wp/navi-lain-rgbsplit.jpg"
+        source: "file:///usr/share/navi/wired/wp/neon-lain.png"
     }
 
     // ---- readability veil
