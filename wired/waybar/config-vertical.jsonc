@@ -4,12 +4,15 @@
 // the icon-rail design: launcher, workspaces, time, status. no window
 // title and no nowplaying — a 50-char title rotated is ~350px tall, and
 // a 22-char nowplaying slot is ~150px; neither fits a 768px rail.
-// weekday + date move into clock#2's tooltip. text modules rotate so
-// they read down the bar (letter-tops toward the desktop); single-glyph
-// modules (agent, tailscale, bluetooth, bell, power) stay upright.
+// weekday + date move into clock#2's tooltip. text modules STACK:
+// value on top, symbol below (04 / -- / 15, 46°F over its glyph) —
+// top-to-bottom like the clock, no head tilt, no rotation at all.
+// single-glyph modules (agent, tailscale, bluetooth, bell, power)
+// stay upright. the scripts (weather, update, volume) stack themselves
+// when navi-bar's state file says left/right; the built-ins stack here.
 // navi-bar generates the live config from this template; do not edit the
-// live file. left is the template default; navi-bar swaps rotate 270->90
-// and the margins for a right-side bar.
+// live file. left is the template default; navi-bar only swaps the
+// margins for a right-side bar now (nothing rotates anymore).
 {
     "layer": "top",
     "position": "left",
@@ -90,7 +93,6 @@
     },
 
     "custom/volume": {
-        "rotate": 270,
         // navi-audio volume module: live volume ("🔊 74%"). the device
         // label ("Line Out", "HDMI", …) lives in the tooltip so the module
         // stays compact. audio-status.sh is long-running and re-emits on
@@ -157,10 +159,9 @@
     // - - - XXX testing section XXX - - -
     // this is a 'testing' network module. if it doesn't work out right, we'll remove it
     "network": {
-        "rotate": 270,
-            "format-wifi": "📶 {signalStrength}%",
-            "format-ethernet": "🌐 {ifname}",
-            "format-disconnected": "⚠ Disconnected",
+            "format-wifi": "{signalStrength}%\n📶",
+            "format-ethernet": "{ifname}\n🌐",
+            "format-disconnected": "off\n⚠",
             "tooltip-format": "Wireless status -  {ifname}: {ipaddr}/{cidr}",
 	    "tooltip-format-wifi": "{essid}",
             "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-networking\" navi-networking",
@@ -188,13 +189,12 @@
         "format": "CPU {usage:2}%"
     },
     "battery": {
-        "rotate": 270,
         "states": {
             "good": 95,
             "warning": 30,
             "critical": 15
         },
-        "format": "{icon} {capacity}%",
+        "format": "{capacity}%\n{icon}",
         "format-icons": [
             "",
             "",
@@ -228,14 +228,12 @@
         }
     },
     "backlight": {
-        "rotate": 270,
-        "format": "{percent}% {icon}",
+        "format": "{percent}%\n{icon}",
 		"tooltip": true,
 		"tooltip-format": "Brightness control",
         "format-icons": ["", "", "", "", "", "", "", "", ""]
     },
     "custom/update": {
-        "rotate": 270,
         "format": "{}",
         "return-type": "json",
         "escape": true,
@@ -245,7 +243,6 @@
         "tooltip": true
     },
     "custom/weather": {
-        "rotate": 270,
         "format": "{}",
         "return-type": "json",
         "escape": true,

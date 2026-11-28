@@ -485,12 +485,20 @@ verified.
 The bar moves: `navi-bar top|bottom|left|right`, state in
 `~/.local/share/navi/waybar/position`. Bottom is a config flip; left/right
 is the rail design in `wired/waybar/config-vertical.jsonc` (launcher,
-workspaces, time-only clock, 13 status modules rotated 270° so they read
-down the bar; no window title, no nowplaying — a 50-char title rotated is
-~350px tall and neither fits a 768px rail). The clock is stacked, not
-rotated (04 / -- / 15, three lines, no head tilt). **Waybar's rotate:90
-is counterclockwise, not clockwise** — the first build read bottom-to-top
-and had to be flipped to 270 (left) / 90 (right).
+workspaces, time-only clock, 13 status modules stacked (value over
+symbol, top-to-bottom like the clock — no rotation at all); no window
+title, no nowplaying — a 50-char title rotated is ~350px tall and
+neither fits a 768px rail). The clock is stacked (04 / -- / 15, three
+lines, no head tilt). **Waybar's rotate:90 is counterclockwise, not
+clockwise** — the first build read bottom-to-top and was flipped to 270
+(left) / 90 (right); the stacked design then replaced rotation entirely
+(2026-11-28) because it reads top-to-bottom with no head tilt. The
+scripts (weather, update, volume) stack themselves by reading
+navi-bar's state file (`~/.local/share/navi/waybar/position`) — left/
+right emits "value\nicon", top/bottom passes "icon value" through
+unchanged; the built-ins (network, battery, backlight) stack in the
+vertical config's format strings. navi-bar's generator no longer swaps
+any rotate (left and right share one template; only margins differ).
 
 - **The live config is GENERATED, never the source.** `navi-bar` builds
   `~/.config/waybar/config.jsonc` from the stock templates in

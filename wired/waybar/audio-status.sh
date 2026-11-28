@@ -70,20 +70,37 @@ def read_state():
     return {"vol": vol, "muted": muted, "short": short, "full": full}
 
 
+def bar_vertical():
+    """True when navi-bar has the bar on a side rail (stack text over icon)."""
+    import os
+    try:
+        with open(os.environ.get(
+                "NAVI_BAR_STATE",
+                os.path.expanduser("~/.local/share/navi/waybar/position"))) as f:
+            return f.read().strip().split("\n")[0] in ("left", "right")
+    except OSError:
+        return False
+
+
+def stack(icon, value):
+    """Text over symbol on a vertical bar; 'icon value' on a horizontal one."""
+    return value + "\n" + icon if bar_vertical() else icon + " " + value
+
+
 def render(st):
     if st is None:
         return json.dumps({
-            "text": "🔇 no audio",
+            "text": "off\n🔇" if bar_vertical() else "🔇 no audio",
             "class": "error",
             "tooltip": "audio daemon unreachable — is PulseAudio running?",
         })
     icon = "🔇" if st["muted"] else "🔊"
     if st["muted"]:
-        text = icon + " mute"
+        text = stack(icon, "mute")
     elif st["vol"] < 0:
-        text = icon + " --"
+        text = stack(icon, "--")
     else:
-        text = icon + " " + str(st["vol"]) + "%"
+        text = stack(icon, str(st["vol"]) + "%")
     # device identity lives in the tooltip, not the module text
     tip = st["short"]
     if st["full"] and st["full"] != st["short"]:
