@@ -2525,6 +2525,18 @@ install_identity() {
   $DOAS sed -i -e "s/navi [0-9][0-9.]* \"[^\"]*\"/navi $iver \"$iname\"/" \
     /etc/issue /etc/issue.net
   ok "/etc/os-release stamped navi $iver ($iname)"
+  # trixie base-files ships /etc/os-release as a symlink to
+  # /usr/lib/os-release, which is NOT a conffile — every Debian point
+  # release silently restores Debian's version over this stamp (seen
+  # 2026-11-08, base-files 13.8). Divert it once, after stamping, so
+  # future upgrades install their copy to /etc/os-release.debian
+  # instead. --no-rename is explicit: the stamped file stays exactly
+  # where it is, and the flag pins that behaviour even after dpkg
+  # 1.20 changes the default.
+  if ! dpkg-divert --list /etc/os-release | grep -q .; then
+    $DOAS dpkg-divert --add --no-rename --divert /etc/os-release.debian /etc/os-release
+    ok "os-release diverted from base-files upgrades"
+  fi
   # release channel: navi-update reads this to decide what "newer" means.
   # eiri builds follow eiri, everything else follows stable. never clobber
   # an existing channel — the user may have opted into a different one.
