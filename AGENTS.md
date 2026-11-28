@@ -485,9 +485,12 @@ verified.
 The bar moves: `navi-bar top|bottom|left|right`, state in
 `~/.local/share/navi/waybar/position`. Bottom is a config flip; left/right
 is the rail design in `wired/waybar/config-vertical.jsonc` (launcher,
-workspaces, time-only clock, 13 status modules rotated 90° so they read
+workspaces, time-only clock, 13 status modules rotated 270° so they read
 down the bar; no window title, no nowplaying — a 50-char title rotated is
-~350px tall and neither fits a 768px rail).
+~350px tall and neither fits a 768px rail). The clock is stacked, not
+rotated (04 / -- / 15, three lines, no head tilt). **Waybar's rotate:90
+is counterclockwise, not clockwise** — the first build read bottom-to-top
+and had to be flipped to 270 (left) / 90 (right).
 
 - **The live config is GENERATED, never the source.** `navi-bar` builds
   `~/.config/waybar/config.jsonc` from the stock templates in

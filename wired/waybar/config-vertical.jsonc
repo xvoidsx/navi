@@ -8,7 +8,7 @@
 // they read down the bar (letter-tops toward the desktop); single-glyph
 // modules (agent, tailscale, bluetooth, bell, power) stay upright.
 // navi-bar generates the live config from this template; do not edit the
-// live file. left is the template default; navi-bar swaps rotate 90->270
+// live file. left is the template default; navi-bar swaps rotate 270->90
 // and the margins for a right-side bar.
 {
     "layer": "top",
@@ -75,11 +75,11 @@
         "tooltip": false,
         "on-click": "alacritty -e calcurse"
     },
+    // stacked, not rotated: 04 / -- / 15 reads top-to-bottom, no head tilt.
     "clock#2": {
-        "format": "{:%H:%M}",
+        "format": "{:%H\n--\n%M}",
         "tooltip": true,
         "tooltip-format": "{:%A, %d %B}",
-        "rotate": 90,
         "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-reminders\" navi-reminders"
     },
     "clock#3": {
@@ -90,7 +90,7 @@
     },
 
     "custom/volume": {
-        "rotate": 90,
+        "rotate": 270,
         // navi-audio volume module: live volume ("🔊 74%"). the device
         // label ("Line Out", "HDMI", …) lives in the tooltip so the module
         // stays compact. audio-status.sh is long-running and re-emits on
@@ -157,7 +157,7 @@
     // - - - XXX testing section XXX - - -
     // this is a 'testing' network module. if it doesn't work out right, we'll remove it
     "network": {
-        "rotate": 90,
+        "rotate": 270,
             "format-wifi": "📶 {signalStrength}%",
             "format-ethernet": "🌐 {ifname}",
             "format-disconnected": "⚠ Disconnected",
@@ -188,7 +188,7 @@
         "format": "CPU {usage:2}%"
     },
     "battery": {
-        "rotate": 90,
+        "rotate": 270,
         "states": {
             "good": 95,
             "warning": 30,
@@ -228,14 +228,14 @@
         }
     },
     "backlight": {
-        "rotate": 90,
+        "rotate": 270,
         "format": "{percent}% {icon}",
 		"tooltip": true,
 		"tooltip-format": "Brightness control",
         "format-icons": ["", "", "", "", "", "", "", "", ""]
     },
     "custom/update": {
-        "rotate": 90,
+        "rotate": 270,
         "format": "{}",
         "return-type": "json",
         "escape": true,
@@ -245,7 +245,7 @@
         "tooltip": true
     },
     "custom/weather": {
-        "rotate": 90,
+        "rotate": 270,
         "format": "{}",
         "return-type": "json",
         "escape": true,
