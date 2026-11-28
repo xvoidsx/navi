@@ -1,134 +1,100 @@
 /* ============================================================================
- * WIRED // PATCHBAY
+ * PRESENCE
  * ----------------------------------------------------------------------------
- * The bar as a signal panel. One lit trace runs the full width, channel ticks
- * are ruled along it, and every module is soldered onto that trace with a stem
- * dropping from its underside. The distro that feels alive, wired.
+ * Quiet static. The bar is near-black and near-colourless — desaturated
+ * grey on grey, flat square modules, hairline borders, no glow anywhere —
+ * except one neon pink eye. The focused workspace is the eye: pink text,
+ * pink underline, a slow pink-to-white pulse. Notifications, blocked agents,
+ * and available updates also turn the eye toward them. Everything else
+ * stays quiet. It is the bar version of Lain in the wired: present,
+ * watching, saying almost nothing.
  *
- * COST MODEL — read before adding motion.
- * GTK3 has no partial damage here: any animated property repaints the whole bar,
- * all Pango text included, at ~15ms a frame. Measured on this machine:
+ * Four tones, and only four. Grey is quiet, white is alive, pink is the
+ * eye, red is danger. Nothing else gets a colour — that discipline is the
+ * whole theme. If a new state needs a colour, it is one of these four.
  *
- *     no animation ............ 0.2% of a core
- *     ~1 visible change/sec ... ~18% of a core
- *     continuous 60Hz ......... ~90% of a core
+ * Animation budget, in patchbay's stepped language — and on the properties
+ * this hardware proves it animates. Hollow's whisper runs on color, and
+ * jack-panel's ring-drift runs on border-color; box-shadow and
+ * text-shadow motion did not show on this machine, so nothing here
+ * animates those. The eye pulses pink-to-white in two steps, the bar's
+ * hairline breathes pink in two steps, urgent states pulse to white.
+ * The scanline crawl stays as a bonus — if background-position runs on
+ * your build it's a second motion; the color motions are the ones that
+ * carry it. Workspace animations pause on hover — the jack-panel lesson,
+ * honoured. No smooth easing anywhere: GTK repaints the whole bar per
+ * animated frame, so smooth motion is the most expensive motion here.
  *
- * Motion is priced per *visible change*, so the budget goes to two deliberate
- * events: the packet crossing the trace every 16s, and a slow colour drift in
- * the trace itself. Everything else is static and free after first paint.
- *
- * A NOTE ON GRADIENT FADES
- * `transparent` is rgba(0,0,0,0). Fading a colour to it interpolates through
- * black and leaves a dark fringe — on the trace that reads as a persistent
- * black line. Every fade below fades to a zero-alpha copy of its own hue
- * instead, which is why the wire looks like wire and not like a seam.
- *
- * FONT NOTE: "Noto Sans Symbols2" is listed deliberately. The navi mods emit
- * emoji codepoints (weather conditions, volume), and Symbols2 carries a clean
- * monochrome sun-behind-rain / fog that reads correctly at 10px.
- *
- * The white square the weather module used to show was NOT a missing font.
- * weather.sh emitted each glyph followed by U+FE0F VARIATION SELECTOR-16, which
- * forces emoji *presentation*. Pango honoured that and demanded a real colour
- * emoji font, and the only one installed (Noto Color Emoji) is a fixed 109px
- * strike that cannot be used at bar size — so GTK drew the .notdef box. The fix
- * belongs in weather.sh, which now strips the selector in json_escape.
- *
- * Noto Color Emoji is deliberately NOT named in this stack for the same reason:
- * it is a 109px bitmap strike and would downscale to mush at 10px.
+ * FONT NOTE: "Noto Sans Symbols2" is listed deliberately, same as
+ * jack-panel and nightshade. The navi mods emit emoji codepoints
+ * (weather conditions, volume); Symbols2 carries clean monochrome glyphs
+ * that read at 10px. Noto Color Emoji is NOT named — its 109px bitmap
+ * strike downscales to mush at bar size.
  * ========================================================================== */
 
-@define-color np #ff10f0;
-@define-color ng #39ff14;
-@define-color nc #00ffff;
-@define-color nr #ff3131;
-@define-color nw #ffffff;
-@define-color ob #0a050b;
-
-@define-color np-1 rgba(255, 16, 240, 0.30);
-@define-color np-2 rgba(255, 16, 240, 0.62);
-@define-color ng-1 rgba(57, 255, 20, 0.34);
-@define-color ng-2 rgba(57, 255, 20, 0.66);
-@define-color nc-1 rgba(0, 255, 255, 0.30);
-@define-color nc-2 rgba(0, 255, 255, 0.62);
-@define-color nr-1 rgba(255, 49, 49, 0.55);
-@define-color nw-2 rgba(255, 255, 255, 0.66);
-@define-color nw-3 rgba(255, 255, 255, 0.42);
-@define-color nw-4 rgba(255, 255, 255, 0.22);
-@define-color quiet rgba(184, 184, 184, 0.80);
+@define-color pr-ink #d7d7da;
+@define-color pr-dim #96969e;
+@define-color pr-faint #5f5f66;
+@define-color pr-bg rgba(11, 11, 13, 0.80);
+@define-color pr-hairline rgba(255, 255, 255, 0.06);
+@define-color pr-panel rgba(11, 11, 13, 0.50);
+@define-color pr-pink #ff10f0;
+@define-color pr-pink-soft rgba(255, 16, 240, 0.45);
+@define-color pr-pink-faint rgba(255, 16, 240, 0.14);
+@define-color pr-red #ff5555;
+@define-color pr-red-soft rgba(255, 85, 85, 0.50);
 
 * {
     font-family: "JetBrainsMono Nerd Font", "Cascadia Mono NF", "Noto Sans", "Noto Sans Symbols2", sans-serif;
     font-size: 10px;
-    font-weight: bold;
+    font-weight: normal;
 }
 
 /* ----------------------------------------------------------------------------
- * The rail.
- *
- * The trace is a real animated border-bottom rather than a background band, so
- * its colour can actually cycle — background layers are positioned and cannot
- * interpolate their colour stops. The bloom and the ticks stay background
- * layers, pinned to the bottom edge.
+ * The bar: near-black, flat, with a faint scanline texture underneath.
+ * The stripes are barely there — texture, not decoration. The recipe is
+ * crt-scope's proven one (to bottom, rgba(0, 0, 0, 0) gaps, 1px dark lines
+ * at 0.30), plus a slow downward crawl so the texture reads through
+ * motion as well as contrast. If the scanline layer ever looks wrong on
+ * hardware, deleting the background-image and animation lines leaves the
+ * whole design intact. The bar is slightly transparent (0.80) with sheerer
+ * modules (0.50), so the wallpaper shows through both layers.
  * -------------------------------------------------------------------------- */
 window#waybar {
-    color: @nw;
-
-    /* Pure black. The channel ticks that used to run along the bottom fought
-     * the pulsing wire for attention — two competing rhythms in three pixels of
-     * height. With them gone the wire is the only light down there. */
-    background-color: #000000;
-
-    /* 1. the packet: a comet that runs the trace          */
+    color: @pr-ink;
+    background-color: @pr-bg;
     background-image:
-        linear-gradient(to right,
-            rgba(0, 255, 255, 0) 0%,
-            rgba(255, 16, 240, 0.50) 36%,
-            rgba(255, 255, 255, 0.92) 50%,
-            rgba(255, 16, 240, 0.50) 64%,
-            rgba(0, 255, 255, 0) 100%),
-        /* 2. the wire's light bleeding up out of the black  */
-        linear-gradient(to bottom,
-            rgba(0, 255, 255, 0) 22px,
-            rgba(0, 255, 255, 0.05) 30px,
-            rgba(0, 255, 255, 0.11) 35px,
-            rgba(0, 255, 255, 0) 36px);
-
-    background-size: 180px 3px, 100% 100%;
-    background-position: -180px 33px, 0 0;
-    background-repeat: no-repeat;
-
-    border-bottom: 2px solid rgba(0, 255, 255, 0.55);
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-
-    /* steps(110) over 16s puts twelve hops inside the first 11% (1.76s) of the
-     * cycle; the rest holds one constant position, which queues no repaint. */
-    animation:
-        packet-run 16s steps(110, end) infinite,
-        trace-live 9s steps(6, end) infinite;
+        repeating-linear-gradient(to bottom,
+            rgba(0, 0, 0, 0) 0,
+            rgba(0, 0, 0, 0) 3px,
+            rgba(0, 0, 0, 0.35) 3px,
+            rgba(0, 0, 0, 0.35) 4px);
+    background-repeat: repeat;
+    background-position: 0 0;
+    border-bottom: 1px solid #232327;
+    animation: scan-crawl 4s steps(4, end) infinite,
+        hairline-breath 6s steps(2, end) infinite alternate;
 }
 
-@keyframes packet-run {
-    0%   { background-position: -180px 33px, 0 0; }
-    11%  { background-position: 1540px 33px, 0 0; }
-    100% { background-position: 1540px 33px, 0 0; }
+/* One slow crawl: one full stripe period per loop, so the motion loops
+ * seamlessly. One selector per keyframe — GTK CSS rejects comma lists. */
+@keyframes scan-crawl {
+    from { background-position: 0 0; }
+    to   { background-position: 0 4px; }
 }
 
-/* The wire itself, breathing between the three neon hues. */
-@keyframes trace-live {
-    0%   { border-bottom-color: rgba(0, 255, 255, 0.55); }
-    33%  { border-bottom-color: rgba(255, 16, 240, 0.55); }
-    66%  { border-bottom-color: rgba(57, 255, 20, 0.55); }
-    100% { border-bottom-color: rgba(0, 255, 255, 0.55); }
+/* The hairline breathes pink in two steps — the bar's visible motion,
+ * on border-color, a property this hardware proves it animates. */
+@keyframes hairline-breath {
+    from { border-bottom-color: #232327; }
+    to   { border-bottom-color: rgba(255, 16, 240, 0.30); }
 }
 
 window#waybar > box { background: transparent; }
 
 /* ----------------------------------------------------------------------------
- * Sockets. A dark plate, a lit ring, and a 1px stem dropping from the underside
- * to the trace — sized 1x6 and pinned to the bottom edge so it follows the
- * module whatever its final height turns out to be.
+ * Flat modules. Square corners, hairline borders, no shadow. The bar reads
+ * as one quiet instrument strip, not a row of pills.
  * -------------------------------------------------------------------------- */
 #workspaces,
 #window,
@@ -139,11 +105,10 @@ window#waybar > box { background: transparent; }
 #network,
 #bluetooth,
 #custom-bluetooth,
-#custom-tailscale,
 #battery,
 #backlight,
 #idle_inhibitor,
-#power-profiles-daemon,
+#custom-tailscale,
 #custom-agent,
 #custom-bell,
 #custom-nowplaying,
@@ -154,96 +119,74 @@ window#waybar > box { background: transparent; }
 #disk,
 #tray {
     min-height: 20px;
-    margin: 5px 5px 9px 5px;
-    padding: 2px 8px;
-    color: @nw;
-    background-color: rgba(9, 5, 11, 0.62);
-    background-image:
-        linear-gradient(to bottom,
-            rgba(0, 255, 255, 0) 0,
-            rgba(0, 255, 255, 0) 3px,
-            rgba(0, 255, 255, 0.34) 3px,
-            rgba(0, 255, 255, 0.34) 5px);
-    background-size: 1px 6px;
-    background-position: center bottom;
-    background-repeat: no-repeat;
-    border: 1px solid @nc-1;
-    border-radius: 7px;
-    box-shadow:
-        0 0 9px rgba(0, 255, 255, 0.13),
-        inset 0 1px 0 rgba(255, 255, 255, 0.09);
-    text-shadow: 0 0 5px rgba(255, 255, 255, 0.42);
-    animation: neon-cycle 9s steps(6, end) infinite;
-    transition: background-color 400ms ease-out;
+    margin: 4px 3px;
+    padding: 2px 10px;
+    color: @pr-dim;
+    background-color: @pr-panel;
+    border: 1px solid @pr-hairline;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
+    transition: color 200ms ease-out, border-color 200ms ease-out;
 }
 
-/* Low amplitude on purpose: a full neon-to-neon jump turns every step into a
- * visible strobe, while halving the swing lets the same stepped timing read as
- * a slow shimmer instead. */
-@keyframes neon-cycle {
-    0%   { color: #86e6e6; border-color: @nc-1; }
-    33%  { color: #e878e0; border-color: @np-1; }
-    66%  { color: #86dc86; border-color: @ng-1; }
-    100% { color: #86e6e6; border-color: @nc-1; }
+#clock {
+    color: @pr-ink;
+    font-weight: bold;
 }
 
-/* Signature hues — each socket keeps its own resting colour. */
 #custom-wired-launcher,
-#custom-power,
-#clock,
-#power-profiles-daemon { color: #e878e0; }
+#custom-power {
+    color: @pr-ink;
+    font-size: 12px;
+}
 
-#network,
-#backlight,
-#memory,
-#cpu { color: #86dc86; }
-
-#custom-volume,
-#idle_inhibitor { color: #86e6e6; }
-
-#battery { color: @nw-2; }
-
-#custom-wired-launcher,
-#custom-power { font-size: 12px; }
-
-/* Ports, not pills. */
+/* ----------------------------------------------------------------------------
+ * Workspaces: dim numbers, the focused one is the eye.
+ * -------------------------------------------------------------------------- */
 #workspaces button {
     min-width: 22px;
     margin: 0 2px;
-    padding: 1px 6px;
-    color: @nw-3;
-    background-color: rgba(0, 0, 0, 0);
-    border: 1px solid rgba(0, 0, 0, 0);
-    border-radius: 5px;
-    box-shadow: none;
+    padding: 1px 8px;
+    color: @pr-dim;
+    background-color: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
     text-shadow: none;
 }
 
-#workspaces button.empty { color: @nw-4; }
-
-#workspaces button:hover {
-    color: @ng-2;
-    border-color: @ng-1;
-    box-shadow: 0 0 10px rgba(57, 255, 20, 0.30);
+#workspaces button.empty {
+    color: @pr-faint;
 }
 
 #workspaces button.focused,
 #workspaces button.active {
-    color: @nw;
-    background-color: rgba(255, 16, 240, 0.18);
-    border-color: @ng-2;
-    box-shadow:
-        0 0 11px rgba(255, 16, 240, 0.55),
-        inset 0 0 7px rgba(255, 16, 240, 0.16);
+    color: @pr-pink;
+    font-weight: bold;
+    border-bottom-color: @pr-pink;
+    text-shadow: 0 0 8px rgba(255, 16, 240, 0.65);
+    animation: eye-pulse 4s steps(2, end) infinite alternate;
 }
 
-/* Title stays quiet so the active controls carry the signal. */
+/* One selector per keyframe — GTK CSS rejects comma-separated keyframes.
+ * Color, not glow: the eye's pulse is pink-to-white now, because
+ * box-shadow motion did not show on this hardware. */
+@keyframes eye-pulse {
+    from { color: @pr-pink; }
+    to   { color: #ffffff; }
+}
+
+#workspaces button:hover {
+    color: #ffffff;
+}
+
+#workspaces button.focused:hover {
+    animation-play-state: paused;
+}
+
 #window {
-    color: rgba(255, 255, 255, 0.55);
-    border-color: rgba(255, 255, 255, 0.13);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    text-shadow: none;
-    animation: none;
+    color: @pr-dim;
 }
 
 window#waybar.empty #window {
@@ -251,209 +194,118 @@ window#waybar.empty #window {
     margin: 0;
     padding: 0;
     border: 0;
-    background: transparent;
     box-shadow: none;
-    text-shadow: none;
     opacity: 0;
 }
 
-/* Weather is ambient, not chrome. */
 #custom-weather {
-    margin: 5px 2px 9px 2px;
-    padding: 2px 3px;
-    color: @quiet;
+    color: @pr-dim;
     background: transparent;
     border: none;
     box-shadow: none;
-    text-shadow: 0 0 5px rgba(0, 255, 255, 0.35);
-    animation: none;
-}
-
-#custom-weather:hover {
-    color: @nw;
-    text-shadow: 0 0 8px rgba(0, 255, 255, 0.75);
+    font-size: 8px;
 }
 
 /* ----------------------------------------------------------------------------
- * State semantics.
+ * States, in the four tones. Quiet states go faint. Alive states go white.
+ * The eye turns pink only where it needs to look. Red is danger alone.
  * -------------------------------------------------------------------------- */
-#network.disconnected,
-#battery.critical {
-    color: @nw;
-    background-color: rgba(255, 49, 49, 0.16);
-    border-color: @nr-1;
-    box-shadow: 0 0 12px rgba(255, 49, 49, 0.50);
-    animation: alert-pulse 1.4s steps(6, end) infinite alternate;
+@keyframes eye-alert {
+    from { color: @pr-pink; }
+    to   { color: #ffffff; }
 }
 
-@keyframes alert-pulse {
-    from { box-shadow: 0 0 7px rgba(255, 49, 49, 0.26); }
-    to   { box-shadow: 0 0 20px rgba(255, 49, 49, 0.72); }
+@keyframes presence-alert {
+    from { color: @pr-red; }
+    to   { color: #ffffff; }
 }
 
-#battery.warning { color: #e878e0; border-color: @np-2; animation: none; }
-
-/* Bluetooth: the rune is always the same, a second glyph states the link, colour
- * finishes the sentence. Never a dot — a filled circle is the bell's job. */
+/* Quiet: off, asleep, up to date, idle, muted, no notifications. */
 #bluetooth.off,
-#custom-bluetooth.off {
-    color: @nw-3;
-    border-color: rgba(255, 255, 255, 0.13);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    text-shadow: none;
-    animation: none;
-}
-
-#bluetooth.connected,
-#custom-bluetooth.connected {
-    color: @nc;
-    border-color: @nc-2;
-    background-color: rgba(0, 255, 255, 0.10);
-    box-shadow:
-        0 0 13px rgba(0, 255, 255, 0.38),
-        inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    animation: none;
-}
-
-/* Tailscale: mesh VPN status. Cyan when connected (it's network, like
- * bluetooth), dimmed when down. */
-#custom-tailscale.off {
-    color: @nw-3;
-    border-color: rgba(255, 255, 255, 0.13);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    text-shadow: none;
-    animation: none;
-}
-
-#custom-tailscale.connected {
-    color: @nc;
-    border-color: @nc-2;
-    background-color: rgba(0, 255, 255, 0.10);
-    box-shadow:
-        0 0 13px rgba(0, 255, 255, 0.38),
-        inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    animation: none;
-}
-
-#bluetooth.connecting,
-#custom-bluetooth.connecting {
-    color: #e878e0;
-    border-color: @np-2;
-    animation: agent-pulse 1.2s steps(5, end) infinite alternate;
-}
-
+#custom-bluetooth.off,
+#custom-tailscale.off,
 #custom-update.up-to-date,
-#custom-bell.no-notifs {
-    color: @nw-3;
-    border-color: rgba(255, 255, 255, 0.13);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    text-shadow: none;
-    animation: none;
-}
-
-#custom-update.updates-available {
-    color: #e878e0;
-    border-color: @np-2;
-    animation: alert-pulse 2s steps(6, end) infinite alternate;
-}
-
-#custom-bell.has-notifs {
-    color: @nc;
-    border-color: @nc-2;
-    box-shadow:
-        0 0 13px rgba(0, 255, 255, 0.34),
-        inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    animation: none;
-}
-
-/* Agent state. */
-#custom-agent.agent-asleep {
-    color: @nw-3;
-    border-color: rgba(255, 255, 255, 0.13);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    text-shadow: none;
-    animation: none;
-}
-
-#custom-agent.agent-ready {
-    color: @nc;
-    border-color: @nc-2;
-    box-shadow:
-        0 0 13px rgba(0, 255, 255, 0.34),
-        inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    animation: none;
-}
-
-#custom-agent.agent-working {
-    color: #86dc86;
-    border-color: @ng-2;
-    animation: agent-pulse 2s steps(6, end) infinite alternate;
-}
-
-#custom-agent.agent-listening,
-#custom-agent.agent-blocked {
-    color: #e878e0;
-    border-color: @np-2;
-    animation: agent-pulse 1.2s steps(5, end) infinite alternate;
-}
-
-@keyframes agent-pulse {
-    from { box-shadow: 0 0 8px rgba(255, 255, 255, 0.10); }
-    to   { box-shadow: 0 0 20px currentColor; }
-}
-
+#custom-bell.no-notifs,
+#custom-agent.agent-asleep,
+#custom-nowplaying.idle,
 #custom-volume.muted {
-    color: @nw-3;
-    border-color: rgba(255, 255, 255, 0.18);
-    text-shadow: none;
+    color: @pr-faint;
+    border-color: rgba(255, 255, 255, 0.03);
     animation: none;
 }
 
+/* Alive, but not the eye: connected, ready, playing, working. */
+#bluetooth.connected,
+#custom-bluetooth.connected,
+#custom-tailscale.connected,
+#custom-agent.agent-ready,
+#custom-agent.agent-working,
+#custom-nowplaying.playing,
 #idle_inhibitor.activated {
-    color: #86dc86;
-    border-color: @ng-2;
-    box-shadow: 0 0 12px rgba(57, 255, 20, 0.36);
+    color: @pr-ink;
+    border-color: rgba(255, 255, 255, 0.14);
     animation: none;
-}
-
-#custom-nowplaying.idle {
-    color: @nw-3;
-    border-color: rgba(255, 255, 255, 0.13);
-    text-shadow: none;
-    animation: none;
-}
-
-#custom-nowplaying.playing {
-    color: #e878e0;
-    border-color: @np-2;
-    animation: nowplaying-pulse 2.4s steps(6, end) infinite alternate;
 }
 
 #custom-nowplaying.paused {
-    color: @nc;
-    border-color: @nc-2;
+    color: @pr-dim;
     animation: none;
 }
 
-@keyframes nowplaying-pulse {
-    from { text-shadow: 0 0 5px rgba(255, 16, 240, 0.32); }
-    to   { text-shadow: 0 0 15px rgba(255, 16, 240, 0.80); }
+/* The eye: updates waiting, notifications waiting. */
+#custom-update.updates-available,
+#custom-bell.has-notifs {
+    color: @pr-pink;
+    border-color: @pr-pink-soft;
+    animation: none;
+}
+
+/* The eye, urgent: an agent needs the user right now. */
+#custom-agent.agent-listening,
+#custom-agent.agent-blocked {
+    color: @pr-pink;
+    border-color: @pr-pink-soft;
+    animation: eye-alert 1.2s steps(4, end) infinite alternate;
+}
+
+/* Connecting is a transition, so it gets the eye too, briefly. */
+#bluetooth.connecting,
+#custom-bluetooth.connecting {
+    color: @pr-pink;
+    border-color: @pr-pink-soft;
+    animation: none;
+}
+
+/* Danger alone is red. */
+#network.disconnected,
+#battery.critical {
+    color: @pr-red;
+    border-color: @pr-red-soft;
+    animation: presence-alert 1.2s steps(4, end) infinite alternate;
+}
+
+#battery.warning {
+    color: @pr-ink;
+    border-color: rgba(255, 255, 255, 0.14);
+    animation: none;
 }
 
 #tray { padding-left: 6px; padding-right: 6px; }
-#tray > .passive { opacity: 0.55; }
+#tray > .passive { opacity: 0.50; }
 
 #tray > .needs-attention {
-    background-color: rgba(255, 49, 49, 0.18);
-    border-radius: 5px;
+    background-color: @pr-pink-faint;
+    border-radius: 0;
 }
 
 /* ----------------------------------------------------------------------------
- * Hover. Pointer-gated, so these transitions cost nothing while the mouse is
- * elsewhere — which is what lets the flare linger without a permanent price.
+ * Hover: white, nothing more. No glow, no colour — presence stays quiet
+ * even when touched. The paused play-state covers the breathing and
+ * pulsing exceptions, so hover always wins.
  * -------------------------------------------------------------------------- */
 #workspaces:hover,
 #clock:hover,
+#custom-weather:hover,
 #custom-volume:hover,
 #network:hover,
 #battery:hover,
@@ -467,31 +319,25 @@ window#waybar.empty #window {
 #custom-bell:hover,
 #custom-nowplaying:hover,
 #custom-agent:hover,
+#custom-tailscale:hover,
 #bluetooth:hover,
 #custom-bluetooth:hover {
-    background-color: rgba(39, 5, 35, 0.72);
-    border-color: @ng-2;
-    box-shadow:
-        0 0 18px rgba(255, 16, 240, 0.42),
-        0 0 32px rgba(57, 255, 20, 0.16),
-        inset 0 1px 0 rgba(255, 255, 255, 0.16);
-    transition: background-color 400ms ease-out, box-shadow 900ms ease-out;
-    animation: none;
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.18);
+    animation-play-state: paused;
 }
 
 #custom-power:hover {
-    color: @nr;
-    border-color: @nr-1;
-    box-shadow: 0 0 18px rgba(255, 49, 49, 0.52);
+    color: @pr-red;
+    border-color: @pr-red-soft;
 }
 
 tooltip {
-    color: @nw;
-    background-color: rgba(0, 0, 0, 0.95);
-    background-image: linear-gradient(to bottom, rgba(255, 16, 240, 0.10), rgba(255, 16, 240, 0.02));
-    border: 1px solid @ng-2;
-    border-radius: 7px;
-    box-shadow: 0 0 16px rgba(255, 16, 240, 0.32);
+    color: @pr-ink;
+    background-color: rgba(11, 11, 13, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0;
+    box-shadow: none;
 }
 
-tooltip label { color: @nw; }
+tooltip label { color: @pr-ink; }
