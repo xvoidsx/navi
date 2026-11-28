@@ -1,0 +1,76 @@
+/* ============================================================================
+ * navi-bar vertical fragment — RIGHT
+ * ----------------------------------------------------------------------------
+ * Structural overrides for a right-side (vertical) waybar. Appended AFTER
+ * the active theme in the live style.css by navi-bar (and by navi-theme,
+ * so a theme switch keeps the bar vertical).
+ *
+ * The mirror of vertical-left.css: the edge border and the workspace eye
+ * sit on the inner edge (left, toward the desktop). Everything else is
+ * the same rail — see vertical-left.css for the why.
+ * ========================================================================== */
+
+/* === navi-bar: vertical fragment (right) — begin === */
+
+window#waybar {
+    border-bottom: none;
+    border-left: 1px solid #232327;
+    background-image:
+        repeating-linear-gradient(to right,
+            rgba(0, 0, 0, 0) 0,
+            rgba(0, 0, 0, 0) 3px,
+            rgba(0, 0, 0, 0.35) 3px,
+            rgba(0, 0, 0, 0.35) 4px);
+    animation: scan-crawl 4s steps(4, end) infinite;
+}
+
+/* One selector per keyframe — GTK CSS rejects comma-separated keyframes.
+ * Sideways now: one full stripe period per loop, so the crawl loops. */
+@keyframes scan-crawl {
+    from { background-position: 0 0; }
+    to   { background-position: 4px 0; }
+}
+
+/* Tight rail spacing: the budget on a 768px screen is the whole design. */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#memory,
+#cpu,
+#disk,
+#tray {
+    margin: 2px 4px;
+    padding: 2px 2px;
+    min-height: 0;
+}
+
+/* Workspaces stack; the eye moves from the bottom edge to the inner edge. */
+#workspaces button {
+    margin: 2px 0;
+    padding: 1px 8px;
+    border-bottom: none;
+    border-left: 2px solid transparent;
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    border-bottom-color: transparent;
+    border-left-color: currentColor;
+}
+
+/* === navi-bar: vertical fragment (right) — end === */

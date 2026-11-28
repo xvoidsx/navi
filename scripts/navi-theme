@@ -44,6 +44,11 @@ else
     USER_THEMES="${NAVI_THEMES_USER:-$HOME/.local/share/navi/waybar/themes}"
     SYS_THEMES="${NAVI_THEMES_SYS:-/usr/share/navi/waybar/themes}"
 fi
+# navi-bar's position state and vertical fragments (waybar only): a user
+# fragment shadows the distro one, mirroring how themes resolve.
+BAR_POS_STATE="${NAVI_BAR_STATE:-$HOME/.local/share/navi/waybar/position}"
+USER_POS="${NAVI_BAR_POSITIONS:-$HOME/.local/share/navi/waybar/positions}"
+SYS_POS="${NAVI_BAR_SYS:-/usr/share/navi/waybar}/positions"
 WAYBAR_DIR="$BAR_DIR" # legacy name kept for the die() message below
 CACHE="${NAVI_THEME_CACHE:-$HOME/.cache/navi-theme}"
 STYLE="$BAR_DIR/$THEME_FILE"
@@ -78,11 +83,41 @@ meta_get() { # <dir> <key>
     sed -n "s/^[[:space:]]*$2=//p" "$1/meta" | head -1
 }
 
+# The vertical fragment for the saved bar position (waybar only): prints
+# the fragment path, or nothing when the bar is horizontal / unset.
+position_fragment() {
+    [ "$BAR" = waybar ] || return 0
+    local pos; pos=$(cat "$BAR_POS_STATE" 2>/dev/null | head -1)
+    case "$pos" in left|right) ;; *) return 0 ;; esac
+    local f="vertical-$pos.css"
+    [ -f "$USER_POS/$f" ] && { printf '%s\n' "$USER_POS/$f"; return; }
+    [ -f "$SYS_POS/$f" ] && { printf '%s\n' "$SYS_POS/$f"; return; }
+    return 0
+}
+
+# The live stylesheet for a theme: theme.css plus the vertical fragment
+# when the bar is vertical. navi-bar composes the same way, so a theme
+# switch keeps the bar vertical and a position switch keeps the theme.
+compose_theme() { # <theme-dir> <out>
+    local d="$1" out="$2" frag
+    frag=$(position_fragment)
+    if [ -n "$frag" ]; then
+        cat "$d/$THEME_FILE" "$frag" > "$out"
+    else
+        cp -f "$d/$THEME_FILE" "$out"
+    fi
+}
+
 current_theme() {
-    local n
+    local n d tmp
     for n in $(all_themes); do
-        local d; d=$(theme_dir "$n") || continue
+        d=$(theme_dir "$n") || continue
         cmp -s "$d/$THEME_FILE" "$STYLE" 2>/dev/null && { printf '%s\n' "$n"; return; }
+        # a vertical bar's style.css is the theme plus the fragment
+        tmp="$STYLE.tmp.$$"
+        compose_theme "$d" "$tmp" 2>/dev/null
+        cmp -s "$tmp" "$STYLE" 2>/dev/null && { rm -f "$tmp"; printf '%s\n' "$n"; return; }
+        rm -f "$tmp"
     done
     printf 'custom\n'
 }
@@ -165,13 +200,19 @@ apply_theme() { # <name>
     }
 
     # Capture stderr too: a hard parse failure raises rather than reporting.
+    # Compose first, then validate the composed file — the fragment is part
+    # of what waybar will actually load.
+    _tmp="$STYLE.tmp.$$"
     if [ "$BAR" = polybar ]; then
         if ! out=$(validate_ini "$d/$THEME_FILE" 2>&1); then
             printf '%s\n' "$out" >&2
             die "theme '$name' is invalid — bar left on '$(current_theme)'"
         fi
+        cp -f "$d/$THEME_FILE" "$_tmp"
     else
-        if ! out=$(validate_css "$d/$THEME_FILE" 2>&1); then
+        compose_theme "$d" "$_tmp"
+        if ! out=$(validate_css "$_tmp" 2>&1); then
+            rm -f "$_tmp"
             printf '%s\n' "$out" >&2
             die "theme '$name' is invalid — bar left on '$(current_theme)'"
         fi
@@ -180,8 +221,7 @@ apply_theme() { # <name>
     # Atomic write: cp -f is not atomic, and waybar reading a partially-
     # written style.css gets a truncated file — GTK fails the parse silently
     # and animations never apply. Write temp + rename instead.
-    _tmp="$STYLE.tmp.$$"
-    cp -f "$d/$THEME_FILE" "$_tmp" && mv -f "$_tmp" "$STYLE"
+    mv -f "$_tmp" "$STYLE"
     rm -f "$_tmp"
     reload_bar
 
@@ -218,7 +258,7 @@ shoot() { # <name>
     local settle="${SHOT_SETTLE:-1.8}"
 
     _tmp="$STYLE.tmp.$$"
-    cp -f "$d/$THEME_FILE" "$_tmp" && mv -f "$_tmp" "$STYLE"
+    compose_theme "$d" "$_tmp" && mv -f "$_tmp" "$STYLE"
     rm -f "$_tmp"
     reload_bar
     sleep "$settle"

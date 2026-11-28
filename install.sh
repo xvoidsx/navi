@@ -1299,6 +1299,43 @@ deploy_waybar_themes() {
   ok "waybar themes -> ~/.local/share/navi/waybar/themes"
 }
 
+deploy_waybar_positions() {
+  # deploy_waybar_positions — the vertical rail CSS fragments for navi-bar.
+  # system: /usr/share/navi/waybar/positions/vertical-{left,right}.css
+  # user:   ~/.local/share/navi/waybar/positions/ (wins; same manifest logic
+  # as the themes, so a user fragment is only overwritten if untouched).
+  local src_dir="$WIRED_SHARE/waybar/positions"
+  [ -d "$src_dir" ] || { warn "missing waybar positions in wired/ — skipping"; return 0; }
+  local sys_dir="$SHARE_DIR/waybar/positions"
+  $DOAS mkdir -p "$sys_dir"
+  $DOAS cp -a "$src_dir/." "$sys_dir/"
+  $DOAS chmod -R a+rX "$sys_dir"
+  ok "waybar positions -> $sys_dir"
+
+  local user_dir="$HOME/.local/share/navi/waybar/positions"
+  mkdir -p "$user_dir"
+  local frag
+  for frag in "$src_dir"/*.css; do
+    frag="$(basename "$frag")"
+    local dest="$user_dir/$frag"
+    if [ "$NAVI_UPDATE_MODE" -eq 1 ] && [ -f "$dest" ]; then
+      local baseline live_sha
+      baseline="$(manifest_lookup "$dest")"
+      if [ -n "$baseline" ]; then
+        live_sha="$(sha256sum "$dest" 2>/dev/null | cut -d' ' -f1 || true)"
+        if [ "$live_sha" != "$baseline" ]; then
+          info "kept your modified waybar fragment: $frag"
+          continue
+        fi
+      fi
+    fi
+    backup_if_changed "$src_dir/$frag" "$dest"
+    cp -a "$src_dir/$frag" "$dest"
+    manifest_record "$src_dir/$frag" "waybar/positions/$frag" "$dest" "644"
+  done
+  ok "waybar positions -> ~/.local/share/navi/waybar/positions"
+}
+
 deploy_polybar_themes() {
   # deploy_polybar_themes — the polybar theme store (X11 session).
   # system: /usr/share/navi/polybar/themes/<name>/{config.ini,meta}
@@ -1378,12 +1415,20 @@ deploy_configs() {
   deploy_config "i3/config"                   "$HOME/.config/i3/config"
   deploy_config "waybar/config.jsonc"         "$HOME/.config/waybar/config.jsonc"
   deploy_config "waybar/style.css"            "$HOME/.config/waybar/style.css"
-  # waybar theme store (eiri): five themes, one dir each so a theme can grow
+  # stock bar templates for navi-bar: the horizontal config and the vertical
+  # rail config, kept under /usr/share/navi so the live config can be
+  # regenerated from them (the live file is generated, never the source).
+  deploy_config "waybar/config.jsonc"         "$SHARE_DIR/waybar/config.jsonc"
+  deploy_config "waybar/config-vertical.jsonc" "$SHARE_DIR/waybar/config-vertical.jsonc"
+  # waybar theme store (eiri): fifteen themes, one dir each so a theme can grow
   # its own config.json later. system copy lands under /usr/share/navi (what
   # navi-theme reads as SYS_THEMES); user copy goes to ~/.local/share/navi
-  # (USER_THEMES, wins). style.css IS the patchbay theme, byte-identical —
+  # (USER_THEMES, wins). style.css IS the presence theme, byte-identical —
   # that's the whole default-persistence mechanism (no state file to drift).
   deploy_waybar_themes
+  # vertical fragments for navi-bar (left/right rail CSS), same two-copy
+  # shape as the themes: system under /usr/share/navi, user wins.
+  deploy_waybar_positions
   deploy_config "rofi/navi-theme.rasi"       "$HOME/.config/rofi/navi-theme.rasi"
   deploy_waybar_service
   deploy_config "polybar/config.ini"          "$HOME/.config/polybar/config.ini"
@@ -1486,6 +1531,15 @@ deploy_configs() {
       warn "waybar is running but the reload signal failed — restart it or re-login"
     fi
   fi
+
+  # a saved bar position survives the deploy: the stock templates above are
+  # fresh, so regenerate the live config/style from them. navi-bar apply is
+  # best-effort (never fails the deploy, never touches a hand-customized
+  # config) and runs from the repo copy — /usr/bin/navi-bar is installed
+  # later, in install_commands.
+  if [ -x "$REPO_DIR/scripts/navi-bar" ]; then
+    "$REPO_DIR/scripts/navi-bar" apply 2>/dev/null || true
+  fi
 }
 
 verify_wallpaper_wiring() {
@@ -1531,7 +1585,7 @@ install_commands() {
 
   # distro-level tools live in scripts/ (repo root), outside the /wired
   # desktop layer — same /usr/bin destination, same rofi visibility.
-  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore" "navi-wired-adopt.sh:navi-wired-adopt" "navi-extras.sh:navi-extras" "navi-theme:navi-theme" "navi-terminal:navi-terminal" "navi-bt-agent:navi-bt-agent"; do
+  for pair in "navi-update.sh:navi-update" "navi-wired-restore.sh:navi-wired-restore" "navi-wired-adopt.sh:navi-wired-adopt" "navi-extras.sh:navi-extras" "navi-theme:navi-theme" "navi-bar:navi-bar" "navi-terminal:navi-terminal" "navi-bt-agent:navi-bt-agent"; do
     local src="$REPO_DIR/scripts/${pair%%:*}" name="${pair##*:}"
     if [ -e "$src" ]; then
       $DOAS install -m 0755 "$src" "/usr/bin/$name"

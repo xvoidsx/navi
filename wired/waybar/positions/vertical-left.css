@@ -1,0 +1,91 @@
+/* ============================================================================
+ * navi-bar vertical fragment — LEFT
+ * ----------------------------------------------------------------------------
+ * Structural overrides for a left-side (vertical) waybar. Appended AFTER
+ * the active theme in the live style.css by navi-bar (and by navi-theme,
+ * so a theme switch keeps the bar vertical).
+ *
+ * Theme-agnostic on purpose: no theme colours here. The workspace eye
+ * follows currentColor, so whatever the theme paints the focused
+ * workspace becomes the side indicator — and it pulses with the theme's
+ * own eye-pulse, because currentColor tracks the animated color.
+ *
+ * What changes, and why:
+ * - the bar's edge border moves from the bottom to the inner edge (right,
+ *   toward the desktop), and the scanline texture rotates to vertical
+ *   stripes crawling sideways.
+ * - modules get tight rail padding. The budget on a 768px-tall screen is
+ *   the whole design: 13 status modules + 10 workspaces + clock + launcher
+ *   only fit if every module is as short as its text allows.
+ * - workspace buttons stack; the focused underline becomes a side bar.
+ * - the breathing hairline is a horizontal-bar motion (it animates
+ *   border-bottom-color, which no longer exists here). In vertical the bar
+ *   keeps a static hairline and the scanline crawl carries the motion.
+ *   Per-theme vertical tuning (a breathing side hairline in the theme's
+ *   own accent) is a later step, not this fragment.
+ * ========================================================================== */
+
+/* === navi-bar: vertical fragment (left) — begin === */
+
+window#waybar {
+    border-bottom: none;
+    border-right: 1px solid #232327;
+    background-image:
+        repeating-linear-gradient(to right,
+            rgba(0, 0, 0, 0) 0,
+            rgba(0, 0, 0, 0) 3px,
+            rgba(0, 0, 0, 0.35) 3px,
+            rgba(0, 0, 0, 0.35) 4px);
+    animation: scan-crawl 4s steps(4, end) infinite;
+}
+
+/* One selector per keyframe — GTK CSS rejects comma-separated keyframes.
+ * Sideways now: one full stripe period per loop, so the crawl loops. */
+@keyframes scan-crawl {
+    from { background-position: 0 0; }
+    to   { background-position: 4px 0; }
+}
+
+/* Tight rail spacing: the budget on a 768px screen is the whole design. */
+#workspaces,
+#window,
+#clock,
+#custom-weather,
+#custom-update,
+#custom-volume,
+#network,
+#bluetooth,
+#custom-bluetooth,
+#battery,
+#backlight,
+#idle_inhibitor,
+#custom-tailscale,
+#custom-agent,
+#custom-bell,
+#custom-nowplaying,
+#custom-wired-launcher,
+#custom-power,
+#memory,
+#cpu,
+#disk,
+#tray {
+    margin: 2px 4px;
+    padding: 2px 2px;
+    min-height: 0;
+}
+
+/* Workspaces stack; the eye moves from the bottom edge to the inner edge. */
+#workspaces button {
+    margin: 2px 0;
+    padding: 1px 8px;
+    border-bottom: none;
+    border-right: 2px solid transparent;
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+    border-bottom-color: transparent;
+    border-right-color: currentColor;
+}
+
+/* === navi-bar: vertical fragment (left) — end === */
