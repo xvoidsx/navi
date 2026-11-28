@@ -22,15 +22,19 @@ emit() { # <text> <tooltip> <class>
     "$(json_escape "$(stack_text "$1")")" "$(json_escape "$2")" "$(json_escape "$3")"
 }
 
-# stack_text <"icon value"> — on a vertical bar, "value\nicon" (text over
-# symbol, top-to-bottom like the clock); horizontal passes through.
+# stack_text <"icon value"> — value first, always: "value\nicon" on a
+# vertical bar (text over symbol, top-to-bottom like the clock), "value
+# icon" on a horizontal bar. Single glyphs pass through unchanged.
 # The bar position is navi-bar's state file; a missing file means top.
 stack_text() {
-  local pos
+  local pos icon rest
   pos=$(cat "${NAVI_BAR_STATE:-$HOME/.local/share/navi/waybar/position}" 2>/dev/null | head -1)
-  case "$pos" in left|right) ;; *) printf '%s' "$1"; return ;; esac
-  local icon="${1%% *}" rest="${1#* }"
-  if [ "$rest" = "$1" ]; then printf '%s' "$1"; else printf '%s\n%s' "$rest" "$icon"; fi
+  icon="${1%% *}"; rest="${1#* }"
+  if [ "$rest" = "$1" ]; then printf '%s' "$1"; return; fi
+  case "$pos" in
+    left|right) printf '%s\n%s' "$rest" "$icon" ;;
+    *) printf '%s %s' "$rest" "$icon" ;;
+  esac
 }
 
 mkdir -p "$CACHE_DIR"

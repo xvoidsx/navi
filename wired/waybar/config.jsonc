@@ -149,9 +149,9 @@
     // - - - XXX testing section XXX - - -
     // this is a 'testing' network module. if it doesn't work out right, we'll remove it
     "network": {
-            "format-wifi": "📶 {signalStrength}%",
-            "format-ethernet": "🌐 {ifname}",
-            "format-disconnected": "⚠ Disconnected",
+            "format-wifi": "{signalStrength}% 📶",
+            "format-ethernet": "{ifname} 🌐",
+            "format-disconnected": "Disconnected ⚠",
             "tooltip-format": "Wireless status -  {ifname}: {ipaddr}/{cidr}",
 	    "tooltip-format-wifi": "{essid}",
             "on-click": "/usr/share/navi/wired/waybar/mod-open.sh \"navi-networking\" navi-networking",
@@ -184,7 +184,7 @@
             "warning": 30,
             "critical": 15
         },
-        "format": "{icon} {capacity}%",
+        "format": "{capacity}% {icon}",
         "format-icons": [
             "",
             "",

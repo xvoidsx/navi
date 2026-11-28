@@ -83,14 +83,14 @@ def bar_vertical():
 
 
 def stack(icon, value):
-    """Text over symbol on a vertical bar; 'icon value' on a horizontal one."""
-    return value + "\n" + icon if bar_vertical() else icon + " " + value
+    """Value first, always: 'value\nicon' on a vertical bar, 'value icon' on a horizontal one."""
+    return value + "\n" + icon if bar_vertical() else value + " " + icon
 
 
 def render(st):
     if st is None:
         return json.dumps({
-            "text": "off\n🔇" if bar_vertical() else "🔇 no audio",
+            "text": "off\n🔇" if bar_vertical() else "no audio 🔇",
             "class": "error",
             "tooltip": "audio daemon unreachable — is PulseAudio running?",
         })

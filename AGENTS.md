@@ -495,10 +495,21 @@ clockwise** — the first build read bottom-to-top and was flipped to 270
 (2026-11-28) because it reads top-to-bottom with no head tilt. The
 scripts (weather, update, volume) stack themselves by reading
 navi-bar's state file (`~/.local/share/navi/waybar/position`) — left/
-right emits "value\nicon", top/bottom passes "icon value" through
-unchanged; the built-ins (network, battery, backlight) stack in the
-vertical config's format strings. navi-bar's generator no longer swaps
+right emits "value\nicon", top/bottom emits "value icon". **Value
+first, always, in every position** (2026-11-28): the horizontal bar
+is value-first inline ("74% 🔊", "46°F 🌤") and the rail is value-first
+stacked; the built-ins (network, battery, backlight) are value-first in
+both configs' format strings. navi-bar's generator no longer swaps
 any rotate (left and right share one template; only margins differ).
+**Every theme turns sideways:** all 15 themes (afterglow, crt-scope,
+ghost, glass, hollow, jack-panel, matrix, monolith, neon-tube,
+nightshade, patchbay, presence, refined-obsidian, voids, wired) compose
+with the vertical fragment — same 10px base, no per-module padding
+conflicts (sim section 10 checks all of them). Caveat: in vertical the
+bar's background animation becomes the fragment's generic scan-crawl,
+so a theme loses its signature motion (wired's glitch, matrix's rain,
+nightshade's aurora) until per-theme vertical tuning lands; the
+fragment's 1px inner border is a hardcoded dark grey.
 
 - **The live config is GENERATED, never the source.** `navi-bar` builds
   `~/.config/waybar/config.jsonc` from the stock templates in
